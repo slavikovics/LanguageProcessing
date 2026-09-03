@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ips-db"
+version = "0.1.0"
+description = "Shared SQLAlchemy schema for the IR lab platform — the only place the table layout is defined, imported by api and crawler-service alike."
+requires-python = ">=3.11"
+dependencies = [
+    "sqlalchemy>=2.0,<2.1",
+    "asyncpg>=0.29,<0.31",
+]
+
+[tool.setuptools.packages.find]
+include = ["ips_db*"]

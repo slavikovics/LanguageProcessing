@@ -1,0 +1,102 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ips_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ips_password}
+      POSTGRES_DB: ${POSTGRES_DB:-ips}
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ips_user} -d ${POSTGRES_DB:-ips}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  adminer:
+    image: adminer:4
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+
+  nlp-service:
+    build:
+      context: .
+      dockerfile: services/nlp-service/Dockerfile
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: "1"
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./packages/nlp_core:/app/packages/nlp_core
+
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://ips_user:ips_password@postgres:5432/ips}
+      NLP_SERVICE_URL: ${NLP_SERVICE_URL:-http://nlp-service:8001}
+      PYTHONUNBUFFERED: "1"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nlp-service:
+        condition: service_started
+    volumes:
+      - ./packages/ips_db:/app/packages/ips_db
+    healthcheck:
+      # api's entrypoint runs `alembic upgrade head` before uvicorn starts, so
+      # "healthy" also means migrations are applied — crawler-service depends
+      # on that, not just on postgres, to avoid racing the schema.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  crawler-service:
+    build:
+      context: .
+      dockerfile: services/crawler-service/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://ips_user:ips_password@postgres:5432/ips}
+      CRAWLER_USER_AGENT: ${CRAWLER_USER_AGENT:-IPSLabBot/0.1 (+educational project)}
+      CRAWLER_POLITENESS_DELAY_SECONDS: ${CRAWLER_POLITENESS_DELAY_SECONDS:-1.0}
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    volumes:
+      - ./packages/nlp_core:/app/packages/nlp_core
+      - ./packages/ips_db:/app/packages/ips_db
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+
+volumes:
+  postgres_data:
+  frontend_node_modules:

@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nlp-core"
+version = "0.1.0"
+description = "Reusable NLP primitives shared across the IR labs (tokenization, TF-IDF weighting, cosine similarity, IR quality metrics)."
+requires-python = ">=3.11"
+dependencies = [
+    "beautifulsoup4>=4.12,<5",
+]
+
+[project.optional-dependencies]
+# Only the tokenize/lemmatize/split_sentences path needs spaCy — clean_html()
+# and char_ngrams() do not. Consumers that only need HTML cleanup (e.g.
+# crawler-service) can skip this heavy extra; nlp-service installs it.
+spacy = [
+    "spacy>=3.7,<3.8",
+]
+dev = [
+    "pytest>=8,<9",
+]
+
+[tool.setuptools.packages.find]
+include = ["nlp_core*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

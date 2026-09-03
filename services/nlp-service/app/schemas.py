@@ -1,0 +1,59 @@
+from pydantic import BaseModel, ConfigDict
+
+
+class TokenizeRequest(BaseModel):
+    text: str
+    keep_stopwords: bool = False
+
+
+class TokenOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)  # nlp_core.tokenization.Token is a dataclass
+
+    text: str
+    lemma: str
+    pos: str
+    is_stop: bool
+
+
+class TokenizeResponse(BaseModel):
+    tokens: list[TokenOut]
+
+
+class LemmatizeRequest(BaseModel):
+    text: str
+
+
+class LemmatizeResponse(BaseModel):
+    lemmas: list[str]
+
+
+class IdfRequest(BaseModel):
+    document_term_lists: list[list[str]]
+
+
+class IdfResponse(BaseModel):
+    total_documents: int
+    document_frequency: dict[str, int]
+    idf: dict[str, float]
+
+
+class DocumentVectorRequest(BaseModel):
+    term_frequencies: dict[str, int]
+    idf: dict[str, float]
+
+
+class VectorResponse(BaseModel):
+    vector: dict[str, float]
+
+
+class QueryVectorRequest(BaseModel):
+    terms: list[str]
+
+
+class SimilarityRequest(BaseModel):
+    a: dict[str, float]
+    b: dict[str, float]
+
+
+class SimilarityResponse(BaseModel):
+    score: float

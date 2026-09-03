@@ -1,0 +1,60 @@
+"""Pure validation/business rules for crawl jobs — no I/O, no framework
+dependency, so it is unit-testable without a database or an HTTP client.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from urllib.parse import urlparse
+
+MAX_SEED_URLS = 25
+MAX_DOCUMENTS_LIMIT = 2000
+MAX_DEPTH_LIMIT = 5
+
+
+class InvalidCrawlJobConfig(ValueError):
+    pass
+
+
+@dataclass(frozen=True)
+class CrawlJobConfig:
+    collection_id: int
+    seed_urls: tuple[str, ...]
+    max_documents: int
+    max_depth: int
+
+
+def validate_seed_url(url: str) -> str:
+    parsed = urlparse(url.strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise InvalidCrawlJobConfig(f"'{url}' is not a valid http(s) URL")
+    return url.strip()
+
+
+def build_crawl_job_config(
+    *,
+    collection_id: int,
+    seed_urls: list[str],
+    max_documents: int,
+    max_depth: int,
+) -> CrawlJobConfig:
+    if not seed_urls:
+        raise InvalidCrawlJobConfig("at least one seed URL is required")
+    if len(seed_urls) > MAX_SEED_URLS:
+        raise InvalidCrawlJobConfig(f"at most {MAX_SEED_URLS} seed URLs are allowed")
+
+    normalized = tuple(dict.fromkeys(validate_seed_url(url) for url in seed_urls))
+
+    if not (1 <= max_documents <= MAX_DOCUMENTS_LIMIT):
+        raise InvalidCrawlJobConfig(
+            f"max_documents must be between 1 and {MAX_DOCUMENTS_LIMIT}"
+        )
+    if not (0 <= max_depth <= MAX_DEPTH_LIMIT):
+        raise InvalidCrawlJobConfig(f"max_depth must be between 0 and {MAX_DEPTH_LIMIT}")
+
+    return CrawlJobConfig(
+        collection_id=collection_id,
+        seed_urls=normalized,
+        max_documents=max_documents,
+        max_depth=max_depth,
+    )
