@@ -1,38 +1,37 @@
-import { useEffect, useState } from "react";
-import { createCollection, createCrawlJob, listCollections, listCrawlJobs } from "../api/client";
+import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import {
+  createCrawlSeed,
+  deleteCrawlSeed,
+  listCrawlSeeds,
+  runCollectionCrawl,
+  updateCrawlSeed,
+} from "../api/client";
 import { ProgressBar } from "../components/ProgressBar";
 import { useCrawlJobProgress } from "../hooks/useCrawlJobProgress";
-import type { Collection, CrawlJob } from "../api/types";
+import type { CrawlJob, CrawlSeed } from "../api/types";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
+import { useCollectionContext } from "@/context/CollectionContext";
 import { cn } from "@/lib/utils";
-import { Plus, X } from "lucide-react";
+import {
+  Check,
+  FileStack,
+  Layers,
+  Link2,
+  Lock,
+  Pencil,
+  Play,
+  Plus,
+  Waypoints,
+  X,
+} from "lucide-react";
 
 const STATUS_LABELS: Record<CrawlJob["status"], string> = {
   pending: "в очереди",
@@ -42,363 +41,426 @@ const STATUS_LABELS: Record<CrawlJob["status"], string> = {
   cancelled: "отменён",
 };
 
+const STATUS_BADGE_CLASS: Record<CrawlJob["status"], string> = {
+  pending: "border-primary/40 text-primary",
+  running: "border-primary/40 text-primary",
+  completed: "border-emerald-600/40 text-emerald-600 dark:border-emerald-400/40 dark:text-emerald-400",
+  failed: "border-destructive/40 text-destructive",
+  cancelled: "border-destructive/40 text-destructive",
+};
+
 const URL_STATUS_COLOR: Record<string, string> = {
   success: "text-emerald-600 dark:text-emerald-400",
   failed: "text-destructive",
   skipped: "text-destructive",
 };
 
-type CollectionMode = "existing" | "new";
+const DEFAULT_MAX_DOCUMENTS = 20;
+const DEFAULT_MAX_DEPTH = 1;
+
+function CrawlJobProgressCard({ jobId }: { jobId: number }) {
+  const { refreshCollections } = useCollectionContext();
+  const { progress, connection } = useCrawlJobProgress(jobId);
+
+  // The document count shown in the header switcher is fetched once on
+  // load; without this the "Индексировать" button on Collections stays
+  // disabled (0 documents) until a manual page reload.
+  useEffect(() => {
+    if (progress?.job.status === "completed") {
+      void refreshCollections();
+    }
+  }, [progress?.job.status, refreshCollections]);
+
+  if (!progress) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <span>Задача #{progress.job.id}</span>
+          <Badge variant="outline" className={STATUS_BADGE_CLASS[progress.job.status]}>
+            {STATUS_LABELS[progress.job.status]}
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <span className="max-w-full truncate text-xs text-muted-foreground" title={progress.job.seed_urls[0]}>
+            {progress.job.seed_urls[0]}
+          </span>
+          {connection !== "idle" && (
+            <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+              <span
+                className={cn(
+                  "size-1.5 rounded-full",
+                  connection === "websocket" ? "bg-emerald-500" : "bg-amber-500",
+                )}
+              />
+              {connection === "websocket" ? "live" : "опрос"}
+            </span>
+          )}
+        </div>
+
+        <ProgressBar value={progress.job.documents_fetched} max={progress.job.max_documents} />
+
+        <p className="text-xs text-muted-foreground">
+          Посещено: {progress.job.urls_visited} · В очереди: {progress.job.urls_queued} · Ошибок:{" "}
+          {progress.job.urls_failed}
+        </p>
+
+        {progress.job.error_message && (
+          <p className="text-sm text-destructive">{progress.job.error_message}</p>
+        )}
+
+        {progress.job.status === "completed" && (
+          <div className="flex items-center gap-2 rounded-md border border-emerald-600/30 bg-emerald-600/5 px-3 py-2 text-sm dark:border-emerald-400/30">
+            <span>Готово: {progress.job.documents_fetched} документов сохранено.</span>
+            <Button asChild size="sm" variant="secondary" className="ml-auto shrink-0">
+              <Link to="/collections">К индексации</Link>
+            </Button>
+          </div>
+        )}
+
+        <div>
+          <h3 className="mb-2 text-xs font-medium text-muted-foreground">Последние обработанные URL</h3>
+          <ScrollArea className="h-56 rounded-md border">
+            <ul className="flex flex-col gap-0.5 p-2">
+              {progress.recent_urls.map((u) => (
+                <li
+                  key={u.id}
+                  className="flex items-baseline gap-2 rounded px-2 py-1 text-xs transition-colors duration-150 hover:bg-muted"
+                >
+                  <span className={cn("shrink-0 font-semibold uppercase", URL_STATUS_COLOR[u.status])}>
+                    {u.status}
+                  </span>
+                  <span className="shrink-0 text-muted-foreground">d{u.depth}</span>
+                  <span className="min-w-0 flex-1 truncate" title={u.url}>
+                    {u.url}
+                  </span>
+                  {u.error && (
+                    <span className="max-w-[35%] shrink-0 truncate text-destructive" title={u.error}>
+                      {u.error}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </ScrollArea>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export function CrawlPage() {
-  const [collections, setCollections] = useState<Collection[]>([]);
-  const [collectionMode, setCollectionMode] = useState<CollectionMode>("existing");
-  const [collectionId, setCollectionId] = useState<number | null>(null);
-  const [newCollectionName, setNewCollectionName] = useState("");
+  const { selected, selectedId } = useCollectionContext();
 
-  const [seedUrls, setSeedUrls] = useState<string[]>([]);
+  const [seeds, setSeeds] = useState<CrawlSeed[]>([]);
+  const [seedsLoading, setSeedsLoading] = useState(false);
+
   const [urlDraft, setUrlDraft] = useState("");
-  const [maxDocuments, setMaxDocuments] = useState(20);
-  const [maxDepth, setMaxDepth] = useState(1);
-
-  const [submitting, setSubmitting] = useState(false);
+  const [maxDocuments, setMaxDocuments] = useState(DEFAULT_MAX_DOCUMENTS);
+  const [maxDepth, setMaxDepth] = useState(DEFAULT_MAX_DEPTH);
+  const [sameDomainOnly, setSameDomainOnly] = useState(false);
+  const [editingSeedId, setEditingSeedId] = useState<number | null>(null);
+  const [savingSeed, setSavingSeed] = useState(false);
+  const [deletingSeedId, setDeletingSeedId] = useState<number | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const [jobs, setJobs] = useState<CrawlJob[]>([]);
-  const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
-  const { progress, connection } = useCrawlJobProgress(selectedJobId);
+  const [running, setRunning] = useState(false);
+  const [runError, setRunError] = useState<string | null>(null);
+  const [jobIds, setJobIds] = useState<number[]>([]);
 
-  useEffect(() => {
-    void refreshCollections();
-    void refreshJobs();
-  }, []);
-
-  async function refreshCollections() {
-    try {
-      setCollections(await listCollections());
-    } catch (err) {
-      console.error(err);
-    }
-  }
-
-  async function refreshJobs() {
-    try {
-      setJobs(await listCrawlJobs());
-    } catch (err) {
-      console.error(err);
-    }
-  }
-
-  function addSeedUrl() {
-    const trimmed = urlDraft.trim();
-    if (!trimmed) return;
-    setSeedUrls((urls) => [...urls, trimmed]);
-    setUrlDraft("");
-  }
-
-  function removeSeedUrl(index: number) {
-    setSeedUrls((urls) => urls.filter((_, i) => i !== index));
-  }
-
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    setFormError(null);
-
-    const trimmedUrls = seedUrls.map((url) => url.trim()).filter(Boolean);
-    if (trimmedUrls.length === 0) {
-      setFormError("Укажите хотя бы один начальный URL.");
+  const refreshSeeds = useCallback(async () => {
+    if (selectedId === null) {
+      setSeeds([]);
       return;
     }
-
-    setSubmitting(true);
+    setSeedsLoading(true);
     try {
-      let targetCollectionId: number;
-      if (collectionMode === "new") {
-        if (!newCollectionName.trim()) {
-          setFormError("Введите название новой коллекции.");
-          setSubmitting(false);
-          return;
-        }
-        const created = await createCollection({ name: newCollectionName.trim(), language: "en" });
-        targetCollectionId = created.id;
-        await refreshCollections();
-      } else {
-        if (collectionId === null) {
-          setFormError("Выберите коллекцию.");
-          setSubmitting(false);
-          return;
-        }
-        targetCollectionId = collectionId;
-      }
-
-      const job = await createCrawlJob({
-        collection_id: targetCollectionId,
-        seed_urls: trimmedUrls,
-        max_documents: maxDocuments,
-        max_depth: maxDepth,
-      });
-      await refreshJobs();
-      setSelectedJobId(job.id);
+      setSeeds(await listCrawlSeeds(selectedId));
     } catch (err) {
       setFormError(err instanceof Error ? err.message : String(err));
     } finally {
-      setSubmitting(false);
+      setSeedsLoading(false);
+    }
+  }, [selectedId]);
+
+  useEffect(() => {
+    void refreshSeeds();
+    setJobIds([]);
+    setRunError(null);
+    resetForm();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
+
+  function resetForm() {
+    setUrlDraft("");
+    setMaxDocuments(DEFAULT_MAX_DOCUMENTS);
+    setMaxDepth(DEFAULT_MAX_DEPTH);
+    setSameDomainOnly(false);
+    setEditingSeedId(null);
+    setFormError(null);
+  }
+
+  function startEdit(seed: CrawlSeed) {
+    setEditingSeedId(seed.id);
+    setUrlDraft(seed.url);
+    setMaxDocuments(seed.max_documents);
+    setMaxDepth(seed.max_depth);
+    setSameDomainOnly(seed.same_domain_only);
+    setFormError(null);
+  }
+
+  async function submitSeedForm() {
+    if (selectedId === null) return;
+    const trimmed = urlDraft.trim();
+    if (!trimmed) return;
+    setSavingSeed(true);
+    setFormError(null);
+    try {
+      const input = {
+        url: trimmed,
+        max_documents: maxDocuments,
+        max_depth: maxDepth,
+        same_domain_only: sameDomainOnly,
+      };
+      if (editingSeedId !== null) {
+        await updateCrawlSeed(editingSeedId, input);
+      } else {
+        await createCrawlSeed(selectedId, input);
+      }
+      await refreshSeeds();
+      resetForm();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSavingSeed(false);
+    }
+  }
+
+  async function removeSeed(seed: CrawlSeed) {
+    setDeletingSeedId(seed.id);
+    try {
+      await deleteCrawlSeed(seed.id);
+      if (editingSeedId === seed.id) resetForm();
+      await refreshSeeds();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDeletingSeedId(null);
+    }
+  }
+
+  async function handleRunCrawl() {
+    if (selectedId === null) return;
+    if (seeds.length === 0) {
+      setRunError("Добавьте хотя бы один адрес, чтобы начать обход.");
+      return;
+    }
+    if (
+      selected &&
+      selected.document_count > 0 &&
+      !window.confirm(
+        `Коллекция «${selected.name}» уже содержит ${selected.document_count} документов. Запуск краулинга удалит их вместе с построенным индексом и начнёт сбор заново. Продолжить?`,
+      )
+    ) {
+      return;
+    }
+    setRunning(true);
+    setRunError(null);
+    try {
+      const jobs = await runCollectionCrawl(selectedId);
+      setJobIds(jobs.map((job) => job.id));
+    } catch (err) {
+      setRunError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRunning(false);
     }
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Запуск краулинга</CardTitle>
-          <CardDescription>
-            Краулер обходит страницы вширь (BFS), начиная с указанных адресов, и сохраняет
-            найденные документы в выбранную коллекцию — с учётом robots.txt и лимитов ниже.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="flex max-w-xl flex-col gap-5">
-            <div className="grid gap-1.5">
-              <Label>Коллекция</Label>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={collectionMode === "existing" ? "default" : "outline"}
-                  onClick={() => setCollectionMode("existing")}
-                >
-                  Существующая
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={collectionMode === "new" ? "default" : "outline"}
-                  onClick={() => setCollectionMode("new")}
-                >
-                  Новая
-                </Button>
-              </div>
+      <div className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+        <Waypoints className="size-5 text-muted-foreground" />
+        Запуск краулинга
+      </div>
 
-              {collectionMode === "existing" ? (
-                <Select
-                  value={collectionId === null ? undefined : String(collectionId)}
-                  onValueChange={(v) => setCollectionId(Number(v))}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="— выберите коллекцию —" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {collections.map((c) => (
-                      <SelectItem key={c.id} value={String(c.id)}>
-                        {c.name} ({c.language})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Input
-                  type="text"
-                  value={newCollectionName}
-                  onChange={(e) => setNewCollectionName(e.target.value)}
-                  placeholder="например, tech-news-en"
-                />
-              )}
-              <p className="text-xs text-muted-foreground">
-                Коллекция — это группа документов, в которую попадут скачанные страницы.
-              </p>
-            </div>
-
-            <div className="grid gap-1.5">
-              <Label>Начальные адреса (URL)</Label>
-              <div className="flex gap-2">
-                <Input
-                  type="url"
-                  value={urlDraft}
-                  onChange={(e) => setUrlDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addSeedUrl();
-                    }
-                  }}
-                  placeholder="https://example.com/"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={addSeedUrl}
-                  aria-label="Добавить URL"
-                >
-                  <Plus className="size-4" />
-                </Button>
-              </div>
-
-              {seedUrls.length > 0 && (
-                <ul className="flex flex-col gap-1 rounded-md border p-1">
-                  {seedUrls.map((url, index) => (
-                    <li
-                      key={index}
-                      className="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted"
-                    >
-                      <span className="flex-1 truncate">{url}</span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeSeedUrl(index)}
-                        aria-label="Удалить URL"
-                      >
-                        <X className="size-4" />
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Краулер начнёт обход с этих страниц (глубина 0).
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-1.5">
-                <Label>Макс. документов</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={2000}
-                  value={maxDocuments}
-                  onChange={(e) => setMaxDocuments(Number(e.target.value))}
-                />
-                <p className="text-xs text-muted-foreground">Остановка после N документов</p>
-              </div>
-
-              <div className="grid gap-1.5">
-                <Label>Глубина обхода</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={5}
-                  value={maxDepth}
-                  onChange={(e) => setMaxDepth(Number(e.target.value))}
-                />
-                <p className="text-xs text-muted-foreground">0 — только начальные страницы</p>
-              </div>
-            </div>
-
-            {formError && <p className="text-sm text-destructive">{formError}</p>}
-
-            <Button type="submit" disabled={submitting} className="w-fit">
-              {submitting ? "Запуск…" : "Запустить краулинг"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Прогресс</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          {selectedJobId === null && (
-            <p className="text-sm text-muted-foreground">
-              Выберите задачу ниже или запустите новый краулинг.
-            </p>
-          )}
-          {progress && (
-            <div className="flex flex-col gap-3">
-              <p className="flex flex-wrap items-center gap-2 text-sm">
-                Задача #{progress.job.id} — статус:{" "}
-                <strong>{STATUS_LABELS[progress.job.status]}</strong>
-                {connection !== "idle" && (
-                  <Badge variant="outline">
-                    {connection === "websocket" ? "● live" : "● polling"}
-                  </Badge>
-                )}
-              </p>
-              <ProgressBar
-                value={progress.job.documents_fetched}
-                max={progress.job.max_documents}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="flex min-w-[16rem] flex-1 flex-col gap-1.5">
+            <Label className="flex items-center gap-1.5">
+              <Link2 className="size-4 text-muted-foreground" />
+              Адрес (URL)
+            </Label>
+            <div className="flex gap-1.5">
+              <Input
+                type="url"
+                value={urlDraft}
+                onChange={(e) => setUrlDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void submitSeedForm();
+                  }
+                  if (e.key === "Escape" && editingSeedId !== null) {
+                    resetForm();
+                  }
+                }}
+                placeholder="https://example.com/"
               />
-              <div className="flex gap-2">
-                <Badge variant="secondary">В очереди: {progress.job.urls_queued}</Badge>
-                <Badge variant="secondary">Посещено: {progress.job.urls_visited}</Badge>
-                <Badge variant="secondary">Ошибок: {progress.job.urls_failed}</Badge>
-              </div>
-              {progress.job.error_message && (
-                <p className="text-sm text-destructive">{progress.job.error_message}</p>
-              )}
-              <h3 className="text-sm font-medium">Последние обработанные URL</h3>
-              <ScrollArea className="h-64 rounded-md border">
-                <ul className="flex flex-col gap-1 p-2">
-                  {progress.recent_urls.map((u) => (
-                    <li
-                      key={u.id}
-                      className="flex items-baseline gap-2 rounded px-2 py-1 text-sm hover:bg-muted"
-                    >
-                      <span
-                        className={cn(
-                          "text-xs font-semibold uppercase",
-                          URL_STATUS_COLOR[u.status],
-                        )}
-                      >
-                        {u.status}
-                      </span>
-                      <span className="text-muted-foreground">d{u.depth}</span>
-                      <span className="flex-1 truncate">{u.url}</span>
-                      {u.error && (
-                        <span className="text-xs text-destructive">{u.error}</span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </ScrollArea>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Последние задачи</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>#</TableHead>
-                <TableHead>Статус</TableHead>
-                <TableHead>Прогресс</TableHead>
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {jobs.map((job) => (
-                <TableRow
-                  key={job.id}
-                  className={cn(job.id === selectedJobId && "bg-muted")}
+              {editingSeedId !== null && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={resetForm}
+                  aria-label="Отменить редактирование"
+                  className="shrink-0 text-muted-foreground"
                 >
-                  <TableCell>{job.id}</TableCell>
-                  <TableCell>{STATUS_LABELS[job.status]}</TableCell>
-                  <TableCell>
-                    {job.documents_fetched} / {job.max_documents}
-                  </TableCell>
-                  <TableCell>
+                  <X className="size-4" />
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex w-32 flex-col gap-1.5">
+            <Label className="flex items-center gap-1.5">
+              <FileStack className="size-4 text-muted-foreground" />
+              Документов
+            </Label>
+            <Input
+              type="number"
+              min={1}
+              max={2000}
+              value={maxDocuments}
+              onChange={(e) => setMaxDocuments(Number(e.target.value))}
+            />
+          </div>
+
+          <div className="flex w-28 flex-col gap-1.5">
+            <Label className="flex items-center gap-1.5">
+              <Layers className="size-4 text-muted-foreground" />
+              Глубина
+            </Label>
+            <Input
+              type="number"
+              min={0}
+              max={5}
+              value={maxDepth}
+              onChange={(e) => setMaxDepth(Number(e.target.value))}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label className="flex items-center gap-1.5">
+              <Lock className="size-4 text-muted-foreground" />
+              Только этот домен
+            </Label>
+            <div className="flex h-9 items-center">
+              <Switch checked={sameDomainOnly} onCheckedChange={setSameDomainOnly} />
+            </div>
+          </div>
+
+          <Button
+            type="button"
+            variant={editingSeedId !== null ? "default" : "outline"}
+            size="icon"
+            onClick={submitSeedForm}
+            disabled={savingSeed}
+            aria-label={editingSeedId !== null ? "Сохранить адрес" : "Добавить адрес"}
+            className="shrink-0 transition-transform duration-150 hover:scale-105 active:scale-95"
+          >
+            {editingSeedId !== null ? <Check className="size-4" /> : <Plus className="size-4" />}
+          </Button>
+        </div>
+
+        <div className="flex min-h-40 w-full flex-col rounded-md border">
+          {seedsLoading ? (
+            <p className="flex flex-1 items-center justify-center px-6 py-8 text-center text-xs text-muted-foreground">
+              Загрузка…
+            </p>
+          ) : seeds.length === 0 ? (
+            <p className="flex flex-1 items-center justify-center px-6 py-8 text-center text-xs text-muted-foreground">
+              Добавьте хотя бы один адрес, чтобы начать обход.
+            </p>
+          ) : (
+            <ScrollArea className="h-40 min-w-0">
+              <div className="min-w-0 divide-y">
+                {seeds.map((seed, index) => (
+                  <div
+                    key={seed.id}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2 text-xs transition-colors duration-150 hover:bg-muted/50",
+                      editingSeedId === seed.id && "bg-accent/60",
+                    )}
+                  >
+                    <span className="w-5 shrink-0 text-muted-foreground">{index + 1}.</span>
+                    <span className="min-w-0 flex-1 truncate" title={seed.url}>
+                      {seed.url}
+                    </span>
+                    <span className="hidden shrink-0 items-center gap-1 sm:flex">
+                      <Badge variant="outline" className="gap-1 text-[10px]">
+                        <FileStack className="size-3" />
+                        {seed.max_documents}
+                      </Badge>
+                      <Badge variant="outline" className="gap-1 text-[10px]">
+                        <Layers className="size-3" />
+                        {seed.max_depth}
+                      </Badge>
+                      {seed.same_domain_only && (
+                        <Badge variant="outline" className="gap-1 text-[10px]">
+                          <Lock className="size-3" />
+                          домен
+                        </Badge>
+                      )}
+                    </span>
                     <Button
                       type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setSelectedJobId(job.id)}
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => startEdit(seed)}
+                      aria-label="Редактировать адрес"
+                      className="shrink-0 text-muted-foreground transition-all duration-150 hover:scale-110 hover:text-primary active:scale-95"
                     >
-                      Следить
+                      <Pencil className="size-3.5" />
                     </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => removeSeed(seed)}
+                      disabled={deletingSeedId === seed.id}
+                      aria-label="Удалить адрес"
+                      className="shrink-0 text-muted-foreground transition-all duration-150 hover:scale-110 hover:text-destructive active:scale-95"
+                    >
+                      <X className="size-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+        </div>
+
+        {formError && <p className="text-sm text-destructive">{formError}</p>}
+        {runError && <p className="text-sm text-destructive">{runError}</p>}
+
+        <Button
+          type="button"
+          onClick={handleRunCrawl}
+          disabled={running || selectedId === null}
+          size="lg"
+          className="group w-full overflow-hidden transition-all duration-300 hover:scale-[1.015] hover:shadow-lg hover:shadow-primary/30 active:scale-[0.98]"
+        >
+          <Play className="size-4 transition-transform duration-300 group-hover:scale-125" />
+          {running ? "Запуск…" : "Запустить краулинг"}
+        </Button>
+      </div>
+
+      {jobIds.map((jobId) => (
+        <CrawlJobProgressCard key={jobId} jobId={jobId} />
+      ))}
     </div>
   );
 }
