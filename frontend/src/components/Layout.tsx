@@ -1,7 +1,10 @@
-import { BarChart3, Library, Search, Waypoints } from "lucide-react";
+import { BarChart3, HelpCircle, Library, Search, Waypoints } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 
+import { CollectionSwitcher } from "@/components/CollectionSwitcher";
 import { ModeToggle } from "@/components/mode-toggle";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -9,40 +12,45 @@ const NAV_ITEMS = [
   { to: "/collections", label: "Коллекции", icon: Library },
   { to: "/search", label: "Поиск", icon: Search },
   { to: "/metrics", label: "Метрики", icon: BarChart3 },
+  { to: "/help", label: "Справка", icon: HelpCircle },
 ];
 
 export function Layout() {
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <aside className="flex w-60 shrink-0 flex-col border-r bg-card">
-        <div className="flex h-16 items-center border-b px-5">
-          <span className="text-lg font-bold tracking-tight">LanguageProcessing</span>
+    <div className="h-screen overflow-hidden bg-background">
+      <header className="pointer-events-none fixed inset-x-0 top-0 z-40 flex justify-center px-4 py-3">
+        <div className="pointer-events-auto flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border bg-card/90 p-1.5 pt-2 shadow-lg backdrop-blur-md">
+          <nav className="flex shrink-0 items-center gap-1">
+            {NAV_ITEMS.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) =>
+                  cn(
+                    "flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-all duration-150 hover:-translate-y-0.5 hover:bg-accent hover:text-accent-foreground active:scale-[0.97] active:translate-y-0",
+                    isActive && "bg-accent text-accent-foreground",
+                  )
+                }
+              >
+                <item.icon className="size-4 transition-transform duration-150" />
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
+          <Separator orientation="vertical" className="h-6 shrink-0" />
+          <div className="shrink-0 px-1">
+            <ModeToggle />
+          </div>
+          <div className="shrink-0">
+            <CollectionSwitcher />
+          </div>
         </div>
-        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
-          {NAV_ITEMS.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
-                  isActive && "bg-accent text-accent-foreground",
-                )
-              }
-            >
-              <item.icon className="size-4" />
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
-        <div className="flex items-center justify-between border-t px-4 py-3">
-          <span className="text-sm text-muted-foreground">Тема</span>
-          <ModeToggle />
-        </div>
-      </aside>
-      <main className="flex-1 overflow-y-auto p-6 md:p-8">
-        <Outlet />
-      </main>
+      </header>
+      <ScrollArea className="h-full">
+        <main className="mx-auto w-full max-w-6xl px-6 pt-24 pb-6 md:px-8 md:pt-28 md:pb-8">
+          <Outlet />
+        </main>
+      </ScrollArea>
     </div>
   );
 }

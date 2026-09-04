@@ -32,7 +32,14 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
+  /* The classic shadcn light-theme problem: background and card were both
+     pure white and border/muted/secondary sat within ~3% lightness of
+     white, so surfaces had almost no fill or edge contrast. Here the page
+     canvas is a hair darker than white so cards visibly float on it, and
+     border/muted/secondary/ring are pulled down several more points of
+     lightness so edges and chip backgrounds actually read against paper
+     white instead of disappearing into it. */
+  --background: oklch(0.975 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
@@ -40,17 +47,17 @@
   --popover-foreground: oklch(0.145 0 0);
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
+  --secondary: oklch(0.87 0 0);
   --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
+  --muted: oklch(0.93 0 0);
+  --muted-foreground: oklch(0.44 0 0);
+  --accent: oklch(0.87 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: oklch(0.87 0 0);
+  --input: oklch(0.87 0 0);
+  --ring: oklch(0.58 0 0);
 }
 
 .dark {
@@ -84,5 +91,31 @@
     font-feature-settings: "cv11", "ss01";
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Themes the browser's native scrollbar (used on elements we can't route
+   through the Radix ScrollArea, e.g. <textarea> and dialog overflow) so it
+   matches the ScrollArea thumb instead of the OS default. */
+@layer utilities {
+  .themed-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .themed-scrollbar::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .themed-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .themed-scrollbar::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  .themed-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: var(--muted-foreground);
   }
 }

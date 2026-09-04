@@ -1,4 +1,17 @@
-import type { Collection, CrawlJob, CrawlJobProgress, DocumentSummary } from "./types";
+import type {
+  Collection,
+  CollectionMetricsSummary,
+  CrawlJob,
+  CrawlJobProgress,
+  CrawlSeed,
+  DocumentDetail,
+  DocumentSummary,
+  IndexJob,
+  QueryMetrics,
+  QuerySummary,
+  RelevanceJudgment,
+  SearchResponse,
+} from "./types";
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
@@ -10,6 +23,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     const detail = await response.text();
     throw new Error(`${response.status} ${response.statusText}: ${detail}`);
+  }
+  if (response.status === 204) {
+    return undefined as T;
   }
   return (await response.json()) as T;
 }
@@ -25,8 +41,41 @@ export function createCollection(input: { name: string; language: string }): Pro
   });
 }
 
-export function listDocuments(collectionId: number): Promise<DocumentSummary[]> {
-  return request<DocumentSummary[]>(`/collections/${collectionId}/documents`);
+export function listDocuments(
+  collectionId: number,
+  { limit = 50, offset = 0 }: { limit?: number; offset?: number } = {},
+): Promise<DocumentSummary[]> {
+  return request<DocumentSummary[]>(
+    `/collections/${collectionId}/documents?limit=${limit}&offset=${offset}`,
+  );
+}
+
+export interface DocumentInput {
+  title: string;
+  url: string | null;
+  clean_text: string;
+}
+
+export function createDocument(collectionId: number, input: DocumentInput): Promise<DocumentDetail> {
+  return request<DocumentDetail>(`/collections/${collectionId}/documents`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function getDocument(id: number): Promise<DocumentDetail> {
+  return request<DocumentDetail>(`/documents/${id}`);
+}
+
+export function updateDocument(id: number, input: DocumentInput): Promise<DocumentDetail> {
+  return request<DocumentDetail>(`/documents/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteDocument(id: number): Promise<void> {
+  return request<void>(`/documents/${id}`, { method: "DELETE" });
 }
 
 export interface CreateCrawlJobInput {
@@ -54,4 +103,102 @@ export function getCrawlJob(id: number): Promise<CrawlJobProgress> {
 export function crawlJobWebSocketUrl(id: number): string {
   const wsBase = API_BASE_URL.replace(/^http/, "ws");
   return `${wsBase}/crawl-jobs/ws/${id}`;
+}
+
+export function refreshCollection(collectionId: number): Promise<CrawlJob> {
+  return request<CrawlJob>(`/collections/${collectionId}/refresh`, { method: "POST" });
+}
+
+export interface CrawlSeedInput {
+  url: string;
+  max_documents: number;
+  max_depth: number;
+  same_domain_only: boolean;
+}
+
+export function listCrawlSeeds(collectionId: number): Promise<CrawlSeed[]> {
+  return request<CrawlSeed[]>(`/collections/${collectionId}/crawl-seeds`);
+}
+
+export function createCrawlSeed(collectionId: number, input: CrawlSeedInput): Promise<CrawlSeed> {
+  return request<CrawlSeed>(`/collections/${collectionId}/crawl-seeds`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateCrawlSeed(seedId: number, input: CrawlSeedInput): Promise<CrawlSeed> {
+  return request<CrawlSeed>(`/crawl-seeds/${seedId}`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteCrawlSeed(seedId: number): Promise<void> {
+  return request<void>(`/crawl-seeds/${seedId}`, { method: "DELETE" });
+}
+
+export function runCollectionCrawl(collectionId: number): Promise<CrawlJob[]> {
+  return request<CrawlJob[]>(`/collections/${collectionId}/crawl-seeds/run`, { method: "POST" });
+}
+
+export function createIndexJob(collectionId: number): Promise<IndexJob> {
+  return request<IndexJob>(`/collections/${collectionId}/index-jobs`, { method: "POST" });
+}
+
+export function getIndexJob(id: number): Promise<IndexJob> {
+  return request<IndexJob>(`/index-jobs/${id}`);
+}
+
+export function getLatestIndexJob(collectionId: number): Promise<IndexJob | null> {
+  return request<IndexJob | null>(`/collections/${collectionId}/index-jobs/latest`);
+}
+
+export function indexJobWebSocketUrl(id: number): string {
+  const wsBase = API_BASE_URL.replace(/^http/, "ws");
+  return `${wsBase}/index-jobs/ws/${id}`;
+}
+
+export interface SearchInput {
+  collection_id: number;
+  text: string;
+  top_k?: number;
+}
+
+export function search(input: SearchInput): Promise<SearchResponse> {
+  return request<SearchResponse>("/search", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function listCollectionQueries(collectionId: number): Promise<QuerySummary[]> {
+  return request<QuerySummary[]>(`/collections/${collectionId}/queries`);
+}
+
+export function setJudgment(
+  queryId: number,
+  documentId: number,
+  isRelevant: boolean,
+): Promise<RelevanceJudgment> {
+  return request<RelevanceJudgment>(`/queries/${queryId}/judgments/${documentId}`, {
+    method: "PUT",
+    body: JSON.stringify({ is_relevant: isRelevant }),
+  });
+}
+
+export function clearJudgment(queryId: number, documentId: number): Promise<void> {
+  return request<void>(`/queries/${queryId}/judgments/${documentId}`, { method: "DELETE" });
+}
+
+export function listJudgments(queryId: number): Promise<RelevanceJudgment[]> {
+  return request<RelevanceJudgment[]>(`/queries/${queryId}/judgments`);
+}
+
+export function evaluateSearchRun(searchRunId: number): Promise<QueryMetrics> {
+  return request<QueryMetrics>(`/search-runs/${searchRunId}/metrics`, { method: "POST" });
+}
+
+export function getCollectionMetricsSummary(collectionId: number): Promise<CollectionMetricsSummary> {
+  return request<CollectionMetricsSummary>(`/collections/${collectionId}/metrics/summary`);
 }
