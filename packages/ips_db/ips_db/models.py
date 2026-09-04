@@ -37,6 +37,11 @@ class Collection(Base):
     name: Mapped[str] = mapped_column(String(200), unique=True)
     language: Mapped[str] = mapped_column(String(10), default="en")
     created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
+    # Bumped whenever a document in this collection is created/updated/
+    # deleted/re-fetched — compared against the latest completed IndexJob's
+    # finished_at to tell the UI the index is stale, since indexing a
+    # document doesn't happen automatically on every mutation.
+    documents_changed_at: Mapped[dt.datetime | None] = mapped_column(nullable=True)
 
     documents: Mapped[list["Document"]] = relationship(back_populates="collection")
     crawl_jobs: Mapped[list["CrawlJob"]] = relationship(back_populates="collection")
@@ -48,7 +53,7 @@ class Document(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     collection_id: Mapped[int] = mapped_column(ForeignKey("collections.id", ondelete="CASCADE"))
     title: Mapped[str] = mapped_column(String(500))
-    url: Mapped[str] = mapped_column(String(2000))
+    url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     raw_html: Mapped[str | None] = mapped_column(Text, nullable=True)
     clean_text: Mapped[str] = mapped_column(Text)
     language: Mapped[str] = mapped_column(String(10), default="en")
@@ -137,6 +142,29 @@ class MetricResult(Base):
     value: Mapped[float] = mapped_column(Float)
 
 
+class CrawlSeed(Base):
+    """A persisted, editable crawl address for a collection — the source of
+    truth the Crawl page's address list reads and writes. Each seed carries
+    its own max_documents/max_depth/same_domain_only, independent of every
+    other seed in the collection. Running the crawl spawns one CrawlJob per
+    seed (see CrawlJobService.run_collection_crawl)."""
+
+    __tablename__ = "crawl_seeds"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    collection_id: Mapped[int] = mapped_column(ForeignKey("collections.id", ondelete="CASCADE"))
+    url: Mapped[str] = mapped_column(String(2000))
+    max_documents: Mapped[int] = mapped_column(Integer)
+    max_depth: Mapped[int] = mapped_column(Integer)
+    # When true, the crawl for this seed never follows a link to a different
+    # host — including subdomains (en.example.com vs example.com) — useful
+    # when a site fans out into other-language subdomains or links out a lot.
+    same_domain_only: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (UniqueConstraint("collection_id", "url", name="uq_crawl_seed_collection_url"),)
+
+
 class CrawlJob(Base):
     __tablename__ = "crawl_jobs"
 
@@ -145,7 +173,16 @@ class CrawlJob(Base):
     seed_urls: Mapped[list[str]] = mapped_column(JSON)
     max_documents: Mapped[int] = mapped_column(Integer)
     max_depth: Mapped[int] = mapped_column(Integer)
+    # Copied from CrawlSeed.same_domain_only at job-creation time as the
+    # exact host to stay on (netloc of the seed URL), or null when the crawl
+    # may follow links anywhere — see CrawlWorker._enqueue_links.
+    allowed_domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="pending")
+    # "crawl" discovers new pages via BFS; "refresh" re-fetches a fixed set
+    # of already-known URLs in place (updates the existing Document rows
+    # instead of inserting/skipping-on-duplicate) — see CollectionsPage's
+    # "Обновить коллекцию" button.
+    mode: Mapped[str] = mapped_column(String(20), default="crawl")
 
     documents_fetched: Mapped[int] = mapped_column(Integer, default=0)
     urls_queued: Mapped[int] = mapped_column(Integer, default=0)
@@ -158,6 +195,23 @@ class CrawlJob(Base):
     finished_at: Mapped[dt.datetime | None] = mapped_column(nullable=True)
 
     collection: Mapped[Collection] = relationship(back_populates="crawl_jobs")
+
+
+class IndexJob(Base):
+    __tablename__ = "index_jobs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    collection_id: Mapped[int] = mapped_column(ForeignKey("collections.id", ondelete="CASCADE"))
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+
+    documents_total: Mapped[int] = mapped_column(Integer, default=0)
+    documents_processed: Mapped[int] = mapped_column(Integer, default=0)
+    terms_indexed: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
+    started_at: Mapped[dt.datetime | None] = mapped_column(nullable=True)
+    finished_at: Mapped[dt.datetime | None] = mapped_column(nullable=True)
 
 
 class CrawlUrl(Base):

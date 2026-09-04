@@ -58,3 +58,25 @@ def build_crawl_job_config(
         max_documents=max_documents,
         max_depth=max_depth,
     )
+
+
+def build_refresh_job_config(*, collection_id: int, urls: list[str]) -> CrawlJobConfig:
+    """A refresh job re-fetches a fixed, already-known set of URLs in
+    place — unlike a regular crawl it isn't bounded by MAX_SEED_URLS (that
+    cap exists to keep a BFS discovery job's blast radius sane, not to limit
+    how many documents a collection may contain) and never follows links
+    (max_depth=0).
+    """
+    if not urls:
+        raise InvalidCrawlJobConfig("collection has no documents with a URL to refresh")
+    if len(urls) > MAX_DOCUMENTS_LIMIT:
+        raise InvalidCrawlJobConfig(f"at most {MAX_DOCUMENTS_LIMIT} documents can be refreshed at once")
+
+    normalized = tuple(dict.fromkeys(validate_seed_url(url) for url in urls))
+
+    return CrawlJobConfig(
+        collection_id=collection_id,
+        seed_urls=normalized,
+        max_documents=len(normalized),
+        max_depth=0,
+    )

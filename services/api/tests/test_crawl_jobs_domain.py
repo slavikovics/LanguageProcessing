@@ -1,6 +1,6 @@
 import pytest
 
-from app.domain.crawl_jobs import InvalidCrawlJobConfig, build_crawl_job_config
+from app.domain.crawl_jobs import InvalidCrawlJobConfig, build_crawl_job_config, build_refresh_job_config
 
 
 def test_build_crawl_job_config_happy_path():
@@ -56,3 +56,25 @@ def test_build_crawl_job_config_rejects_too_many_seed_urls():
     urls = [f"https://example.com/{i}" for i in range(26)]
     with pytest.raises(InvalidCrawlJobConfig):
         build_crawl_job_config(collection_id=1, seed_urls=urls, max_documents=10, max_depth=1)
+
+
+def test_build_refresh_job_config_happy_path_forces_depth_zero():
+    config = build_refresh_job_config(
+        collection_id=1, urls=["https://example.com/a", "https://example.com/b"]
+    )
+    assert config.max_depth == 0
+    assert config.max_documents == 2
+    assert config.seed_urls == ("https://example.com/a", "https://example.com/b")
+
+
+def test_build_refresh_job_config_allows_more_than_max_seed_urls():
+    # Unlike a discovery crawl, a refresh isn't bounded by MAX_SEED_URLS —
+    # it re-fetches whatever the collection already contains.
+    urls = [f"https://example.com/{i}" for i in range(40)]
+    config = build_refresh_job_config(collection_id=1, urls=urls)
+    assert len(config.seed_urls) == 40
+
+
+def test_build_refresh_job_config_rejects_empty_url_list():
+    with pytest.raises(InvalidCrawlJobConfig):
+        build_refresh_job_config(collection_id=1, urls=[])

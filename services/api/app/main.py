@@ -2,7 +2,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
-from app.interface.routers import collections, crawl_jobs, documents, health
+from app.interface.routers import (
+    collections,
+    crawl_jobs,
+    crawl_seeds,
+    documents,
+    health,
+    indexing,
+    metrics,
+    search,
+)
 
 settings = get_settings()
 
@@ -20,3 +29,7 @@ app.include_router(health.router)
 app.include_router(collections.router)
 app.include_router(documents.router)
 app.include_router(crawl_jobs.router)
+app.include_router(crawl_seeds.router)
+app.include_router(indexing.router)
+app.include_router(search.router)
+app.include_router(metrics.router)

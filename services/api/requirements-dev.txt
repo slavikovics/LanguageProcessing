@@ -1,3 +1,10 @@
 -r requirements.txt
 pytest==8.3.4
 pytest-asyncio==0.24.0
+aiosqlite==0.20.0
+
+# Test-only: the indexing/search/metrics integration test stubs nlp-service
+# in-process using nlp_core's own weighting/metrics functions (no spacy
+# extra needed — lemmatization is faked with a plain regex tokenizer), so it
+# exercises the real formulas without a network hop or the spacy model.
+-e ./packages/nlp_core

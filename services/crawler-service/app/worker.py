@@ -34,6 +34,10 @@ class JobContext:
     language: str
     max_documents: int
     max_depth: int
+    mode: str
+    # Exact host (netloc) this job's discovered links must stay on — including
+    # rejecting subdomains — or None when links may go anywhere.
+    allowed_domain: str | None = None
 
 
 @dataclass(frozen=True)
@@ -107,6 +111,8 @@ class CrawlWorker:
                     CrawlJob.collection_id,
                     CrawlJob.max_documents,
                     CrawlJob.max_depth,
+                    CrawlJob.mode,
+                    CrawlJob.allowed_domain,
                     Collection.language,
                 )
                 .join(Collection, Collection.id == CrawlJob.collection_id)
@@ -121,6 +127,8 @@ class CrawlWorker:
                 language=row.language,
                 max_documents=row.max_documents,
                 max_depth=row.max_depth,
+                mode=row.mode,
+                allowed_domain=row.allowed_domain,
             )
 
     async def _current_progress(self, job_id: int) -> tuple[int, str]:
@@ -229,9 +237,18 @@ class CrawlWorker:
             await session.commit()
 
     async def _enqueue_links(
-        self, job_id: int, discovered_from_id: int, depth: int, links: list[str]
+        self,
+        job_id: int,
+        discovered_from_id: int,
+        depth: int,
+        links: list[str],
+        *,
+        allowed_domain: str | None = None,
     ) -> None:
-        candidates = list(dict.fromkeys(links))[: self._settings.links_per_page_cap]
+        deduped = list(dict.fromkeys(links))
+        if allowed_domain is not None:
+            deduped = [url for url in deduped if urlsplit(url).netloc == allowed_domain]
+        candidates = deduped[: self._settings.links_per_page_cap]
         if not candidates:
             return
         async with self._sessionmaker() as session:
@@ -261,11 +278,39 @@ class CrawlWorker:
 
     # -- fetch + save one page ----------------------------------------------
 
+    async def _touch_collection(self, session: AsyncSession, collection_id: int) -> None:
+        """Marks the collection as changed *now* so the UI can flag the
+        index as stale — see Collection.documents_changed_at."""
+        collection = await session.get(Collection, collection_id)
+        if collection is not None:
+            collection.documents_changed_at = dt.datetime.utcnow()
+
     async def _save_document(self, ctx: JobContext, url: str, html: str, text: str) -> int | None:
+        title = extract_title(html, fallback=url)
         async with self._sessionmaker() as session:
+            if ctx.mode == "refresh":
+                # Re-fetching a known URL: update the existing row in place
+                # instead of inserting — a "refresh" is meant to bring
+                # already-crawled documents up to date, not duplicate them.
+                result = await session.execute(
+                    select(Document).where(
+                        Document.collection_id == ctx.collection_id, Document.url == url
+                    )
+                )
+                existing = result.scalar_one_or_none()
+                if existing is not None:
+                    existing.title = title
+                    existing.raw_html = html
+                    existing.clean_text = text
+                    existing.char_count = len(text)
+                    existing.fetched_at = dt.datetime.utcnow()
+                    await self._touch_collection(session, ctx.collection_id)
+                    await session.commit()
+                    return existing.id
+
             document = Document(
                 collection_id=ctx.collection_id,
-                title=extract_title(html, fallback=url),
+                title=title,
                 url=url,
                 raw_html=html,
                 clean_text=text,
@@ -274,6 +319,7 @@ class CrawlWorker:
             )
             session.add(document)
             try:
+                await self._touch_collection(session, ctx.collection_id)
                 await session.commit()
             except IntegrityError:
                 await session.rollback()
@@ -315,7 +361,9 @@ class CrawlWorker:
 
             if handle.depth < ctx.max_depth:
                 links = extract_links(html, handle.url)
-                await self._enqueue_links(ctx.id, handle.id, handle.depth + 1, links)
+                await self._enqueue_links(
+                    ctx.id, handle.id, handle.depth + 1, links, allowed_domain=ctx.allowed_domain
+                )
 
         except (FetchError, httpx.HTTPError) as exc:
             await self._finish_url(handle.id, "failed", error=str(exc)[:500])
