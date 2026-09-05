@@ -109,8 +109,8 @@ class CrawlJobService:
         await self._session.commit()
         return jobs
 
-    async def list_jobs(self) -> list[CrawlJob]:
-        return await self._jobs.list()
+    async def list_jobs(self, *, collection_id: int | None = None) -> list[CrawlJob]:
+        return await self._jobs.list(collection_id=collection_id)
 
     async def get_progress(self, job_id: int) -> tuple[CrawlJob | None, list[CrawlUrl]]:
         job = await self._jobs.get(job_id)

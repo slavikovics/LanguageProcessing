@@ -1,6 +1,6 @@
 import asyncio
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.crawl_jobs import CrawlJobService
@@ -36,9 +36,11 @@ async def create_crawl_job(
 
 
 @router.get("", response_model=list[CrawlJobOut])
-async def list_crawl_jobs(db: AsyncSession = Depends(get_db)) -> list[CrawlJobOut]:
+async def list_crawl_jobs(
+    collection_id: int | None = Query(default=None), db: AsyncSession = Depends(get_db)
+) -> list[CrawlJobOut]:
     service = CrawlJobService(db)
-    return await service.list_jobs()
+    return await service.list_jobs(collection_id=collection_id)
 
 
 @router.get("/{job_id}", response_model=CrawlJobProgressOut)

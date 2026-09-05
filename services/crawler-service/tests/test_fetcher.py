@@ -33,3 +33,21 @@ def test_extract_title_strips_whitespace():
 
 def test_extract_title_falls_back_when_missing():
     assert extract_title("<html><body>no title</body></html>", fallback="fallback") == "fallback"
+
+
+def test_extract_links_skips_non_page_file_types():
+    html = """
+    <a href="/report.pdf">PDF</a>
+    <a href="/photo.jpg">Photo</a>
+    <a href="/style.css">Stylesheet</a>
+    <a href="/app.js">Script</a>
+    <a href="/feed.xml">Feed</a>
+    <a href="/archive.zip">Archive</a>
+    <a href="/article">Article</a>
+    <a href="/notes.txt">Notes</a>
+    """
+    links = extract_links(html, base_url="https://example.com/")
+    assert links == [
+        "https://example.com/article",
+        "https://example.com/notes.txt",
+    ]

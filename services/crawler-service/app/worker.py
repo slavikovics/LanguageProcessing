@@ -1,8 +1,11 @@
 """BFS crawl worker: claims pending crawl_jobs one at a time, fetches pages
-in breadth-first order bounded by max_depth/max_documents, and keeps
-crawl_jobs/crawl_urls updated so app.interface.routers.crawl_jobs (in the
-api service) can report live progress by reading those same tables — see
-docs/PROJECT_PLAN.md, 3.1.
+shallowest-first, and keeps crawl_jobs/crawl_urls updated so
+app.interface.routers.crawl_jobs (in the api service) can report live
+progress by reading those same tables — see docs/PROJECT_PLAN.md, 3.1.
+
+max_depth is a traversal preference, not a hard stop: a job keeps widening
+past it rather than finishing short of max_documents (see _claim_next_url).
+max_documents (or a genuinely exhausted, finite link graph) is what ends it.
 """
 
 from __future__ import annotations
@@ -15,12 +18,12 @@ from urllib.parse import urlsplit
 
 import httpx
 from ips_db import Collection, CrawlJob, CrawlUrl, Document
-from nlp_core.tokenization import clean_html
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.config import Settings
+from app.content_extraction import extract_main_content
 from app.fetcher import FetchError, extract_links, extract_title, fetch_html
 from app.robots import RobotsCache
 
@@ -151,7 +154,7 @@ class CrawlWorker:
                     return
                 if fetched >= ctx.max_documents:
                     break
-                handle = await self._claim_next_url(job_id, ctx.max_depth)
+                handle = await self._claim_next_url(job_id)
                 if handle is None:
                     break
                 await self._process_url(ctx, handle, client, robots)
@@ -195,14 +198,20 @@ class CrawlWorker:
 
     # -- URL frontier -------------------------------------------------------
 
-    async def _claim_next_url(self, job_id: int, max_depth: int) -> CrawlUrlHandle | None:
+    async def _claim_next_url(self, job_id: int) -> CrawlUrlHandle | None:
+        """Claims the shallowest queued URL, with no depth ceiling: max_depth
+        is a starting preference (BFS naturally exhausts shallower URLs
+        first via order_by), not a hard stop — a job keeps widening past it
+        rather than finishing short of max_documents just because the
+        original depth budget ran out. The job still terminates: the link
+        graph reachable from a job's seed is finite, and _enqueue_links
+        dedupes so retracing it can't loop forever."""
         async with self._sessionmaker() as session:
             result = await session.execute(
                 select(CrawlUrl)
                 .where(
                     CrawlUrl.job_id == job_id,
                     CrawlUrl.status == "queued",
-                    CrawlUrl.depth <= max_depth,
                 )
                 .order_by(CrawlUrl.depth, CrawlUrl.id)
                 .limit(1)
@@ -212,6 +221,14 @@ class CrawlWorker:
             if crawl_url is None:
                 return None
             crawl_url.status = "fetching"
+            # urls_queued tracks the current backlog (not a lifetime total),
+            # so the UI's "В очереди" reflects what's actually left to do —
+            # it must shrink here to match _enqueue_links growing it.
+            await session.execute(
+                update(CrawlJob)
+                .where(CrawlJob.id == job_id)
+                .values(urls_queued=CrawlJob.urls_queued - 1)
+            )
             await session.commit()
             return CrawlUrlHandle(id=crawl_url.id, url=crawl_url.url, depth=crawl_url.depth)
 
@@ -335,15 +352,38 @@ class CrawlWorker:
     ) -> None:
         try:
             if not await robots.is_allowed(handle.url):
-                await self._finish_url(handle.id, "skipped", error="disallowed by robots.txt")
+                # "blocked", not "skipped" — this page was never fetched, so
+                # unlike the skips below it was never actually a document
+                # candidate; the api service's progress view relies on that
+                # distinction to only list genuine candidates.
+                await self._finish_url(handle.id, "blocked", error="disallowed by robots.txt")
                 await self._bump_counters(ctx.id, urls_visited=1)
                 return
 
             await self._throttle.wait(handle.url)
             html = await fetch_html(client, handle.url)
-            text = clean_html(html)
+            text = extract_main_content(html)
+
+            # The page fetched fine even when we end up not keeping it as a
+            # document (too short, duplicate) — its links are still real
+            # discoveries, so enqueue them before recording the skip. Losing
+            # that page must not also lose everything it linked to.
+            #
+            # max_depth is not enforced here: it's a starting preference the
+            # frontier follows (see _claim_next_url's shallowest-first
+            # order), not a hard ceiling — a job keeps widening past it
+            # rather than finishing short of max_documents. A run that hits
+            # only skips/duplicates within its "intended" depth would
+            # otherwise stall at, say, 16/30 with an empty queue even though
+            # the site has plenty more pages to try.
+            async def _enqueue_discovered_links() -> None:
+                links = extract_links(html, handle.url)
+                await self._enqueue_links(
+                    ctx.id, handle.id, handle.depth + 1, links, allowed_domain=ctx.allowed_domain
+                )
 
             if len(text) < self._settings.min_document_chars:
+                await _enqueue_discovered_links()
                 await self._finish_url(
                     handle.id, "skipped", error="document too short after cleanup"
                 )
@@ -352,18 +392,14 @@ class CrawlWorker:
 
             document_id = await self._save_document(ctx, handle.url, html, text)
             if document_id is None:
+                await _enqueue_discovered_links()
                 await self._finish_url(handle.id, "skipped", error="duplicate document url")
                 await self._bump_counters(ctx.id, urls_visited=1)
                 return
 
             await self._finish_url(handle.id, "success", document_id=document_id)
             await self._bump_counters(ctx.id, urls_visited=1, documents_fetched=1)
-
-            if handle.depth < ctx.max_depth:
-                links = extract_links(html, handle.url)
-                await self._enqueue_links(
-                    ctx.id, handle.id, handle.depth + 1, links, allowed_domain=ctx.allowed_domain
-                )
+            await _enqueue_discovered_links()
 
         except (FetchError, httpx.HTTPError) as exc:
             await self._finish_url(handle.id, "failed", error=str(exc)[:500])

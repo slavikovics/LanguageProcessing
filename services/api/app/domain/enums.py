@@ -23,6 +23,10 @@ class CrawlUrlStatus(str, Enum):
     SUCCESS = "success"
     FAILED = "failed"
     SKIPPED = "skipped"
+    # Never fetched at all (robots.txt disallowed it) — distinct from
+    # SKIPPED, which is a page that *was* fetched and evaluated as a
+    # document candidate but didn't qualify (too short, duplicate).
+    BLOCKED = "blocked"
 
 
 class IndexJobStatus(str, Enum):

@@ -1,5 +1,6 @@
 httpx==0.28.1
 beautifulsoup4==4.12.3
+readability-lxml==0.9
 sqlalchemy==2.0.36
 asyncpg==0.30.0
 pydantic-settings==2.6.1

@@ -3,21 +3,22 @@ import { Link } from "react-router-dom";
 import {
   createCrawlSeed,
   deleteCrawlSeed,
+  listCrawlJobs,
   listCrawlSeeds,
   runCollectionCrawl,
   updateCrawlSeed,
 } from "../api/client";
 import { ProgressBar } from "../components/ProgressBar";
 import { useCrawlJobProgress } from "../hooks/useCrawlJobProgress";
-import type { CrawlJob, CrawlSeed } from "../api/types";
+import { TERMINAL_CRAWL_STATUSES, type CrawlJob, type CrawlSeed } from "../api/types";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Switch } from "@/components/ui/switch";
 import { useCollectionContext } from "@/context/CollectionContext";
 import { cn } from "@/lib/utils";
 import {
@@ -60,7 +61,7 @@ const DEFAULT_MAX_DEPTH = 1;
 
 function CrawlJobProgressCard({ jobId }: { jobId: number }) {
   const { refreshCollections } = useCollectionContext();
-  const { progress, connection } = useCrawlJobProgress(jobId);
+  const { progress } = useCrawlJobProgress(jobId);
 
   // The document count shown in the header switcher is fetched once on
   // load; without this the "Индексировать" button on Collections stays
@@ -76,37 +77,29 @@ function CrawlJobProgressCard({ jobId }: { jobId: number }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <span>Задача #{progress.job.id}</span>
-          <Badge variant="outline" className={STATUS_BADGE_CLASS[progress.job.status]}>
-            {STATUS_LABELS[progress.job.status]}
-          </Badge>
-        </CardTitle>
+        <div className="flex items-start justify-between gap-4">
+          <CardTitle className="flex items-center gap-2">
+            <span>Задача #{progress.job.id}</span>
+            <Badge variant="outline" className={STATUS_BADGE_CLASS[progress.job.status]}>
+              {STATUS_LABELS[progress.job.status]}
+            </Badge>
+          </CardTitle>
+          <p className="shrink-0 text-right text-xs text-muted-foreground">
+            Посещено: {progress.job.urls_visited} · В очереди: {progress.job.urls_queued} · Ошибок:{" "}
+            {progress.job.urls_failed}
+          </p>
+        </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <span className="max-w-full truncate text-xs text-muted-foreground" title={progress.job.seed_urls[0]}>
-            {progress.job.seed_urls[0]}
-          </span>
-          {connection !== "idle" && (
-            <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
-              <span
-                className={cn(
-                  "size-1.5 rounded-full",
-                  connection === "websocket" ? "bg-emerald-500" : "bg-amber-500",
-                )}
-              />
-              {connection === "websocket" ? "live" : "опрос"}
-            </span>
-          )}
-        </div>
+        <span className="max-w-full truncate text-xs text-muted-foreground" title={progress.job.seed_urls[0]}>
+          {progress.job.seed_urls[0]}
+        </span>
 
-        <ProgressBar value={progress.job.documents_fetched} max={progress.job.max_documents} />
-
-        <p className="text-xs text-muted-foreground">
-          Посещено: {progress.job.urls_visited} · В очереди: {progress.job.urls_queued} · Ошибок:{" "}
-          {progress.job.urls_failed}
-        </p>
+        <ProgressBar
+          value={progress.job.documents_fetched}
+          max={progress.job.max_documents}
+          complete={TERMINAL_CRAWL_STATUSES.includes(progress.job.status)}
+        />
 
         {progress.job.error_message && (
           <p className="text-sm text-destructive">{progress.job.error_message}</p>
@@ -122,7 +115,7 @@ function CrawlJobProgressCard({ jobId }: { jobId: number }) {
         )}
 
         <div>
-          <h3 className="mb-2 text-xs font-medium text-muted-foreground">Последние обработанные URL</h3>
+          <h3 className="mb-2 text-xs font-medium text-muted-foreground">URL, обработанные как документы</h3>
           <ScrollArea className="h-56 rounded-md border">
             <ul className="flex flex-col gap-0.5 p-2">
               {progress.recent_urls.map((u) => (
@@ -169,7 +162,7 @@ export function CrawlPage() {
 
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState<string | null>(null);
-  const [jobIds, setJobIds] = useState<number[]>([]);
+  const [latestJobBySeedUrl, setLatestJobBySeedUrl] = useState<Map<string, CrawlJob>>(new Map());
 
   const refreshSeeds = useCallback(async () => {
     if (selectedId === null) {
@@ -186,9 +179,30 @@ export function CrawlPage() {
     }
   }, [selectedId]);
 
+  const refreshSeedJobs = useCallback(async () => {
+    if (selectedId === null) {
+      setLatestJobBySeedUrl(new Map());
+      return;
+    }
+    try {
+      const jobs = await listCrawlJobs(selectedId);
+      const latest = new Map<string, CrawlJob>();
+      // Jobs come back newest-first, so the first job seen per seed URL is its latest run.
+      for (const job of jobs) {
+        const seedUrl = job.seed_urls[0];
+        if (seedUrl !== undefined && !latest.has(seedUrl)) {
+          latest.set(seedUrl, job);
+        }
+      }
+      setLatestJobBySeedUrl(latest);
+    } catch {
+      // best-effort: seed rows just fall back to showing no last-run status
+    }
+  }, [selectedId]);
+
   useEffect(() => {
     void refreshSeeds();
-    setJobIds([]);
+    void refreshSeedJobs();
     setRunError(null);
     resetForm();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -271,13 +285,25 @@ export function CrawlPage() {
     setRunError(null);
     try {
       const jobs = await runCollectionCrawl(selectedId);
-      setJobIds(jobs.map((job) => job.id));
+      setLatestJobBySeedUrl((prev) => {
+        const next = new Map(prev);
+        for (const job of jobs) {
+          next.set(job.seed_urls[0], job);
+        }
+        return next;
+      });
     } catch (err) {
       setRunError(err instanceof Error ? err.message : String(err));
     } finally {
       setRunning(false);
     }
   }
+
+  // Only ever shows a task for a base URL that's still configured as a seed
+  // — deleting a seed drops its last run from view too, in seed-list order.
+  const visibleJobs = seeds
+    .map((seed) => latestJobBySeedUrl.get(seed.url))
+    .filter((job): job is CrawlJob => job !== undefined);
 
   return (
     <div className="flex flex-col gap-6">
@@ -357,8 +383,12 @@ export function CrawlPage() {
               <Lock className="size-4 text-muted-foreground" />
               Только этот домен
             </Label>
-            <div className="flex h-9 items-center">
-              <Switch checked={sameDomainOnly} onCheckedChange={setSameDomainOnly} />
+            <div className="flex h-9 items-center justify-center">
+              <Checkbox
+                size="lg"
+                checked={sameDomainOnly}
+                onCheckedChange={(checked) => setSameDomainOnly(checked === true)}
+              />
             </div>
           </div>
 
@@ -387,7 +417,9 @@ export function CrawlPage() {
           ) : (
             <ScrollArea className="h-40 min-w-0">
               <div className="min-w-0 divide-y">
-                {seeds.map((seed, index) => (
+                {seeds.map((seed, index) => {
+                  const lastJob = latestJobBySeedUrl.get(seed.url);
+                  return (
                   <div
                     key={seed.id}
                     className={cn(
@@ -414,6 +446,19 @@ export function CrawlPage() {
                           домен
                         </Badge>
                       )}
+                      {lastJob && (
+                        <Badge
+                          variant="outline"
+                          className={cn("gap-1 text-[10px]", STATUS_BADGE_CLASS[lastJob.status])}
+                          title={
+                            lastJob.finished_at
+                              ? `Последний запуск: ${new Date(lastJob.finished_at).toLocaleString()}`
+                              : undefined
+                          }
+                        >
+                          {STATUS_LABELS[lastJob.status]}
+                        </Badge>
+                      )}
                     </span>
                     <Button
                       type="button"
@@ -437,7 +482,8 @@ export function CrawlPage() {
                       <X className="size-3.5" />
                     </Button>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </ScrollArea>
           )}
@@ -458,8 +504,8 @@ export function CrawlPage() {
         </Button>
       </div>
 
-      {jobIds.map((jobId) => (
-        <CrawlJobProgressCard key={jobId} jobId={jobId} />
+      {visibleJobs.map((job) => (
+        <CrawlJobProgressCard key={job.id} jobId={job.id} />
       ))}
     </div>
   );
