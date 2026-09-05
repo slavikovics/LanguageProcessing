@@ -77,4 +77,6 @@ class SearchResponse:
     query_id: int
     search_run_id: int
     query_text: str
+    model: str
+    model_label: str
     hits: list[SearchHit]

@@ -14,7 +14,10 @@ async def search(payload: SearchRequest, db: AsyncSession = Depends(get_db)) -> 
     service = SearchService(db)
     try:
         return await service.search(
-            collection_id=payload.collection_id, text=payload.text, top_k=payload.top_k
+            collection_id=payload.collection_id,
+            text=payload.text,
+            top_k=payload.top_k,
+            model=payload.model,
         )
     except SearchError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

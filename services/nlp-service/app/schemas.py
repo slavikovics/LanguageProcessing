@@ -120,6 +120,22 @@ class MetricsAggregateRequest(BaseModel):
     runs: list[MetricsRunInput]
 
 
+class EmbedDocumentsRequest(BaseModel):
+    texts: list[str]
+
+
+class EmbedDocumentsResponse(BaseModel):
+    vectors: list[list[float]]
+
+
+class EmbedQueryRequest(BaseModel):
+    text: str
+
+
+class EmbedQueryResponse(BaseModel):
+    vector: list[float]
+
+
 class MetricsAggregateResponse(BaseModel):
     """Aggregate over several query runs. MAP is the mean of each run's
     average_precision (macro-average — that's what "mean" in MAP means).

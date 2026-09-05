@@ -1,8 +1,19 @@
-import { ChevronDown, Globe, SearchIcon, SlidersHorizontal, ThumbsDown, ThumbsUp } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Globe,
+  HelpCircle,
+  ListChecks,
+  SearchIcon,
+  SlidersHorizontal,
+  ThumbsDown,
+  ThumbsUp,
+} from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { getDocument, search, setJudgment } from "../api/client";
-import type { SearchHit, SearchResponse } from "../api/types";
+import { getDocument, listDocuments, listJudgments, search, setJudgment } from "../api/client";
+import type { DocumentSummary, SearchHit, SearchResponse } from "../api/types";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,8 +21,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useCollectionContext } from "@/context/CollectionContext";
+import { useSearchModelContext } from "@/context/SearchModelContext";
 import { cn } from "@/lib/utils";
 
 const JUDGMENT_MODE_STORAGE_KEY = "ips-judgment-mode";
@@ -23,7 +36,7 @@ function escapeRegExp(text: string): string {
 function highlightSnippet(snippet: string, words: string[]): ReactNode {
   const cleaned = [...new Set(words.filter(Boolean))];
   if (cleaned.length === 0) return snippet;
-  const pattern = new RegExp(`(${cleaned.map(escapeRegExp).join("|")})`, "gi");
+  const pattern = new RegExp(`\\b(${cleaned.map(escapeRegExp).join("|")})\\b`, "gi");
   const parts = snippet.split(pattern);
   return parts.map((part, i) =>
     cleaned.some((w) => w.toLowerCase() === part.toLowerCase()) ? (
@@ -49,7 +62,7 @@ function ResultCard({
   judgment: JudgmentState;
   judgmentMode: boolean;
   submittedWords: string[];
-  onJudge: (hit: SearchHit, isRelevant: boolean) => void;
+  onJudge: (documentId: number, isRelevant: boolean) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [fullText, setFullText] = useState<string | null>(null);
@@ -143,7 +156,7 @@ function ResultCard({
               type="button"
               variant="ghost"
               size="icon-sm"
-              onClick={() => onJudge(hit, true)}
+              onClick={() => onJudge(hit.document_id, true)}
               aria-label="Релевантен"
               aria-pressed={judgment === "relevant"}
               className={cn(
@@ -157,7 +170,7 @@ function ResultCard({
               type="button"
               variant="ghost"
               size="icon-sm"
-              onClick={() => onJudge(hit, false)}
+              onClick={() => onJudge(hit.document_id, false)}
               aria-label="Не релевантен"
               aria-pressed={judgment === "not_relevant"}
               className={cn(
@@ -174,8 +187,139 @@ function ResultCard({
   );
 }
 
+const COLLECTION_DOCS_PAGE_SIZE = 20;
+
+function CollectionJudgmentBrowser({
+  collectionId,
+  documentTotal,
+  excludeIds,
+  judgments,
+  onJudge,
+}: {
+  collectionId: number;
+  documentTotal: number;
+  excludeIds: Set<number>;
+  judgments: Record<number, JudgmentState>;
+  onJudge: (documentId: number, isRelevant: boolean) => void;
+}) {
+  const [documents, setDocuments] = useState<DocumentSummary[]>([]);
+  const [offset, setOffset] = useState(0);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    listDocuments(collectionId, { limit: COLLECTION_DOCS_PAGE_SIZE, offset })
+      .then((docs) => {
+        if (!cancelled) setDocuments(docs);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [collectionId, offset]);
+
+  const visible = documents.filter((doc) => !excludeIds.has(doc.id));
+
+  return (
+    <div className="flex flex-col gap-3 rounded-md border border-dashed p-4">
+      <p className="text-xs text-muted-foreground">
+        Остальные документы коллекции — не входят в текущую выдачу. Отметьте здесь те, что
+        релевантны запросу, но поиск их не нашёл: без этого Recall всегда будет считаться по
+        документам, которые и так были найдены, то есть искусственно равен 1.
+      </p>
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Загрузка…</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {visible.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              На этой странице все документы уже есть в выдаче выше.
+            </p>
+          )}
+          {visible.map((doc) => {
+            const judgment = judgments[doc.id] ?? null;
+            return (
+              <div
+                key={doc.id}
+                className="flex items-center justify-between gap-3 rounded-md border p-2.5"
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium">{doc.title}</div>
+                  {doc.url && (
+                    <div className="truncate text-xs text-muted-foreground">{doc.url}</div>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => onJudge(doc.id, true)}
+                    aria-label="Релевантен"
+                    aria-pressed={judgment === "relevant"}
+                    className={cn(
+                      "transition-all duration-150 hover:scale-110",
+                      judgment === "relevant" && "bg-emerald-600/15 text-emerald-600 dark:text-emerald-400",
+                    )}
+                  >
+                    <ThumbsUp className="size-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => onJudge(doc.id, false)}
+                    aria-label="Не релевантен"
+                    aria-pressed={judgment === "not_relevant"}
+                    className={cn(
+                      "transition-all duration-150 hover:scale-110",
+                      judgment === "not_relevant" && "bg-destructive/15 text-destructive",
+                    )}
+                  >
+                    <ThumbsDown className="size-4" />
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <div className="flex items-center justify-between">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={offset === 0 || loading}
+          onClick={() => setOffset((o) => Math.max(0, o - COLLECTION_DOCS_PAGE_SIZE))}
+        >
+          <ChevronLeft className="size-4" />
+          Назад
+        </Button>
+        <span className="text-xs text-muted-foreground">
+          {Math.min(offset + 1, documentTotal)}–{Math.min(offset + documents.length, documentTotal)} из{" "}
+          {documentTotal}
+        </span>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={loading || offset + COLLECTION_DOCS_PAGE_SIZE >= documentTotal}
+          onClick={() => setOffset((o) => o + COLLECTION_DOCS_PAGE_SIZE)}
+        >
+          Дальше
+          <ChevronRight className="size-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function SearchPage() {
   const { selected, selectedId, latestIndexJob } = useCollectionContext();
+  const { models, selectedModelKey, setSelectedModelKey } = useSearchModelContext();
   const [text, setText] = useState("");
   const [topK, setTopK] = useState(10);
   const [submittedWords, setSubmittedWords] = useState<string[]>([]);
@@ -187,6 +331,7 @@ export function SearchPage() {
   const [judgmentMode, setJudgmentMode] = useState(
     () => localStorage.getItem(JUDGMENT_MODE_STORAGE_KEY) === "1",
   );
+  const [showFullCollection, setShowFullCollection] = useState(false);
 
   const isIndexed = latestIndexJob?.status === "completed";
   const isStale =
@@ -215,10 +360,30 @@ export function SearchPage() {
 
     setLoading(true);
     setJudgments({});
+    setShowFullCollection(false);
     try {
-      const result = await search({ collection_id: selectedId, text, top_k: topK });
+      const result = await search({
+        collection_id: selectedId,
+        text,
+        top_k: topK,
+        model: selectedModelKey,
+      });
       setResponse(result);
       setSubmittedWords(text.trim().split(/\s+/));
+      // The query text may already have prior runs/judgments (queries are
+      // deduped by collection+text) — hydrate from those instead of
+      // starting blank, otherwise previously marked documents would look
+      // unjudged until re-clicked.
+      try {
+        const existing = await listJudgments(result.query_id);
+        setJudgments(
+          Object.fromEntries(
+            existing.map((j) => [j.document_id, j.is_relevant ? "relevant" : "not_relevant"]),
+          ),
+        );
+      } catch {
+        // Non-critical: results still render, just without pre-filled marks.
+      }
     } catch (err) {
       setResponse(null);
       const message = err instanceof Error ? err.message : String(err);
@@ -232,13 +397,13 @@ export function SearchPage() {
     }
   }
 
-  async function handleJudgment(hit: SearchHit, isRelevant: boolean) {
+  async function handleJudgment(documentId: number, isRelevant: boolean) {
     if (!response) return;
     try {
-      await setJudgment(response.query_id, hit.document_id, isRelevant);
+      await setJudgment(response.query_id, documentId, isRelevant);
       setJudgments((prev) => ({
         ...prev,
-        [hit.document_id]: isRelevant ? "relevant" : "not_relevant",
+        [documentId]: isRelevant ? "relevant" : "not_relevant",
       }));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -291,17 +456,43 @@ export function SearchPage() {
                   <SlidersHorizontal className="size-4" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent align="end" className="w-64">
-                <div className="grid gap-1.5">
-                  <Label htmlFor="search-top-k">Число результатов (Топ-K)</Label>
-                  <Input
-                    id="search-top-k"
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={topK}
-                    onChange={(e) => setTopK(Number(e.target.value))}
-                  />
+              <PopoverContent align="end" className="w-72">
+                <div className="flex flex-col gap-3">
+                  <div className="grid gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="search-model">Модель поиска</Label>
+                      <Link
+                        to="/help#search-models"
+                        aria-label="Подробнее о моделях поиска"
+                        className="text-muted-foreground transition-colors hover:text-primary"
+                      >
+                        <HelpCircle className="size-3.5" />
+                      </Link>
+                    </div>
+                    <Select value={selectedModelKey} onValueChange={setSelectedModelKey}>
+                      <SelectTrigger id="search-model" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {models.map((m) => (
+                          <SelectItem key={m.key} value={m.key}>
+                            {m.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="search-top-k">Число результатов (Топ-K)</Label>
+                    <Input
+                      id="search-top-k"
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={topK}
+                      onChange={(e) => setTopK(Number(e.target.value))}
+                    />
+                  </div>
                 </div>
               </PopoverContent>
             </Popover>
@@ -320,6 +511,7 @@ export function SearchPage() {
               {response.hits.length > 0
                 ? `Найдено ${response.hits.length} по запросу «${response.query_text}»`
                 : `Совпадений не найдено по запросу «${response.query_text}»`}
+              <span className="text-muted-foreground/70"> · модель: {response.model_label}</span>
             </p>
             <label className="flex shrink-0 items-center gap-2 text-sm">
               <span className="text-muted-foreground">Режим разметки</span>
@@ -338,6 +530,30 @@ export function SearchPage() {
                   onJudge={handleJudgment}
                 />
               ))}
+            </div>
+          )}
+
+          {judgmentMode && selectedId !== null && selected !== null && (
+            <div className="flex flex-col gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-fit"
+                onClick={() => setShowFullCollection((v) => !v)}
+              >
+                <ListChecks className="size-4" />
+                {showFullCollection ? "Скрыть остальные документы" : "Проверить остальные документы коллекции"}
+              </Button>
+              {showFullCollection && (
+                <CollectionJudgmentBrowser
+                  collectionId={selectedId}
+                  documentTotal={selected.document_count}
+                  excludeIds={new Set(response.hits.map((hit) => hit.document_id))}
+                  judgments={judgments}
+                  onJudge={handleJudgment}
+                />
+              )}
             </div>
           )}
         </div>

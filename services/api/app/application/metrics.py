@@ -2,12 +2,19 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.metrics import CollectionMetricsSummary, MetricsError, QueryMetrics, average_curves
+from app.domain.metrics import (
+    CollectionMetricsSummary,
+    MetricsError,
+    QueryMetrics,
+    average_curves,
+    mean_of,
+)
 from app.infrastructure.nlp_client import NlpServiceClient
 from app.infrastructure.repositories import (
     MetricResultRepository,
     QueryRepository,
     RelevanceJudgmentRepository,
+    SearchModelRepository,
 )
 
 
@@ -16,7 +23,9 @@ class MetricsService:
     official ROMIP'2004 methodology, tasks/romip_metrics.pdf): scores one
     search run against its query's relevance judgments (qrels), or rolls up
     every judged query in a collection into MAP + micro-averaged P/R/F1 + an
-    averaged 11-point curve for the report.
+    averaged 11-point curve for the report — scoped to one search model at a
+    time, so multiple models' summaries can be compared side by side (see
+    compare()).
     """
 
     def __init__(self, session: AsyncSession, nlp_client: NlpServiceClient | None = None) -> None:
@@ -24,6 +33,7 @@ class MetricsService:
         self._queries = QueryRepository(session)
         self._judgments = RelevanceJudgmentRepository(session)
         self._metric_results = MetricResultRepository(session)
+        self._models = SearchModelRepository(session)
         self._nlp = nlp_client or NlpServiceClient()
 
     async def evaluate_run(self, search_run_id: int) -> QueryMetrics:
@@ -68,11 +78,18 @@ class MetricsService:
             curve=[tuple(point) for point in evaluated["curve"]],
         )
 
-    async def collection_summary(self, collection_id: int) -> CollectionMetricsSummary:
+    async def collection_summary(
+        self, collection_id: int, *, model: str = "tfidf"
+    ) -> CollectionMetricsSummary:
+        model_row = await self._models.get_by_key(model)
+        if model_row is None:
+            raise MetricsError(f"unknown search model '{model}'")
+
         queries = await self._queries.list_queries_by_collection(collection_id)
 
         per_query: list[QueryMetrics] = []
         runs_for_aggregate: list[tuple[list[int], list[int]]] = []
+        unscored_judged_queries = 0
         for query in queries:
             judgments = await self._judgments.list_for_query(query.id)
             if not judgments:
@@ -81,9 +98,13 @@ class MetricsService:
             if not relevant_ids:
                 # romip_metrics.pdf, section 1: queries with no relevant
                 # documents are excluded from metric computation (0/0).
+                unscored_judged_queries += 1
                 continue
-            run = await self._queries.latest_search_run_for_query(query.id)
+            run = await self._queries.latest_search_run_for_query(query.id, model_id=model_row.id)
             if run is None:
+                # This model hasn't been used to search this query yet —
+                # it simply doesn't contribute a row for it, rather than
+                # showing a misleading zero.
                 continue
 
             query_metrics = await self.evaluate_run(run.id)
@@ -95,12 +116,18 @@ class MetricsService:
         if not per_query:
             return CollectionMetricsSummary(
                 collection_id=collection_id,
+                model=model_row.key,
+                model_label=model_row.label,
                 map=0.0,
+                mean_r_precision=0.0,
+                mean_precision_at_5=0.0,
+                mean_precision_at_10=0.0,
                 micro_precision=0.0,
                 micro_recall=0.0,
                 micro_f1=0.0,
                 queries=[],
                 curve=[],
+                unscored_judged_queries=unscored_judged_queries,
             )
 
         aggregate = await self._nlp.aggregate_metrics(runs_for_aggregate)
@@ -108,10 +135,26 @@ class MetricsService:
 
         return CollectionMetricsSummary(
             collection_id=collection_id,
+            model=model_row.key,
+            model_label=model_row.label,
             map=aggregate["map"],
+            # romip_metrics.pdf doesn't state how R-precision/precision(n)
+            # roll up across queries, only that AP does (as MAP). We use the
+            # same macro-average (mean of each query's own value) for
+            # consistency — the standard trec_eval convention.
+            mean_r_precision=mean_of([q.r_precision for q in per_query]),
+            mean_precision_at_5=mean_of([q.precision_at_5 for q in per_query]),
+            mean_precision_at_10=mean_of([q.precision_at_10 for q in per_query]),
             micro_precision=aggregate["micro_precision"],
             micro_recall=aggregate["micro_recall"],
             micro_f1=aggregate["micro_f1"],
             queries=per_query,
             curve=curve,
+            unscored_judged_queries=unscored_judged_queries,
         )
+
+    async def compare(self, collection_id: int, models: list[str]) -> list[CollectionMetricsSummary]:
+        """One collection_summary() per requested model key — collection
+        sizes here are course-project scale, so a sequential loop needs no
+        concurrency machinery."""
+        return [await self.collection_summary(collection_id, model=key) for key in models]

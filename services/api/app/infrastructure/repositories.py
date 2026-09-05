@@ -11,11 +11,13 @@ from ips_db import (
     CrawlSeed,
     CrawlUrl,
     Document,
+    DocumentEmbedding,
     DocumentTerm,
     IndexJob,
     MetricResult,
     Query,
     RelevanceJudgment,
+    SearchModel,
     SearchResult,
     SearchRun,
     Term,
@@ -263,6 +265,77 @@ class IndexRepository:
         return int(result.scalar_one())
 
 
+class SearchModelRepository:
+    """Reads the search_models registry seeded by migrations (see
+    migrations/versions/0005_search_models.py) — the schema never changes
+    when a new model is added, only a new seeded row."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get_by_key(self, key: str) -> SearchModel | None:
+        result = await self._session.execute(select(SearchModel).where(SearchModel.key == key))
+        return result.scalars().first()
+
+    async def list_active(self) -> list[SearchModel]:
+        result = await self._session.execute(
+            select(SearchModel).where(SearchModel.is_active.is_(True)).order_by(SearchModel.id)
+        )
+        return list(result.scalars().all())
+
+    async def list_all(self) -> list[SearchModel]:
+        result = await self._session.execute(select(SearchModel).order_by(SearchModel.id))
+        return list(result.scalars().all())
+
+
+class EmbeddingRepository:
+    """Writes/reads document_embeddings — the dense-model counterpart to
+    IndexRepository's term_weights. Vectors are stored zero-padded to
+    MAX_EMBEDDING_DIM by the caller (see embedding_padding.pad_to_max_dim)
+    before reaching this repository."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def clear_for_documents(self, document_ids: list[int], search_model_id: int) -> None:
+        if not document_ids:
+            return
+        await self._session.execute(
+            delete(DocumentEmbedding).where(
+                DocumentEmbedding.search_model_id == search_model_id,
+                DocumentEmbedding.document_id.in_(document_ids),
+            )
+        )
+
+    async def bulk_write(self, rows: list[dict[str, object]]) -> None:
+        """rows: [{document_id, search_model_id, embedding}, ...]."""
+        if not rows:
+            return
+        await self._session.execute(insert(DocumentEmbedding), rows)
+
+    async def nearest(
+        self, document_ids: list[int], search_model_id: int, query_vector: list[float]
+    ) -> list[tuple[int, float]]:
+        """Every document in `document_ids` that has a stored vector under
+        this model, ranked by cosine similarity, best first — not limited,
+        so rank-sensitive metrics (AP/R-precision/the curve) stay correct
+        the same way TF-IDF's full ranking does. pgvector's `<=>` operator
+        returns cosine *distance*; we return `1 - distance` so the score
+        scale matches TF-IDF's dot product (higher is better)."""
+        if not document_ids:
+            return []
+        distance = DocumentEmbedding.embedding.cosine_distance(query_vector)
+        result = await self._session.execute(
+            select(DocumentEmbedding.document_id, distance.label("distance"))
+            .where(
+                DocumentEmbedding.search_model_id == search_model_id,
+                DocumentEmbedding.document_id.in_(document_ids),
+            )
+            .order_by(distance)
+        )
+        return [(doc_id, 1.0 - dist) for doc_id, dist in result.all()]
+
+
 class IndexJobRepository:
     """Tracks indexing progress the same way CrawlJobRepository tracks
     crawling — a DB row api.interface.routers.index_jobs polls/pushes so the
@@ -335,7 +408,21 @@ class QueryRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def create_query(self, *, collection_id: int, text: str) -> Query:
+    async def get_or_create_query(self, *, collection_id: int, text: str) -> Query:
+        """Reuses the existing Query row for this exact (collection, text)
+        pair rather than inserting a new one per search: relevance
+        judgments are keyed by query_id, so re-running the same query text
+        (e.g. with a larger top_k to look further down the ranking) has to
+        land on the same query for those judgments to accumulate into one
+        qrel set — otherwise the "relevant" universe a run is scored
+        against can never extend past that one run's own results, which
+        makes recall trivially 1.0 whenever anything is marked relevant."""
+        result = await self._session.execute(
+            select(Query).where(Query.collection_id == collection_id, Query.text == text)
+        )
+        existing = result.scalars().first()
+        if existing is not None:
+            return existing
         query = Query(collection_id=collection_id, text=text)
         self._session.add(query)
         await self._session.flush()
@@ -350,8 +437,8 @@ class QueryRepository:
         )
         return list(result.scalars().all())
 
-    async def create_search_run(self, *, query_id: int) -> SearchRun:
-        run = SearchRun(query_id=query_id)
+    async def create_search_run(self, *, query_id: int, model_id: int) -> SearchRun:
+        run = SearchRun(query_id=query_id, model_id=model_id)
         self._session.add(run)
         await self._session.flush()
         return run
@@ -359,10 +446,10 @@ class QueryRepository:
     async def get_search_run(self, search_run_id: int) -> SearchRun | None:
         return await self._session.get(SearchRun, search_run_id)
 
-    async def latest_search_run_for_query(self, query_id: int) -> SearchRun | None:
+    async def latest_search_run_for_query(self, query_id: int, *, model_id: int) -> SearchRun | None:
         result = await self._session.execute(
             select(SearchRun)
-            .where(SearchRun.query_id == query_id)
+            .where(SearchRun.query_id == query_id, SearchRun.model_id == model_id)
             .order_by(SearchRun.id.desc())
             .limit(1)
         )
@@ -534,10 +621,11 @@ class CrawlJobRepository:
     async def get(self, job_id: int) -> CrawlJob | None:
         return await self._session.get(CrawlJob, job_id)
 
-    async def list(self, *, limit: int = 50) -> list[CrawlJob]:
-        result = await self._session.execute(
-            select(CrawlJob).order_by(CrawlJob.id.desc()).limit(limit)
-        )
+    async def list(self, *, collection_id: int | None = None, limit: int = 50) -> list[CrawlJob]:
+        query = select(CrawlJob).order_by(CrawlJob.id.desc()).limit(limit)
+        if collection_id is not None:
+            query = query.where(CrawlJob.collection_id == collection_id)
+        result = await self._session.execute(query)
         return list(result.scalars().all())
 
     async def list_pending(self) -> list[CrawlJob]:
@@ -585,10 +673,24 @@ class CrawlUrlRepository:
         await self._session.flush()
         return entries
 
+    # Only URLs that were actually fetched and evaluated as a document
+    # candidate — succeeded, failed to fetch, or were fetched but rejected
+    # (too short, duplicate). Excludes "queued"/"fetching" (not resolved
+    # yet) and "blocked" (robots.txt disallowed it before it was ever
+    # fetched, so it was never a candidate at all).
+    _DOCUMENT_CANDIDATE_STATUSES = (
+        CrawlUrlStatus.SUCCESS.value,
+        CrawlUrlStatus.FAILED.value,
+        CrawlUrlStatus.SKIPPED.value,
+    )
+
     async def list_by_job(self, job_id: int, *, limit: int = 50) -> list[CrawlUrl]:
         result = await self._session.execute(
             select(CrawlUrl)
-            .where(CrawlUrl.job_id == job_id)
+            .where(
+                CrawlUrl.job_id == job_id,
+                CrawlUrl.status.in_(self._DOCUMENT_CANDIDATE_STATUSES),
+            )
             .order_by(CrawlUrl.id.desc())
             .limit(limit)
         )

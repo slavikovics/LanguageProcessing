@@ -35,12 +35,34 @@ class QueryMetrics:
 @dataclass(frozen=True)
 class CollectionMetricsSummary:
     collection_id: int
+    model: str
+    model_label: str
     map: float
+    mean_r_precision: float
+    mean_precision_at_5: float
+    mean_precision_at_10: float
     micro_precision: float
     micro_recall: float
     micro_f1: float
     queries: list[QueryMetrics]
     curve: list[tuple[float, float]]
+    unscored_judged_queries: int = 0
+    """Queries that have relevance judgments but were left out of the
+    numbers above because none of those judgments is "relevant" — recall
+    and AP are undefined at zero relevant documents (romip_metrics.pdf,
+    section 1), not merely zero. Surfaced separately so the UI can tell
+    this apart from "nothing has been judged yet"."""
+
+
+def mean_of(values: list[float]) -> float:
+    """Macro-average across queries — the same aggregation MAP itself uses
+    for average_precision (romip_metrics.pdf doesn't spell out how to roll
+    up R-precision/precision(n) across queries, but this is the standard
+    TREC convention: report the mean of each query's own value, exactly
+    parallel to "MAP = mean of AP")."""
+    if not values:
+        return 0.0
+    return sum(values) / len(values)
 
 
 def average_curves(curves: list[list[tuple[float, float]]]) -> list[tuple[float, float]]:

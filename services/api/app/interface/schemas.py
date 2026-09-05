@@ -146,6 +146,7 @@ class SearchRequest(BaseModel):
     collection_id: int
     text: str
     top_k: int = 10
+    model: str = "tfidf"
 
 
 class SearchHitOut(BaseModel):
@@ -162,12 +163,24 @@ class SearchHitOut(BaseModel):
 
 
 class SearchResponseOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
     query_id: int
     search_run_id: int
     query_text: str
+    model: str
+    model_label: str
     hits: list[SearchHitOut]
+
+
+class SearchModelOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    key: str
+    label: str
+    kind: str
+    dimension: int | None
 
 
 class QueryOut(BaseModel):
@@ -207,12 +220,22 @@ class QueryMetricsOut(BaseModel):
 
 
 class CollectionMetricsSummaryOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
     collection_id: int
+    model: str
+    model_label: str
     map: float
+    mean_r_precision: float
+    mean_precision_at_5: float
+    mean_precision_at_10: float
     micro_precision: float
     micro_recall: float
     micro_f1: float
     queries: list[QueryMetricsOut]
     curve: list[tuple[float, float]]
+    unscored_judged_queries: int = 0
+
+
+class MetricsCompareResponseOut(BaseModel):
+    summaries: list[CollectionMetricsSummaryOut]

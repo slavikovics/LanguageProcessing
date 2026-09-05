@@ -10,6 +10,7 @@ requires-python = ">=3.11"
 dependencies = [
     "sqlalchemy>=2.0,<2.1",
     "asyncpg>=0.29,<0.31",
+    "pgvector>=0.3,<0.4",
 ]
 
 [tool.setuptools.packages.find]

@@ -7,9 +7,11 @@ import type {
   DocumentDetail,
   DocumentSummary,
   IndexJob,
+  MetricsCompareResponse,
   QueryMetrics,
   QuerySummary,
   RelevanceJudgment,
+  SearchModel,
   SearchResponse,
 } from "./types";
 
@@ -92,8 +94,9 @@ export function createCrawlJob(input: CreateCrawlJobInput): Promise<CrawlJob> {
   });
 }
 
-export function listCrawlJobs(): Promise<CrawlJob[]> {
-  return request<CrawlJob[]>("/crawl-jobs");
+export function listCrawlJobs(collectionId?: number): Promise<CrawlJob[]> {
+  const query = collectionId !== undefined ? `?collection_id=${collectionId}` : "";
+  return request<CrawlJob[]>(`/crawl-jobs${query}`);
 }
 
 export function getCrawlJob(id: number): Promise<CrawlJobProgress> {
@@ -163,6 +166,7 @@ export interface SearchInput {
   collection_id: number;
   text: string;
   top_k?: number;
+  model?: string;
 }
 
 export function search(input: SearchInput): Promise<SearchResponse> {
@@ -170,6 +174,10 @@ export function search(input: SearchInput): Promise<SearchResponse> {
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export function listSearchModels(): Promise<SearchModel[]> {
+  return request<SearchModel[]>("/search-models");
 }
 
 export function listCollectionQueries(collectionId: number): Promise<QuerySummary[]> {
@@ -199,6 +207,19 @@ export function evaluateSearchRun(searchRunId: number): Promise<QueryMetrics> {
   return request<QueryMetrics>(`/search-runs/${searchRunId}/metrics`, { method: "POST" });
 }
 
-export function getCollectionMetricsSummary(collectionId: number): Promise<CollectionMetricsSummary> {
-  return request<CollectionMetricsSummary>(`/collections/${collectionId}/metrics/summary`);
+export function getCollectionMetricsSummary(
+  collectionId: number,
+  model = "tfidf",
+): Promise<CollectionMetricsSummary> {
+  return request<CollectionMetricsSummary>(
+    `/collections/${collectionId}/metrics/summary?model=${encodeURIComponent(model)}`,
+  );
+}
+
+export function getMetricsComparison(
+  collectionId: number,
+  modelKeys: string[] = [],
+): Promise<MetricsCompareResponse> {
+  const query = modelKeys.length > 0 ? `?models=${modelKeys.map(encodeURIComponent).join(",")}` : "";
+  return request<MetricsCompareResponse>(`/collections/${collectionId}/metrics/compare${query}`);
 }

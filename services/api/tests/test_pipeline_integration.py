@@ -12,7 +12,7 @@ import re
 
 import pytest
 import pytest_asyncio
-from ips_db import Base, Collection, Document
+from ips_db import Base, Collection, Document, SearchModel
 from nlp_core import metrics, weighting
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -82,6 +82,22 @@ class _InProcessNlpClient(NlpServiceClient):
             "curve": metrics.interpolated_precision_recall(ranked_ids, relevant),
         }
 
+    async def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        """Deterministic 8-dim stand-in for the real dense encoder: a bag-
+        of-words hash into fixed buckets, L2-normalized like the real
+        sentence-transformers call (normalize_embeddings=True)."""
+        vectors = []
+        for text in texts:
+            bucket = [0.0] * 8
+            for word in _fake_lemmatize(text):
+                bucket[hash(word) % 8] += 1.0
+            norm = sum(v * v for v in bucket) ** 0.5
+            vectors.append([v / norm for v in bucket] if norm else bucket)
+        return vectors
+
+    async def embed_query(self, text: str) -> list[float]:
+        return (await self.embed_documents([text]))[0]
+
     async def aggregate_metrics(self, runs) -> dict:
         pairs = [(ranked, set(relevant)) for ranked, relevant in runs]
         average_precisions = [metrics.average_precision(r, rel) for r, rel in pairs]
@@ -108,7 +124,25 @@ async def session_factory(tmp_path):
     engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    yield async_sessionmaker(engine, expire_on_commit=False)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    # Production seeds search_models via migration 0005; these throwaway
+    # SQLite databases are built from Base.metadata directly (no alembic),
+    # so the same two rows are seeded here instead.
+    async with factory() as session:
+        session.add_all(
+            [
+                SearchModel(key="tfidf", label="TF-IDF", kind="tfidf", dimension=None, is_active=True),
+                SearchModel(
+                    key="gte-multilingual-base",
+                    label="GTE Multilingual Base",
+                    kind="dense_embedding",
+                    dimension=768,
+                    is_active=True,
+                ),
+            ]
+        )
+        await session.commit()
+    yield factory
     await engine.dispose()
 
 
@@ -140,7 +174,10 @@ async def test_full_pipeline_index_search_judge_metrics(session_factory, collect
 
     async with session_factory() as session:
         summary = await IndexingService(session, nlp).reindex_collection_now(collection_id)
-    assert summary.documents_indexed == 3
+    # documents_processed/documents_total count units across every active
+    # model's pass (see IndexingService._run) — 3 docs x 2 active models
+    # (tfidf + gte-multilingual-base, both seeded active in session_factory).
+    assert summary.documents_indexed == 6
     assert summary.terms_indexed > 0
 
     async with session_factory() as session:
@@ -180,6 +217,74 @@ async def test_full_pipeline_index_search_judge_metrics(session_factory, collect
     assert len(collection_summary.queries) == 1
     assert collection_summary.map == pytest.approx(query_metrics.average_precision)
     assert len(collection_summary.curve) == 11
+    assert collection_summary.model == "tfidf"
+
+
+@pytest.mark.asyncio
+async def test_metrics_are_scoped_per_model(session_factory, collection_with_documents):
+    """MetricsService.collection_summary/compare must key off search_runs.
+    model_id, not just "the latest run for this query" — two models'
+    results for the same query must be evaluated and reported
+    independently. The embedding model's search_run/search_results are
+    inserted directly via the repositories here (bypassing
+    EmbeddingSearchBackend, which issues a pgvector-specific `<=>` SQL
+    operator that plain SQLite — used by this test's throwaway DB — has no
+    equivalent for; that backend's real behavior is exercised against the
+    actual Postgres+pgvector stack instead, not this offline suite)."""
+    collection_id = collection_with_documents
+    nlp = _InProcessNlpClient()
+
+    async with session_factory() as session:
+        await IndexingService(session, nlp).reindex_collection_now(collection_id)
+
+    async with session_factory() as session:
+        tfidf_response = await SearchService(session, nlp).search(
+            collection_id=collection_id, text="cats domestic animals", top_k=10, model="tfidf"
+        )
+    cats_doc_id = tfidf_response.hits[0].document_id
+
+    async with session_factory() as session:
+        from app.infrastructure.repositories import QueryRepository, RelevanceJudgmentRepository, SearchModelRepository
+
+        embedding_model = await SearchModelRepository(session).get_by_key("gte-multilingual-base")
+        queries = QueryRepository(session)
+        # Same (collection, text) pools onto the same Query row (query-level
+        # pooling stays model-agnostic) — reuse it rather than creating a
+        # second Query, exactly like a real search under this model would.
+        query_row = await queries.get_or_create_query(collection_id=collection_id, text=tfidf_response.query_text)
+        assert query_row.id == tfidf_response.query_id
+        embedding_run = await queries.create_search_run(query_id=query_row.id, model_id=embedding_model.id)
+        # A different ranking from tfidf's, to prove each summary reads its
+        # own model's run rather than "whatever the latest run is."
+        await queries.bulk_insert_results(embedding_run.id, [(cats_doc_id, 1, 0.9)])
+
+        await RelevanceJudgmentRepository(session).set_judgment(
+            query_id=tfidf_response.query_id, document_id=cats_doc_id, is_relevant=True
+        )
+        await session.commit()
+        embedding_run_id = embedding_run.id
+
+    async with session_factory() as session:
+        tfidf_summary = await MetricsService(session, nlp).collection_summary(collection_id, model="tfidf")
+    async with session_factory() as session:
+        embedding_summary = await MetricsService(session, nlp).collection_summary(
+            collection_id, model="gte-multilingual-base"
+        )
+
+    assert tfidf_summary.model == "tfidf"
+    assert len(tfidf_summary.queries) == 1
+    assert tfidf_summary.queries[0].search_run_id == tfidf_response.search_run_id
+
+    assert embedding_summary.model == "gte-multilingual-base"
+    assert len(embedding_summary.queries) == 1
+    assert embedding_summary.queries[0].search_run_id == embedding_run_id
+    # Both models scored the same one relevant document at rank 1 in their
+    # own ranking, so both should show a perfect AP for this query.
+    assert embedding_summary.queries[0].average_precision == pytest.approx(1.0)
+
+    async with session_factory() as session:
+        compared = await MetricsService(session, nlp).compare(collection_id, ["tfidf", "gte-multilingual-base"])
+    assert [s.model for s in compared] == ["tfidf", "gte-multilingual-base"]
 
 
 @pytest.mark.asyncio
@@ -213,8 +318,10 @@ async def test_index_job_reports_progress_across_multiple_chunks(session_factory
 
     assert finished is not None
     assert finished.status == "completed"
-    assert finished.documents_total == 12
-    assert finished.documents_processed == 12
+    # 12 docs x 2 active models (tfidf + gte-multilingual-base) — see the
+    # comment in test_full_pipeline_index_search_judge_metrics above.
+    assert finished.documents_total == 24
+    assert finished.documents_processed == 24
     assert finished.terms_indexed and finished.terms_indexed > 0
 
 

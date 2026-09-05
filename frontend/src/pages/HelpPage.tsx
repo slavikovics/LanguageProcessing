@@ -1,15 +1,16 @@
 import {
   BarChart3,
-  FileText,
+  Layers,
   Library,
+  ListOrdered,
   Search,
   ThumbsDown,
   ThumbsUp,
   Waypoints,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 function Feature({ title, children }: { title: string; children: ReactNode }) {
@@ -21,19 +22,75 @@ function Feature({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
+function MetricEntry({
+  id,
+  title,
+  formula,
+  children,
+}: {
+  id: string;
+  title: string;
+  formula?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      id={id}
+      className="scroll-mt-24 rounded-md border p-3 transition-colors duration-150 target:border-primary target:bg-primary/5"
+    >
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <span className="text-sm font-medium">{title}</span>
+        {formula && (
+          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">{formula}</code>
+        )}
+      </div>
+      <p className="mt-1 text-sm text-muted-foreground">{children}</p>
+    </div>
+  );
+}
+
+/** A vertical, connected step-by-step narrative — for describing a process
+ * (something that happens in order) rather than a flat set of independent
+ * facts, which is what the plain Feature cards are for. */
+function ProcessSteps({ steps }: { steps: { title: string; children: ReactNode }[] }) {
+  return (
+    <ol className="flex flex-col">
+      {steps.map((step, i) => (
+        <li key={i} className="relative flex gap-4 pb-6 last:pb-0">
+          {i < steps.length - 1 && (
+            <span
+              aria-hidden
+              className="absolute top-7 left-[13px] h-[calc(100%-1.25rem)] w-px bg-border"
+            />
+          )}
+          <span className="relative z-10 flex size-7 shrink-0 items-center justify-center rounded-full border bg-background text-xs font-semibold">
+            {i + 1}
+          </span>
+          <div className="flex flex-col gap-1 pt-0.5">
+            <span className="text-sm font-medium">{step.title}</span>
+            <p className="text-sm text-muted-foreground">{step.children}</p>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 function Section({
   icon: Icon,
   title,
   description,
+  id,
   children,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   title: string;
   description: string;
+  id?: string;
   children: ReactNode;
 }) {
   return (
-    <Card className="transition-shadow duration-200 hover:shadow-md">
+    <Card id={id} className="scroll-mt-24 transition-shadow duration-200 hover:shadow-md">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
@@ -43,12 +100,24 @@ function Section({
         </CardTitle>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-3 sm:grid-cols-2">{children}</CardContent>
+      <CardContent className="flex flex-col gap-3">{children}</CardContent>
     </Card>
   );
 }
 
 export function HelpPage() {
+  const { hash } = useLocation();
+
+  useEffect(() => {
+    if (!hash) return;
+    // React has already committed this page's DOM by the time effects run,
+    // so the target element is ready immediately. Instant rather than
+    // smooth: a smooth scroll's animation can silently stall if the tab
+    // loses focus/visibility right as it starts (e.g. switching apps mid-
+    // click), leaving the page stuck at the top instead of at the anchor.
+    document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: "instant", block: "start" });
+  }, [hash]);
+
   return (
     <div className="flex flex-col gap-6">
       <Card>
@@ -140,63 +209,165 @@ export function HelpPage() {
         </Feature>
         <Feature title="Эталонная разметка (qrels)">
           Проставленные оценки релевантности сохраняются как эталонная разметка запроса и
-          используются для расчёта метрик качества на вкладке «Метрики».
+          используются для расчёта метрик качества на вкладке «Метрики». Повторный поиск по тому
+          же тексту запроса — та же разметка: оценки накапливаются, а не начинаются заново.
+        </Feature>
+        <Feature title="Разметка вне выдачи">
+          В режиме разметки под результатами есть кнопка «Проверить остальные документы
+          коллекции» — список всех документов коллекции, которых нет в текущей выдаче. Отмечая
+          там документы как релевантные, вы расширяете эталонную разметку за пределы того, что
+          поиск вообще нашёл — это и делает Recall содержательной метрикой.
         </Feature>
       </Section>
 
       <Section
+        id="search-models"
+        icon={Layers}
+        title="Модели поиска"
+        description="Два независимых способа ранжирования — можно сравнивать их метрики бок о бок."
+      >
+        <Feature title="TF-IDF + косинусная мера">
+          Классическая векторная модель: запрос и документы раскладываются на термины,
+          взвешиваются по TF-IDF и сравниваются косинусной мерой. Быстро, объяснимо — карточки
+          результатов показывают, какие именно термины запроса совпали с документом.
+        </Feature>
+        <Feature title="Alibaba GTE Multilingual Base (эмбеддинги)">
+          Семантическая модель: документ и запрос кодируются в единый плотный вектор (768 чисел),
+          учитывающий смысл текста, а не только совпадение слов — поэтому находит документы на
+          других языках или без общей лексики с запросом. Контекст модели — 8192 токена, этого
+          достаточно почти для любого документа целиком, без разбиения на фрагменты. У таких
+          результатов нет списка «совпавших терминов» — это не про буквальное совпадение слов.
+        </Feature>
+        <Feature title="Общая разметка релевантности">
+          Оценки 👍/👎, проставленные для запроса на странице «Поиск», используются при подсчёте
+          метрик для любой модели — разметку достаточно сделать один раз, независимо от того, какой
+          моделью её проставили.
+        </Feature>
+        <Feature title="Сравнение на странице «Метрики»">
+          Отметьте нужные модели чекбоксами вверху страницы — таблицы и графики построятся сразу
+          для всех выбранных, с общим цветом для каждой модели. Если по какому-то запросу ещё нет
+          результата под одной из моделей, она просто не отображается в этой части сравнения — это
+          не то же самое, что нулевая оценка.
+        </Feature>
+      </Section>
+
+      <Section
+        id="metrics"
         icon={BarChart3}
         title="Метрики качества"
-        description="Официальная методика ROMIP'2004 (дорожка поиска) — считается по размеченным запросам."
+        description="Как считается качество ранжирования — методика ROMIP'2004, дорожка поиска."
       >
-        <Feature title="По каждому запросу">
-          Precision, Recall, F1 (по всему списку найденного), Precision(5) и Precision(10)
-          (точность на первых 5/10 документах), Average Precision, R-Precision и 11-точечная
-          интерполированная кривая Precision/Recall.
-        </Feature>
-        <Feature title="По коллекции">
-          MAP — среднее Average Precision по всем размеченным запросам (макроусреднение);
-          Precision/Recall/F1 коллекции — микроусреднение (суммирование по всем запросам, затем
-          деление), как того требует методика ROMIP.
-        </Feature>
-        <Feature title="Запросы без релевантных документов">
-          Запросы, для которых не отмечено ни одного релевантного документа, исключаются из
-          расчёта агрегатов — как предписывает методика.
-        </Feature>
-        <Feature title="Визуализация">
-          Сводные показатели, усреднённая P/R-кривая, сравнение Average Precision между запросами
-          и подробная таблица метрик по каждому запросу.
-        </Feature>
+        <ProcessSteps
+          steps={[
+            {
+              title: "Поиск сохраняет полное ранжирование",
+              children:
+                "Каждый поиск ранжирует всю коллекцию по сходству с запросом и сохраняет этот список целиком, а не только те несколько документов, что показаны на экране. Число результатов (Топ-K) в поле поиска влияет только на то, что видно, а не на то, что участвует в расчёте метрик.",
+            },
+            {
+              title: "Вы отмечаете релевантность",
+              children:
+                "На странице «Поиск», в режиме разметки, отмечайте 👍/👎 у найденных документов. Для документов, которых поиск не показал, — кнопка «Проверить остальные документы коллекции».",
+            },
+            {
+              title: "Метрики по запросу",
+              children:
+                "Precision, Recall, F1, Precision(5)/Precision(10), R-Precision, Average Precision и 11-точечная кривая — считаются по сохранённому полному ранжированию и текущей разметке.",
+            },
+            {
+              title: "Метрики по коллекции",
+              children:
+                "Каждый размеченный запрос вносит вклад в сводку: MAP и средние R-Precision/P@5/P@10 — как среднее по запросам; Precision/Recall/F1 коллекции — микроусреднением (ROMIP'2004, п. 1.2).",
+            },
+          ]}
+        />
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <MetricEntry id="metric-precision-recall" title="Precision и Recall" formula="p = a/(a+b), r = a/(a+c)">
+            Precision — доля релевантных документов среди найденных; Recall — доля найденных из
+            всех релевантных документов коллекции (ROMIP&apos;2004, п. 1.1.1–1.1.2). Здесь обе
+            считаются по всему сохранённому ранжированию.
+          </MetricEntry>
+
+          <MetricEntry id="metric-f1" title="F-мера" formula="F = 2 / (1/p + 1/r)">
+            Гармоническое среднее Precision и Recall — единая величина, близкая к нулю, если хотя
+            бы одна из двух метрик мала. В методике описана для дорожки классификации (п. 1.1.5);
+            здесь приведена как привычное дополнение рядом с Precision и Recall.
+          </MetricEntry>
+
+          <MetricEntry
+            id="metric-precision-at-n"
+            title="Precision(5) и Precision(10)"
+            formula="p(n) = релевантных среди первых n / n"
+          >
+            Точность на первых n документах выдачи — при n = 5 и n = 10 (п. 1.3.1). Показывает,
+            насколько полезной оказалась бы первая страница результатов.
+          </MetricEntry>
+
+          <MetricEntry
+            id="metric-r-precision"
+            title="R-Precision"
+            formula="R-Precision = p(n), n = число релевантных документов запроса"
+          >
+            То же самое Precision(n), но отсечка n своя для каждого запроса — равна числу его
+            релевантных документов (п. 1.3.2). У идеального ранжирования R-Precision всегда равна
+            1, поэтому метрику можно сравнивать между запросами с разным числом релевантных
+            документов.
+          </MetricEntry>
+
+          <MetricEntry id="metric-ap" title="Average Precision (AP)" formula="AP = (1/k) · Σ p(pos(i))">
+            Среднее значение Precision в момент нахождения каждого из k релевантных документов —
+            чем выше в списке они стоят, тем выше AP (п. 1.3.3); документ, которого нет в
+            ранжировании вовсе, даёт слагаемое 0. MAP на странице «Метрики» — среднее AP по всем
+            размеченным запросам коллекции.
+          </MetricEntry>
+
+          <MetricEntry id="metric-curve" title="11-точечная кривая Precision/Recall">
+            Precision как функция Recall на 11 фиксированных уровнях (0.0, 0.1, …, 1.0): для
+            каждого уровня берётся максимальная точность среди точек ранжирования, где полнота
+            достигла этого уровня или превысила его (п. 1.3.4, вариант TREC), затем усредняется по
+            размеченным запросам. Методика описывает и модифицированный вариант такой кривой
+            (RIRES) — здесь построен классический, TREC.
+          </MetricEntry>
+        </div>
+
+        <MetricEntry id="metric-qrels-scope" title="Запросы без релевантных документов">
+          Если для запроса не отмечено ни одного релевантного документа, он не попадает в
+          сводку — при нуле релевантных документов Precision, Recall и AP превращаются в
+          неопределённость вида 0/0 (п. 1).
+        </MetricEntry>
       </Section>
 
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <FileText className="size-4" />
+            <ListOrdered className="size-4" />
             Типичный порядок действий
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ol className="flex flex-col gap-2 text-sm">
-            <li className="flex items-center gap-2">
-              <Badge variant="secondary" className="shrink-0">1</Badge>
-              Создайте коллекцию и запустите краулинг с одного или нескольких стартовых адресов.
-            </li>
-            <li className="flex items-center gap-2">
-              <Badge variant="secondary" className="shrink-0">2</Badge>
-              При необходимости отредактируйте документы или добавьте свои HTML-файлы на вкладке
-              «Коллекции», затем постройте индекс.
-            </li>
-            <li className="flex items-center gap-2">
-              <Badge variant="secondary" className="shrink-0">3</Badge>
-              Выполните поисковые запросы и, включив режим разметки, отметьте релевантные и
-              нерелевантные документы.
-            </li>
-            <li className="flex items-center gap-2">
-              <Badge variant="secondary" className="shrink-0">4</Badge>
-              Оцените качество поиска на вкладке «Метрики».
-            </li>
-          </ol>
+          <ProcessSteps
+            steps={[
+              {
+                title: "Соберите коллекцию",
+                children: "Создайте коллекцию и запустите краулинг с одного или нескольких стартовых адресов.",
+              },
+              {
+                title: "Приведите документы в порядок",
+                children:
+                  "При необходимости отредактируйте документы или добавьте свои HTML-файлы на вкладке «Коллекции», затем постройте индекс.",
+              },
+              {
+                title: "Найдите и разметьте",
+                children:
+                  "Выполните поисковые запросы и, включив режим разметки, отметьте релевантные и нерелевантные документы.",
+              },
+              {
+                title: "Оцените качество",
+                children: "Оцените качество поиска на вкладке «Метрики».",
+              },
+            ]}
+          />
         </CardContent>
       </Card>
     </div>

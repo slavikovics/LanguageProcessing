@@ -24,10 +24,20 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from pgvector.sqlalchemy import Vector
 
 
 class Base(DeclarativeBase):
     pass
+
+
+# Fixed width of the `document_embeddings.embedding` column. Every dense
+# model's native vector (e.g. 768 for gte-multilingual-base) is zero-padded
+# up to this length before being stored — cosine similarity is invariant to
+# appending equal zero-padding to both compared vectors, and vectors are
+# only ever compared within the same search_model_id, so one shared column
+# width serves any number of dense models without a schema change per model.
+MAX_EMBEDDING_DIM = 1024
 
 
 class Collection(Base):
@@ -96,6 +106,39 @@ class TermWeight(Base):
     weight: Mapped[float] = mapped_column(Float)
 
 
+class SearchModel(Base):
+    """Registry of pluggable search algorithms (TF-IDF, dense embedding
+    models, ...). This table's schema never changes when a new model is
+    added — a new model is just one seeded row (see migrations), keyed by a
+    stable `key` string that `search_runs.model_id` and the frontend refer
+    to."""
+
+    __tablename__ = "search_models"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    key: Mapped[str] = mapped_column(String(64), unique=True)
+    label: Mapped[str] = mapped_column(String(200))
+    kind: Mapped[str] = mapped_column(String(20))  # "tfidf" | "dense_embedding"
+    dimension: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
+
+
+class DocumentEmbedding(Base):
+    """A document's dense vector under one registered model, zero-padded to
+    MAX_EMBEDDING_DIM (see the constant's docstring above)."""
+
+    __tablename__ = "document_embeddings"
+
+    document_id: Mapped[int] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), primary_key=True
+    )
+    search_model_id: Mapped[int] = mapped_column(
+        ForeignKey("search_models.id", ondelete="CASCADE"), primary_key=True
+    )
+    embedding: Mapped[list[float]] = mapped_column(Vector(MAX_EMBEDDING_DIM))
+
+
 class Query(Base):
     __tablename__ = "queries"
 
@@ -110,6 +153,7 @@ class SearchRun(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     query_id: Mapped[int] = mapped_column(ForeignKey("queries.id", ondelete="CASCADE"))
+    model_id: Mapped[int] = mapped_column(ForeignKey("search_models.id", ondelete="RESTRICT"))
     executed_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
 
 

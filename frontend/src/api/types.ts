@@ -22,7 +22,7 @@ export interface DocumentDetail extends DocumentSummary {
 }
 
 export type CrawlJobStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
-export type CrawlUrlStatus = "queued" | "fetching" | "success" | "failed" | "skipped";
+export type CrawlUrlStatus = "queued" | "fetching" | "success" | "failed" | "skipped" | "blocked";
 
 export type CrawlJobMode = "crawl" | "refresh";
 
@@ -91,6 +91,14 @@ export interface IndexJob {
 
 export const TERMINAL_INDEX_STATUSES: readonly IndexJobStatus[] = ["completed", "failed"];
 
+export interface SearchModel {
+  id: number;
+  key: string;
+  label: string;
+  kind: "tfidf" | "dense_embedding";
+  dimension: number | null;
+}
+
 export interface SearchHit {
   document_id: number;
   title: string;
@@ -106,6 +114,8 @@ export interface SearchResponse {
   query_id: number;
   search_run_id: number;
   query_text: string;
+  model: string;
+  model_label: string;
   hits: SearchHit[];
 }
 
@@ -141,10 +151,20 @@ export interface QueryMetrics {
 
 export interface CollectionMetricsSummary {
   collection_id: number;
+  model: string;
+  model_label: string;
   map: number;
+  mean_r_precision: number;
+  mean_precision_at_5: number;
+  mean_precision_at_10: number;
   micro_precision: number;
   micro_recall: number;
   micro_f1: number;
   queries: QueryMetrics[];
   curve: PrecisionRecallCurve;
+  unscored_judged_queries: number;
+}
+
+export interface MetricsCompareResponse {
+  summaries: CollectionMetricsSummary[];
 }

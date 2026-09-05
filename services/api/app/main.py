@@ -11,6 +11,7 @@ from app.interface.routers import (
     indexing,
     metrics,
     search,
+    search_models,
 )
 
 settings = get_settings()
@@ -32,4 +33,5 @@ app.include_router(crawl_jobs.router)
 app.include_router(crawl_seeds.router)
 app.include_router(indexing.router)
 app.include_router(search.router)
+app.include_router(search_models.router)
 app.include_router(metrics.router)
