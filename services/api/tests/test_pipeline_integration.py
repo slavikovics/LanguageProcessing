@@ -198,7 +198,7 @@ async def test_full_pipeline_index_search_judge_metrics(session_factory, collect
     dogs_hit = next((h for h in response.hits if h.title == "Dogs"), None)
 
     async with session_factory() as session:
-        from app.infrastructure.repositories import RelevanceJudgmentRepository
+        from app.infrastructure.repositories.judgments import RelevanceJudgmentRepository
 
         judgments = RelevanceJudgmentRepository(session)
         await judgments.set_judgment(
@@ -248,7 +248,9 @@ async def test_metrics_are_scoped_per_model(session_factory, collection_with_doc
     cats_doc_id = tfidf_response.hits[0].document_id
 
     async with session_factory() as session:
-        from app.infrastructure.repositories import QueryRepository, RelevanceJudgmentRepository, SearchModelRepository
+        from app.infrastructure.repositories.judgments import RelevanceJudgmentRepository
+        from app.infrastructure.repositories.queries import QueryRepository
+        from app.infrastructure.repositories.search_models import SearchModelRepository
 
         embedding_model = await SearchModelRepository(session).get_by_key("gte-multilingual-base")
         queries = QueryRepository(session)
@@ -316,7 +318,9 @@ async def test_rerun_all_and_compare_only_reruns_judged_queries(session_factory,
         )
 
     async with session_factory() as session:
-        from app.infrastructure.repositories import QueryRepository, RelevanceJudgmentRepository, SearchModelRepository
+        from app.infrastructure.repositories.judgments import RelevanceJudgmentRepository
+        from app.infrastructure.repositories.queries import QueryRepository
+        from app.infrastructure.repositories.search_models import SearchModelRepository
 
         await RelevanceJudgmentRepository(session).set_judgment(
             query_id=judged_response.query_id, document_id=cats_doc_id, is_relevant=True
@@ -410,7 +414,7 @@ async def test_deleting_indexed_document_does_not_break_search(session_factory, 
     cats_id = next(h.document_id for h in first.hits if h.title == "Cats")
 
     async with session_factory() as session:
-        from app.infrastructure.repositories import DocumentRepository
+        from app.infrastructure.repositories.documents import DocumentRepository
 
         repo = DocumentRepository(session)
         document = await repo.get(cats_id)
@@ -451,7 +455,7 @@ async def test_editing_document_text_is_stale_until_reindexed(session_factory, c
     assert dogs_id not in {h.document_id for h in before.hits}
 
     async with session_factory() as session:
-        from app.infrastructure.repositories import DocumentRepository
+        from app.infrastructure.repositories.documents import DocumentRepository
 
         repo = DocumentRepository(session)
         document = await repo.get(dogs_id)

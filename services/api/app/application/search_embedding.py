@@ -5,7 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.embedding_padding import pad_to_max_dim
 from app.infrastructure.nlp_client import NlpServiceClient
-from app.infrastructure.repositories import ChunkEmbeddingRepository, DocumentRepository
+from app.infrastructure.repositories.chunk_embeddings import ChunkEmbeddingRepository
+from app.infrastructure.repositories.documents import DocumentRepository
 
 
 class EmbeddingSearchBackend:

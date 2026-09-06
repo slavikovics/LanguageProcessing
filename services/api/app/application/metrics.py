@@ -11,23 +11,17 @@ from app.domain.metrics import (
 )
 from app.domain.search import DEFAULT_TOP_K, SearchError
 from app.infrastructure.nlp_client import NlpServiceClient
-from app.infrastructure.repositories import (
-    MetricResultRepository,
-    QueryRepository,
-    RelevanceJudgmentRepository,
-    SearchModelRepository,
-)
+from app.infrastructure.repositories.judgments import RelevanceJudgmentRepository
+from app.infrastructure.repositories.metrics import MetricResultRepository
+from app.infrastructure.repositories.queries import QueryRepository
+from app.infrastructure.repositories.search_models import SearchModelRepository
 
 
 class MetricsService:
-    """Оценка качества (docs/PROJECT_PLAN.md, stage 5; formulas from the
-    official ROMIP'2004 methodology, tasks/romip_metrics.pdf): scores one
-    search run against its query's relevance judgments (qrels), or rolls up
-    every judged query in a collection into MAP + mean R-precision/P@5/P@10
-    + an averaged 11-point curve for the report — scoped to one search model
-    at a time, so multiple models' summaries can be compared side by side
-    (see compare()).
-    """
+    """Scores one search run against its query's relevance judgments, or
+    rolls up every judged query in a collection into MAP + mean
+    R-precision/P@5/P@10/etc + an averaged curve, scoped to one search model
+    at a time so summaries can be compared across models (see compare())."""
 
     def __init__(self, session: AsyncSession, nlp_client: NlpServiceClient | None = None) -> None:
         self._session = session
@@ -98,15 +92,12 @@ class MetricsService:
                 continue
             relevant_ids = await self._judgments.relevant_document_ids(query.id)
             if not relevant_ids:
-                # romip_metrics.pdf, section 1: queries with no relevant
-                # documents are excluded from metric computation (0/0).
+                # Queries with no relevant documents are excluded (0/0 is undefined).
                 unscored_judged_queries += 1
                 continue
             run = await self._queries.latest_search_run_for_query(query.id, model_id=model_row.id)
             if run is None:
-                # This model hasn't been used to search this query yet —
-                # it simply doesn't contribute a row for it, rather than
-                # showing a misleading zero.
+                # Not searched with this model yet — no row, not a misleading zero.
                 continue
 
             query_metrics = await self.evaluate_run(run.id)
@@ -136,10 +127,6 @@ class MetricsService:
             collection_id=collection_id,
             model=model_row.key,
             model_label=model_row.label,
-            # MAP is defined as the mean of each query's own AP
-            # (romip_metrics.pdf section 1.3.3), same macro-average as
-            # R-precision/precision(n) below — no separate aggregation call
-            # needed.
             map=mean_of([q.average_precision for q in per_query]),
             mean_recall_at_5=mean_of([q.recall_at_5 for q in per_query]),
             mean_recall_at_10=mean_of([q.recall_at_10 for q in per_query]),
@@ -154,25 +141,18 @@ class MetricsService:
         )
 
     async def compare(self, collection_id: int, models: list[str]) -> list[CollectionMetricsSummary]:
-        """One collection_summary() per requested model key — collection
-        sizes here are course-project scale, so a sequential loop needs no
-        concurrency machinery."""
         return [await self.collection_summary(collection_id, model=key) for key in models]
 
     async def rerun_all_and_compare(
         self, collection_id: int, models: list[str]
     ) -> list[CollectionMetricsSummary]:
         """Re-executes every judged query against every requested model
-        before comparing — used by the metrics page's "Обновить" button so
-        the numbers reflect the current index/model (e.g. after
-        reindexing, or after switching the dense-embedding model) instead
-        of whatever search_run happened to run last, possibly under a
-        since-replaced index or model.
+        before comparing, so numbers reflect the current index/model rather
+        than a possibly stale search_run.
 
-        Imports SearchService locally rather than at module load: it's the
-        only place metrics needs the search feature, and importing it at
-        the top would make every metrics-only test pull in the tfidf/dense
-        backend stack too.
+        Imports SearchService locally: it's the only place metrics needs the
+        search feature, and a top-level import would pull the search backend
+        stack into every metrics-only test.
         """
         from app.application.search import SearchService
 
@@ -180,9 +160,6 @@ class MetricsService:
         search_service = SearchService(self._session, self._nlp)
         for query in queries:
             if not await self._judgments.list_for_query(query.id):
-                # Unjudged queries never contribute to the summary (see
-                # collection_summary above), so rerunning them would just
-                # burn API calls for nothing.
                 continue
             for model_key in models:
                 try:
@@ -190,10 +167,8 @@ class MetricsService:
                         collection_id=collection_id, text=query.text, top_k=DEFAULT_TOP_K, model=model_key
                     )
                 except SearchError:
-                    # e.g. the dense-embedding model isn't configured
-                    # (missing OPENROUTER_API_KEY) — leave that model's
-                    # existing runs (if any) alone rather than failing the
-                    # whole rerun for every other model.
+                    # e.g. the dense-embedding model isn't configured — leave
+                    # that model's existing runs alone rather than failing the rerun.
                     continue
 
         return await self.compare(collection_id, models)

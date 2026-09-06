@@ -65,11 +65,8 @@ async def cancel_crawl_job(job_id: int, db: AsyncSession = Depends(get_db)) -> C
 
 @router.websocket("/ws/{job_id}")
 async def crawl_job_progress_ws(websocket: WebSocket, job_id: int) -> None:
-    """Pushes CrawlJobProgressOut diffs by polling the crawl_jobs/crawl_urls
-    tables — the DB stays the single source of truth (see docs/PROJECT_PLAN.md,
-    3.1); the frontend can fall back to plain GET /crawl-jobs/{id} polling if
-    this connection drops.
-    """
+    """Polls crawl_jobs/crawl_urls and pushes diffs; the frontend falls back
+    to plain GET /crawl-jobs/{id} polling if this connection drops."""
     await websocket.accept()
     settings = get_settings()
     last_payload: str | None = None

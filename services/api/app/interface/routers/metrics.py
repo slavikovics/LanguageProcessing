@@ -4,11 +4,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application.metrics import MetricsService
 from app.core.database import get_db
 from app.domain.metrics import MetricsError
-from app.infrastructure.repositories import (
-    QueryRepository,
-    RelevanceJudgmentRepository,
-    SearchModelRepository,
-)
+from app.infrastructure.repositories.judgments import RelevanceJudgmentRepository
+from app.infrastructure.repositories.queries import QueryRepository
+from app.infrastructure.repositories.search_models import SearchModelRepository
 from app.interface.schemas import (
     CollectionMetricsSummaryOut,
     MetricsCompareResponseOut,

@@ -5,7 +5,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.documents import DocumentError, build_document_input
-from app.infrastructure.repositories import CollectionRepository, DocumentRepository
+from app.infrastructure.repositories.collections import CollectionRepository
+from app.infrastructure.repositories.documents import DocumentRepository
 
 _DUPLICATE_URL_MESSAGE = "a document with this URL already exists in this collection"
 

@@ -13,24 +13,19 @@ from app.domain.search import (
     build_snippet,
 )
 from app.infrastructure.nlp_client import NlpServiceClient
-from app.infrastructure.repositories import (
-    CollectionRepository,
-    DocumentRepository,
-    IndexRepository,
-    QueryRepository,
-    SearchModelRepository,
-    TermRepository,
-)
+from app.infrastructure.repositories.collections import CollectionRepository
+from app.infrastructure.repositories.documents import DocumentRepository
+from app.infrastructure.repositories.index import IndexRepository
+from app.infrastructure.repositories.queries import QueryRepository
+from app.infrastructure.repositories.search_models import SearchModelRepository
+from app.infrastructure.repositories.terms import TermRepository
 
 
 class SearchService:
-    """Dispatches to the search model named by `model` (default "tfidf" for
-    backward compatibility), then persists the run identically regardless
-    of which backend produced it — see app/domain/search_models.py for the
-    rank() contract every backend implements. Adding a model of an already-
-    supported kind (another dense-embedding checkpoint) needs no new
-    backend, only a new `search_models` registry row.
-    """
+    """Dispatches to the search model named by `model` (default "tfidf"),
+    then persists the run identically regardless of which backend produced
+    it. A model of an already-supported kind needs no new backend, only a
+    new search_models registry row."""
 
     def __init__(self, session: AsyncSession, nlp_client: NlpServiceClient | None = None) -> None:
         self._session = session
@@ -49,13 +44,9 @@ class SearchService:
     async def _matched_terms_for(
         self, *, collection: Collection, text: str, document_ids: list[int]
     ) -> dict[int, list[str]]:
-        """Which of the query's lemmas each document contains, straight
-        from the indexed TF-IDF vocabulary (document_terms/term_weights) —
-        a lexical-overlap fact about a document, independent of which
-        backend actually ranked it. Every collection gets a TF-IDF pass
-        during indexing regardless of which search models are active (see
-        IndexingService._run), so this is available for dense-embedding
-        hits too, not just tfidf ones."""
+        """Which of the query's lemmas each document contains, from the
+        indexed TF-IDF vocabulary — independent of which backend actually
+        ranked it, so this works for dense-embedding hits too."""
         if not document_ids:
             return {}
         query_lemmas = await self._nlp.lemmatize(text)
@@ -116,14 +107,9 @@ class SearchService:
             collection_id=config.collection_id, text=config.text
         )
         search_run = await self._queries.create_search_run(query_id=query_row.id, model_id=model_row.id)
-        # Persist the *full* ranking (every scored document), not just the
-        # top_k slice shown to the user: top_k is a display choice, and
-        # romip_metrics.pdf's rank-sensitive metrics (AP, R-precision, the
-        # 11-point curve) need the whole ranking to work correctly — a
-        # relevant document ranked just past top_k must still count as
-        # "found, but low", not be indistinguishable from "never found" the
-        # way truncating this list to top_k would make it. See
-        # docs/ARCHITECTURE.md section 5 / MetricsService.
+        # Persist the *full* ranking, not just the top_k slice shown to the
+        # user: rank-sensitive metrics (AP, R-precision, the curve) need the
+        # whole ranking, or a relevant doc just past top_k reads as "never found".
         await self._queries.bulk_insert_results(
             search_run.id,
             [(doc_id, rank, score) for rank, (doc_id, score) in enumerate(ranked, start=1)],

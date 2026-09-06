@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.infrastructure.repositories import CollectionRepository, CrawlJobRepository, IndexJobRepository
+from app.infrastructure.repositories.collections import CollectionRepository
+from app.infrastructure.repositories.crawl_jobs import CrawlJobRepository
+from app.infrastructure.repositories.index_jobs import IndexJobRepository
 
 _ACTIVE_INDEX_STATUSES = {"pending", "running"}
 _ACTIVE_CRAWL_STATUSES = {"pending", "running"}

@@ -7,14 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.crawl_jobs import InvalidCrawlJobConfig, build_crawl_job_config, build_refresh_job_config
 from app.domain.enums import CrawlJobStatus
-from app.infrastructure.repositories import (
-    CollectionRepository,
-    CrawlJobRepository,
-    CrawlSeedRepository,
-    CrawlUrlRepository,
-    DocumentRepository,
-    IndexJobRepository,
-)
+from app.infrastructure.repositories.collections import CollectionRepository
+from app.infrastructure.repositories.crawl_jobs import CrawlJobRepository
+from app.infrastructure.repositories.crawl_seeds import CrawlSeedRepository
+from app.infrastructure.repositories.crawl_urls import CrawlUrlRepository
+from app.infrastructure.repositories.documents import DocumentRepository
+from app.infrastructure.repositories.index_jobs import IndexJobRepository
 
 
 _ACTIVE_INDEX_STATUSES = {"pending", "running"}
@@ -39,11 +37,9 @@ class CrawlJobService:
         self._collections = CollectionRepository(session)
 
     async def _ensure_not_indexing(self, collection_id: int) -> None:
-        """An index job reads the collection's documents over several
-        chunked round trips (see IndexingService._run) — crawling fresh
-        content into it, refreshing existing documents in place, or wiping
-        it for a recrawl while that's happening would race the read and can
-        leave the index half built from stale/mismatched documents."""
+        """An index job reads the collection's documents over several chunked
+        round trips; crawling/refreshing/recrawling concurrently would race
+        that read and leave the index half built from stale documents."""
         latest = await self._index_jobs.latest_for_collection(collection_id)
         if latest is not None and latest.status in _ACTIVE_INDEX_STATUSES:
             raise InvalidCrawlJobConfig(
@@ -77,8 +73,7 @@ class CrawlJobService:
 
     async def create_refresh_job(self, collection_id: int) -> CrawlJob:
         """Re-fetches every document in the collection that has a URL,
-        updating each row in place — see docs on build_refresh_job_config
-        and CrawlWorker's 'refresh' mode."""
+        updating each row in place (CrawlWorker's "refresh" mode)."""
         await self._ensure_not_indexing(collection_id)
         urls = await self._documents.list_urls_by_collection(collection_id)
         if not urls:
@@ -96,18 +91,11 @@ class CrawlJobService:
         return job
 
     async def run_collection_crawl(self, collection_id: int) -> list[CrawlJob]:
-        """Starts a fresh crawl of every configured CrawlSeed. Each seed
-        keeps its own max_documents/max_depth/same_domain_only, so it
-        becomes its own CrawlJob rather than sharing one job-wide budget —
-        the worker already processes crawl_jobs one at a time, so seeds
-        effectively crawl in order.
-
-        A recrawl replaces the collection outright: existing documents (and,
-        via DB cascade, their index rows and any qrels/results pointing at
-        them) and the index-job history are deleted first, so the result
-        only ever reflects the current seed list, never a mix of old and
-        new crawls.
-        """
+        """Starts a fresh crawl of every configured CrawlSeed, one CrawlJob
+        per seed since each keeps its own max_documents/max_depth/
+        same_domain_only. A recrawl replaces the collection outright:
+        existing documents and the index-job history are deleted first, so
+        the result never mixes old and new crawls."""
         await self._ensure_not_indexing(collection_id)
         seeds = await self._seeds.list_by_collection(collection_id)
         if not seeds:
@@ -134,20 +122,17 @@ class CrawlJobService:
         return jobs
 
     async def cancel_job(self, job_id: int) -> CrawlJob:
-        """Flips the job to "cancelled" — crawler-service's own worker loop
-        already re-reads a job's status from the DB before claiming each
-        next URL (see CrawlWorker._drain_frontier/_run_job), so it notices
-        and stops on its own within roughly one in-flight fetch; nothing
-        here talks to that separate process directly."""
+        """Flips the job to "cancelled"; the crawler-service worker re-reads
+        status from the DB before claiming each URL, so it notices and stops
+        on its own within roughly one in-flight fetch."""
         job = await self._jobs.get(job_id)
         if job is None:
             raise CrawlJobNotFound(f"crawl job {job_id} not found")
         if job.status not in _ACTIVE_CRAWL_STATUSES:
             raise InvalidCrawlJobConfig(f"crawl job {job_id} is already {job.status}")
         await self._jobs.mark_status(job_id, CrawlJobStatus.CANCELLED)
-        # mark_status writes via a Core UPDATE, which bypasses the ORM
-        # identity map — this in-memory `job` instance wouldn't otherwise
-        # reflect the new status for the response returned to the caller.
+        # mark_status uses a Core UPDATE, bypassing the identity map, so this
+        # in-memory instance needs updating too for the response to reflect it.
         job.status = CrawlJobStatus.CANCELLED.value
         return job
 

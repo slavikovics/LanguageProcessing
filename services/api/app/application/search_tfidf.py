@@ -6,20 +6,15 @@ from ips_db import Collection, SearchModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.nlp_client import NlpServiceClient
-from app.infrastructure.repositories import DocumentRepository, IndexRepository, TermRepository
+from app.infrastructure.repositories.documents import DocumentRepository
+from app.infrastructure.repositories.index import IndexRepository
+from app.infrastructure.repositories.terms import TermRepository
 
 
 class TfidfSearchBackend:
-    """The original TF-IDF/cosine backend (see docs/ARCHITECTURE.md section
-    5, algorithm 3), extracted out of SearchService so it sits behind the
-    same rank() contract as EmbeddingSearchBackend — behavior is unchanged
-    from before this backend was split out.
-
-    Both the query vector and the stored document vectors are L2-normalized
-    (nlp-service's /document-vector always returns a unit vector), so the
-    cosine measure r(D,Q) = (D,Q)/(||D||*||Q||) reduces to a plain dot
-    product over the terms the two share.
-    """
+    """TF-IDF/cosine backend behind the same rank() contract as
+    EmbeddingSearchBackend. Query and document vectors are both
+    L2-normalized, so cosine similarity reduces to a plain dot product."""
 
     def __init__(self, session: AsyncSession, nlp_client: NlpServiceClient) -> None:
         self._documents = DocumentRepository(session)

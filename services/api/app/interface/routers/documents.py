@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application.documents import DocumentService
 from app.core.database import get_db
 from app.domain.documents import DocumentError
-from app.infrastructure.repositories import DocumentRepository
+from app.infrastructure.repositories.documents import DocumentRepository
 from app.interface.schemas import DocumentCreate, DocumentDetailOut, DocumentOut, DocumentUpdate
 
 router = APIRouter(tags=["documents"])

@@ -8,22 +8,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.indexing import IndexingCancelled, IndexingError, IndexingSummary, chunk_text
 from app.infrastructure.embedding_padding import pad_to_max_dim
 from app.infrastructure.nlp_client import NlpServiceClient
-from app.infrastructure.repositories import (
-    ChunkEmbeddingRepository,
-    ChunkRepository,
-    DocumentRepository,
-    IndexJobRepository,
-    IndexRepository,
-    SearchModelRepository,
-    TermRepository,
-)
+from app.infrastructure.repositories.chunk_embeddings import ChunkEmbeddingRepository
+from app.infrastructure.repositories.chunks import ChunkRepository
+from app.infrastructure.repositories.documents import DocumentRepository
+from app.infrastructure.repositories.index import IndexRepository
+from app.infrastructure.repositories.index_jobs import IndexJobRepository
+from app.infrastructure.repositories.search_models import SearchModelRepository
+from app.infrastructure.repositories.terms import TermRepository
 
-# Large enough to keep nlp-service round trips few (each /lemmatize-batch
-# call now runs spaCy's nlp.pipe() over the whole chunk in one batch — see
-# nlp_core.tokenization.lemmatize_many — so a bigger chunk is strictly
-# cheaper, not just fewer-but-bigger HTTP calls), small enough that a
-# progress bar still visibly moves for lab-scale collections (tens to a few
-# hundred documents per docs/PROJECT_PLAN.md).
+# Large enough to keep nlp-service round trips few, small enough that the
+# progress bar still visibly moves.
 CHUNK_SIZE = 32
 EMBEDDING_CHUNK_SIZE = 16
 
@@ -35,23 +29,16 @@ class IndexJobNotFound(Exception):
 
 
 class IndexingService:
-    """Builds the ПОД (поисковый образ документа) for every document in a
-    collection under every active search model, in one tracked job:
-    TF-IDF's lemmatize -> corpus IDF (1.5) -> per-document normalized
-    TF-IDF vector (1.6) -> persisted document_terms/term_weights, then any
-    active dense-embedding model's encode -> persisted document_chunks +
-    document_chunk_embeddings, one or more chunks per document (see
-    app.domain.indexing.chunk_text and app/domain/search_models.py). One
-    "Индексировать" click covers every active model — see
-    app/infrastructure/repositories.py's SearchModelRepository for the
-    registry this loops over.
+    """Builds the search index for every document in a collection under
+    every active search model, in one tracked job: TF-IDF's lemmatize ->
+    corpus IDF -> per-document TF-IDF vector -> persisted document_terms/
+    term_weights, then any active dense-embedding model's encode ->
+    persisted document_chunks + document_chunk_embeddings.
 
     Runs as a tracked background job (IndexJob) so the frontend can show
-    live progress the same way it does for crawling — see
-    docs/PROJECT_PLAN.md stage 3 and section 3.1's job-tracking pattern.
-    Reindexing is whole-collection and idempotent (existing rows for the
-    collection's documents are replaced), which keeps IDF correct as
-    documents are added.
+    live progress, same as crawling. Reindexing is whole-collection and
+    idempotent (existing rows for the collection's documents are replaced),
+    which keeps IDF correct as documents are added.
     """
 
     def __init__(self, session: AsyncSession, nlp_client: NlpServiceClient | None = None) -> None:
@@ -231,9 +218,8 @@ class IndexingService:
         return processed
 
     async def reindex_collection_now(self, collection_id: int) -> IndexingSummary:
-        """Convenience wrapper that runs a job to completion in the calling
-        coroutine instead of scheduling it in the background — used by
-        tests and any direct/synchronous caller."""
+        """Runs a job to completion in the calling coroutine instead of
+        scheduling it in the background — used by tests and direct callers."""
         job = await self.start_job(collection_id)
         await self.run_job(job.id)
         finished = await self._jobs.get(job.id)

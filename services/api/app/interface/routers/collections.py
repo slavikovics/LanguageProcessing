@@ -5,7 +5,7 @@ from app.application.collections import CollectionBusy, CollectionNotFound, Coll
 from app.application.crawl_jobs import CrawlJobService
 from app.core.database import get_db
 from app.domain.crawl_jobs import InvalidCrawlJobConfig
-from app.infrastructure.repositories import CollectionRepository
+from app.infrastructure.repositories.collections import CollectionRepository
 from app.interface.schemas import CollectionCreate, CollectionOut, CrawlJobOut
 
 router = APIRouter(prefix="/collections", tags=["collections"])

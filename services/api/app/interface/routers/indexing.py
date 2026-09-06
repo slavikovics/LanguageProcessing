@@ -67,11 +67,8 @@ async def cancel_index_job(job_id: int, db: AsyncSession = Depends(get_db)) -> I
 
 @router.websocket("/index-jobs/ws/{job_id}")
 async def index_job_progress_ws(websocket: WebSocket, job_id: int) -> None:
-    """Pushes IndexJobOut diffs by polling the index_jobs table — same
-    pattern as /crawl-jobs/ws/{id} (see docs/PROJECT_PLAN.md, 3.1). The
-    frontend falls back to plain GET /index-jobs/{id} polling if this
-    connection drops.
-    """
+    """Polls index_jobs and pushes diffs; the frontend falls back to plain
+    GET /index-jobs/{id} polling if this connection drops."""
     await websocket.accept()
     settings = get_settings()
     last_payload: str | None = None

@@ -47,7 +47,7 @@ async def test_create_update_delete_document(session_factory, collection_id):
         await DocumentService(session).delete_document(created.id)
 
     async with session_factory() as session:
-        from app.infrastructure.repositories import DocumentRepository
+        from app.infrastructure.repositories.documents import DocumentRepository
 
         assert await DocumentRepository(session).get(created.id) is None
 
@@ -110,7 +110,7 @@ async def test_create_document_without_url_is_allowed(session_factory, collectio
 
 @pytest.mark.asyncio
 async def test_document_mutations_touch_collection_documents_changed_at(session_factory, collection_id):
-    from app.infrastructure.repositories import CollectionRepository
+    from app.infrastructure.repositories.collections import CollectionRepository
 
     async with session_factory() as session:
         collection = await CollectionRepository(session).get(collection_id)

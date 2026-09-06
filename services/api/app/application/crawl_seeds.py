@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.crawl_seeds import MAX_SEEDS_PER_COLLECTION, build_crawl_seed_config
 from app.domain.crawl_jobs import InvalidCrawlJobConfig
-from app.infrastructure.repositories import CrawlSeedRepository
+from app.infrastructure.repositories.crawl_seeds import CrawlSeedRepository
 
 _DUPLICATE_URL_MESSAGE = "this address is already configured for the collection"
 
