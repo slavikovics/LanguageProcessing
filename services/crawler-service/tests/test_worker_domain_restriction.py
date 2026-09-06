@@ -47,7 +47,7 @@ async def test_enqueue_links_drops_other_domains_and_subdomains_when_restricted(
         "https://other.com/page-3",
     ]
 
-    await worker._enqueue_links(job_id, discovered_from_id=1, depth=1, links=links, allowed_domain="example.com")
+    await worker._frontier.enqueue_links(job_id, discovered_from_id=1, depth=1, links=links, allowed_domain="example.com")
 
     async with sessionmaker_() as session:
         result = await session.execute(select(CrawlUrl.url).where(CrawlUrl.job_id == job_id))
@@ -60,7 +60,7 @@ async def test_enqueue_links_keeps_all_domains_when_unrestricted(sessionmaker_, 
     worker = CrawlWorker(sessionmaker_, Settings())
     links = ["https://example.com/page-1", "https://other.com/page-3"]
 
-    await worker._enqueue_links(job_id, discovered_from_id=1, depth=1, links=links, allowed_domain=None)
+    await worker._frontier.enqueue_links(job_id, discovered_from_id=1, depth=1, links=links, allowed_domain=None)
 
     async with sessionmaker_() as session:
         result = await session.execute(select(CrawlUrl.url).where(CrawlUrl.job_id == job_id))
