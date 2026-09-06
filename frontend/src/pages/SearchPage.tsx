@@ -5,6 +5,7 @@ import {
   Globe,
   HelpCircle,
   ListChecks,
+  Loader2,
   SearchIcon,
   SlidersHorizontal,
   ThumbsUp,
@@ -438,7 +439,7 @@ export function SearchPage() {
               <SlidersHorizontal className="size-4" />
             </Button>
             <Button type="submit" size="icon" disabled={loading} aria-label="Искать">
-              <SearchIcon className="size-4" />
+              {loading ? <Loader2 className="size-4 animate-spin" /> : <SearchIcon className="size-4" />}
             </Button>
             <Button asChild variant="outline" size="icon" aria-label="Справка о поиске" className="text-muted-foreground">
               <Link to="/help#searching">
@@ -491,7 +492,14 @@ export function SearchPage() {
       )}
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      {response && (
+      {loading && (
+        <div className="flex flex-col items-center justify-center gap-3 py-16 text-muted-foreground">
+          <Loader2 className="size-6 animate-spin" />
+          <p className="text-sm">Идёт поиск…</p>
+        </div>
+      )}
+
+      {!loading && response && (
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">
