@@ -28,10 +28,12 @@ class IndexingSummary:
 
 # Word-based, not token-based: measuring real subword-token length would
 # mean an extra nlp-service round trip per document just to find out how
-# long it is. ~350 words comfortably fits multilingual-e5-small's 512-token
-# window (see nlp-service's app/embeddings.py) even after subword growth and
-# the "passage: " prefix. Overlap keeps a sentence that would otherwise
-# straddle a chunk boundary fully readable in at least one chunk.
+# long it is. ~350 words comfortably fits within a single embedding call
+# even after subword growth (bge-m3's context is 8192 tokens — see
+# nlp-service's app/embeddings.py — so this is a conservative chunk size,
+# not one dictated by the model's limit). Overlap keeps a sentence that
+# would otherwise straddle a chunk boundary fully readable in at least one
+# chunk.
 CHUNK_TARGET_WORDS = 350
 CHUNK_OVERLAP_WORDS = 40
 

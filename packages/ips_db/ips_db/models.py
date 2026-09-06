@@ -32,12 +32,12 @@ class Base(DeclarativeBase):
 
 
 # Fixed width of the `document_embeddings.embedding` column. Every dense
-# model's native vector (e.g. 384 for multilingual-e5-small) is zero-padded
-# up to this length before being stored — cosine similarity is invariant to
+# model's native vector (e.g. 4096 for qwen3-embedding-8b) is zero-padded up
+# to this length before being stored — cosine similarity is invariant to
 # appending equal zero-padding to both compared vectors, and vectors are
 # only ever compared within the same search_model_id, so one shared column
 # width serves any number of dense models without a schema change per model.
-MAX_EMBEDDING_DIM = 1024
+MAX_EMBEDDING_DIM = 4096
 
 
 class Collection(Base):

@@ -1,19 +1,11 @@
 fastapi==0.115.6
 uvicorn[standard]==0.32.1
 pydantic==2.10.3
+httpx==0.28.1
 
-# Pinned before torch/sentence-transformers resolve their own numpy range:
 # spaCy 3.7.x's compiled thinc/blis extensions are built against numpy<2's
-# ABI, but torch/sentence-transformers alone would happily pull numpy 2.x,
-# which crashes thinc's Cython extensions at import time
-# ("numpy.dtype size changed, may indicate binary incompatibility").
+# ABI and crash at import time on numpy 2.x ("numpy.dtype size changed, may
+# indicate binary incompatibility").
 numpy<2
-
-# CPU-only torch build — the default PyPI wheel bundles CUDA and is far
-# larger than this project needs, since embedding inference here always
-# runs on CPU (see app/embeddings.py).
---extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.5.1+cpu
-sentence-transformers==3.3.1
 
 -e ./packages/nlp_core[spacy]

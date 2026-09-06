@@ -117,20 +117,17 @@ async def embed_documents(payload: EmbedDocumentsRequest) -> EmbedDocumentsRespo
     """Batch-encode document texts with the dense embedding model (see
     app/embeddings.py) — the second search model's counterpart to /index.
 
-    encode_documents() is synchronous, CPU-bound torch inference that can
-    run for minutes on a real document batch; run it in a worker thread via
-    asyncio.to_thread so it doesn't block this single-process event loop —
-    without this, every other concurrent request (including unrelated
-    /lemmatize calls for a different collection) would stall until the
-    encode finishes.
+    encode_documents() just awaits OpenRouter's hosted embeddings API, so
+    (unlike the local-model version this replaced) it doesn't block this
+    process's event loop and needs no worker thread.
     """
-    vectors = await asyncio.to_thread(embeddings.encode_documents, payload.texts)
+    vectors = await embeddings.encode_documents(payload.texts)
     return EmbedDocumentsResponse(vectors=vectors)
 
 
 @router.post("/embeddings/query", response_model=EmbedQueryResponse)
 async def embed_query(payload: EmbedQueryRequest) -> EmbedQueryResponse:
-    vector = await asyncio.to_thread(embeddings.encode_query, payload.text)
+    vector = await embeddings.encode_query(payload.text)
     return EmbedQueryResponse(vector=vector)
 
 
