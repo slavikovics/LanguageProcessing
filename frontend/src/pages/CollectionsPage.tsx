@@ -357,43 +357,43 @@ export function CollectionsPage() {
           )}
           {indexError && <p className="text-xs text-destructive">{indexError}</p>}
           {refreshError && <p className="text-xs text-destructive">{refreshError}</p>}
+        </CardContent>
 
-          <div className="flex w-full flex-wrap items-center justify-center gap-2 border-t pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleDeleteCollection}
-              disabled={deletingCollection || isIndexing || isRefreshing}
-              title={isIndexing ? "Коллекция сейчас индексируется" : undefined}
-              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-            >
-              <Trash2 className="size-4" />
-              {deletingCollection ? "Удаление…" : "Удалить коллекцию"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleRefreshCollection}
-              disabled={isRefreshing || isIndexing || selected.document_count === 0}
-              title={isIndexing ? "Коллекция сейчас индексируется" : undefined}
-            >
-              <RefreshCw className="size-4" />
-              {isRefreshing ? "Обновление…" : "Обновить"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleIndex}
-              disabled={isIndexing || selected.document_count === 0}
-            >
-              <RotateCw className="size-4" />
-              {isIndexing ? "Индексация…" : "Переиндексировать"}
-            </Button>
-            <Button type="button" onClick={openCreateForm}>
-              <Plus className="size-4" />
-              Добавить документ
-            </Button>
-          </div>
+        <CardContent className="flex flex-wrap items-center justify-center gap-2 border-t pt-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleDeleteCollection}
+            disabled={deletingCollection || isIndexing || isRefreshing}
+            title={isIndexing ? "Коллекция сейчас индексируется" : undefined}
+            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+          >
+            <Trash2 className="size-4" />
+            {deletingCollection ? "Удаление…" : "Удалить коллекцию"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleRefreshCollection}
+            disabled={isRefreshing || isIndexing || selected.document_count === 0}
+            title={isIndexing ? "Коллекция сейчас индексируется" : undefined}
+          >
+            <RefreshCw className="size-4" />
+            {isRefreshing ? "Обновление…" : "Обновить"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleIndex}
+            disabled={isIndexing || selected.document_count === 0}
+          >
+            <RotateCw className="size-4" />
+            {isIndexing ? "Индексация…" : "Переиндексировать"}
+          </Button>
+          <Button type="button" onClick={openCreateForm}>
+            <Plus className="size-4" />
+            Добавить документ
+          </Button>
         </CardContent>
 
         {isIndexing && displayedJob && (
