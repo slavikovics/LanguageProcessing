@@ -53,7 +53,13 @@ def extract_links(html: str, base_url: str) -> list[str]:
             continue
         if not _is_crawlable_url(absolute):
             continue
-        links.append(urlsplit(absolute)._replace(fragment="").geturl())
+        # Query strings are dropped, not just fragments: tracking/session
+        # parameters (utm_*, sessionid, ref, ...) otherwise turn one page
+        # into an endless stream of "different" URLs, which both blows up
+        # the frontier and re-saves the same content as separate documents.
+        # This makes query-string-only page variants (e.g. ?page=2) collide
+        # too — a deliberate trade-off for a bounded, non-duplicating crawl.
+        links.append(urlsplit(absolute)._replace(query="", fragment="").geturl())
     return links
 
 

@@ -43,6 +43,10 @@ export function createCollection(input: { name: string; language: string }): Pro
   });
 }
 
+export function deleteCollection(collectionId: number): Promise<void> {
+  return request<void>(`/collections/${collectionId}`, { method: "DELETE" });
+}
+
 export function listDocuments(
   collectionId: number,
   { limit = 50, offset = 0 }: { limit?: number; offset?: number } = {},
@@ -112,6 +116,10 @@ export function refreshCollection(collectionId: number): Promise<CrawlJob> {
   return request<CrawlJob>(`/collections/${collectionId}/refresh`, { method: "POST" });
 }
 
+export function cancelCrawlJob(jobId: number): Promise<CrawlJob> {
+  return request<CrawlJob>(`/crawl-jobs/${jobId}/cancel`, { method: "POST" });
+}
+
 export interface CrawlSeedInput {
   url: string;
   max_documents: number;
@@ -160,6 +168,10 @@ export function getLatestIndexJob(collectionId: number): Promise<IndexJob | null
 export function indexJobWebSocketUrl(id: number): string {
   const wsBase = API_BASE_URL.replace(/^http/, "ws");
   return `${wsBase}/index-jobs/ws/${id}`;
+}
+
+export function cancelIndexJob(jobId: number): Promise<IndexJob> {
+  return request<IndexJob>(`/index-jobs/${jobId}/cancel`, { method: "POST" });
 }
 
 export interface SearchInput {

@@ -29,14 +29,13 @@ class TfidfSearchBackend:
 
     async def rank(
         self, *, collection: Collection, text: str, model_row: SearchModel
-    ) -> tuple[list[tuple[int, float]], dict[int, list[str]]]:
+    ) -> list[tuple[int, float]]:
         query_lemmas = await self._nlp.lemmatize(text)
         term_id_by_lemma = await self._terms.get_existing(set(query_lemmas), collection.language)
 
         if not term_id_by_lemma:
-            return [], {}
+            return []
 
-        lemma_by_term_id = {term_id: lemma for lemma, term_id in term_id_by_lemma.items()}
         term_ids = list(term_id_by_lemma.values())
 
         lemma_counts = Counter(query_lemmas)
@@ -58,23 +57,17 @@ class TfidfSearchBackend:
         }
 
         if not query_vector:
-            return [], {}
+            return []
 
         document_ids = await self._documents.list_ids_by_collection(collection.id)
         doc_vectors = await self._index.load_document_vectors(document_ids, list(query_vector.keys()))
 
-        scored: list[tuple[int, float, set[int]]] = []
+        scored: list[tuple[int, float]] = []
         for doc_id, vector in doc_vectors.items():
             common = vector.keys() & query_vector.keys()
             if not common:
                 continue
             score = sum(vector[term_id] * query_vector[term_id] for term_id in common)
-            scored.append((doc_id, score, common))
+            scored.append((doc_id, score))
         scored.sort(key=lambda item: item[1], reverse=True)
-
-        ranked = [(doc_id, score) for doc_id, score, _ in scored]
-        matched_terms_by_doc = {
-            doc_id: sorted(lemma_by_term_id[term_id] for term_id in common if term_id in lemma_by_term_id)
-            for doc_id, _, common in scored
-        }
-        return ranked, matched_terms_by_doc
+        return scored

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  cancelCrawlJob,
   createCrawlSeed,
   deleteCrawlSeed,
   listCrawlJobs,
@@ -20,16 +21,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCollectionContext } from "@/context/CollectionContext";
-import { cn } from "@/lib/utils";
+import { clampNumberInput, cn } from "@/lib/utils";
 import {
   Check,
   FileStack,
+  HelpCircle,
   Layers,
   Link2,
   Lock,
   Pencil,
   Play,
   Plus,
+  Square,
   Waypoints,
   X,
 } from "lucide-react";
@@ -62,6 +65,8 @@ const DEFAULT_MAX_DEPTH = 1;
 function CrawlJobProgressCard({ jobId }: { jobId: number }) {
   const { refreshCollections } = useCollectionContext();
   const { progress } = useCrawlJobProgress(jobId);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   // The document count shown in the header switcher is fetched once on
   // load; without this the "Индексировать" button on Collections stays
@@ -74,6 +79,20 @@ function CrawlJobProgressCard({ jobId }: { jobId: number }) {
 
   if (!progress) return null;
 
+  const isActive = progress.job.status === "pending" || progress.job.status === "running";
+
+  async function handleCancel() {
+    setCancelling(true);
+    setCancelError(null);
+    try {
+      await cancelCrawlJob(jobId);
+    } catch (err) {
+      setCancelError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCancelling(false);
+    }
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -84,11 +103,27 @@ function CrawlJobProgressCard({ jobId }: { jobId: number }) {
               {STATUS_LABELS[progress.job.status]}
             </Badge>
           </CardTitle>
-          <p className="shrink-0 text-right text-xs text-muted-foreground">
-            Посещено: {progress.job.urls_visited} · В очереди: {progress.job.urls_queued} · Ошибок:{" "}
-            {progress.job.urls_failed}
-          </p>
+          <div className="flex shrink-0 items-center gap-3">
+            <p className="text-right text-xs text-muted-foreground">
+              Посещено: {progress.job.urls_visited} · В очереди: {progress.job.urls_queued} · Ошибок:{" "}
+              {progress.job.urls_failed}
+            </p>
+            {isActive && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleCancel}
+                disabled={cancelling}
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                <Square className="size-3.5" />
+                {cancelling ? "Прерывание…" : "Прервать"}
+              </Button>
+            )}
+          </div>
         </div>
+        {cancelError && <p className="text-sm text-destructive">{cancelError}</p>}
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <span className="max-w-full truncate text-xs text-muted-foreground" title={progress.job.seed_urls[0]}>
@@ -115,7 +150,7 @@ function CrawlJobProgressCard({ jobId }: { jobId: number }) {
         )}
 
         <div>
-          <h3 className="mb-2 text-xs font-medium text-muted-foreground">URL, обработанные как документы</h3>
+          <h3 className="mb-2 text-xs font-medium text-muted-foreground">Последние URL</h3>
           <ScrollArea className="h-56 rounded-md border">
             <ul className="flex flex-col gap-0.5 p-2">
               {progress.recent_urls.map((u) => (
@@ -146,14 +181,14 @@ function CrawlJobProgressCard({ jobId }: { jobId: number }) {
 }
 
 export function CrawlPage() {
-  const { selected, selectedId } = useCollectionContext();
+  const { selected, selectedId, isIndexing } = useCollectionContext();
 
   const [seeds, setSeeds] = useState<CrawlSeed[]>([]);
   const [seedsLoading, setSeedsLoading] = useState(false);
 
   const [urlDraft, setUrlDraft] = useState("");
-  const [maxDocuments, setMaxDocuments] = useState(DEFAULT_MAX_DOCUMENTS);
-  const [maxDepth, setMaxDepth] = useState(DEFAULT_MAX_DEPTH);
+  const [maxDocuments, setMaxDocuments] = useState<number | "">(DEFAULT_MAX_DOCUMENTS);
+  const [maxDepth, setMaxDepth] = useState<number | "">(DEFAULT_MAX_DEPTH);
   const [sameDomainOnly, setSameDomainOnly] = useState(false);
   const [editingSeedId, setEditingSeedId] = useState<number | null>(null);
   const [savingSeed, setSavingSeed] = useState(false);
@@ -235,8 +270,8 @@ export function CrawlPage() {
     try {
       const input = {
         url: trimmed,
-        max_documents: maxDocuments,
-        max_depth: maxDepth,
+        max_documents: clampNumberInput(maxDocuments, 1, 2000),
+        max_depth: clampNumberInput(maxDepth, 0, 5),
         same_domain_only: sameDomainOnly,
       };
       if (editingSeedId !== null) {
@@ -268,6 +303,10 @@ export function CrawlPage() {
 
   async function handleRunCrawl() {
     if (selectedId === null) return;
+    if (isIndexing) {
+      setRunError("Коллекция сейчас индексируется — дождитесь завершения индексации.");
+      return;
+    }
     if (seeds.length === 0) {
       setRunError("Добавьте хотя бы один адрес, чтобы начать обход.");
       return;
@@ -307,9 +346,16 @@ export function CrawlPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-        <Waypoints className="size-5 text-muted-foreground" />
-        Запуск краулинга
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+          <Waypoints className="size-5 text-muted-foreground" />
+          Запуск краулинга
+        </div>
+        <Button asChild variant="ghost" size="icon" aria-label="Справка о краулинге" className="text-muted-foreground">
+          <Link to="/help#crawling">
+            <HelpCircle className="size-4" />
+          </Link>
+        </Button>
       </div>
 
       <div className="flex flex-col gap-3">
@@ -360,7 +406,8 @@ export function CrawlPage() {
               min={1}
               max={2000}
               value={maxDocuments}
-              onChange={(e) => setMaxDocuments(Number(e.target.value))}
+              onChange={(e) => setMaxDocuments(e.target.value === "" ? "" : Number(e.target.value))}
+              onBlur={() => setMaxDocuments((v) => clampNumberInput(v, 1, 2000))}
             />
           </div>
 
@@ -374,7 +421,8 @@ export function CrawlPage() {
               min={0}
               max={5}
               value={maxDepth}
-              onChange={(e) => setMaxDepth(Number(e.target.value))}
+              onChange={(e) => setMaxDepth(e.target.value === "" ? "" : Number(e.target.value))}
+              onBlur={() => setMaxDepth((v) => clampNumberInput(v, 0, 5))}
             />
           </div>
 
@@ -495,11 +543,12 @@ export function CrawlPage() {
         <Button
           type="button"
           onClick={handleRunCrawl}
-          disabled={running || selectedId === null}
+          disabled={running || selectedId === null || isIndexing}
+          title={isIndexing ? "Коллекция сейчас индексируется" : undefined}
           size="lg"
-          className="group w-full overflow-hidden transition-all duration-300 hover:scale-[1.015] hover:shadow-lg hover:shadow-primary/30 active:scale-[0.98]"
+          className="w-full overflow-hidden transition-all duration-300 hover:scale-[1.015] hover:shadow-lg hover:shadow-primary/30 active:scale-[0.98]"
         >
-          <Play className="size-4 transition-transform duration-300 group-hover:scale-125" />
+          <Play className="size-4" />
           {running ? "Запуск…" : "Запустить краулинг"}
         </Button>
       </div>

@@ -8,6 +8,7 @@ import {
 } from "react";
 import { getLatestIndexJob, listCollections } from "../api/client";
 import type { Collection, IndexJob } from "../api/types";
+import { useIndexJobProgress } from "../hooks/useIndexJobProgress";
 
 const STORAGE_KEY = "ips-selected-collection-id";
 
@@ -26,6 +27,10 @@ interface CollectionContextValue {
   latestIndexJob: IndexJob | null;
   /** Re-fetches latestIndexJob (call after starting/finishing an index job). */
   refreshIndexStatus: () => Promise<void>;
+  /** Live (polled) "is the selected collection currently being indexed" —
+   * shared so any page can disable crawl/refresh/delete actions the backend
+   * would reject anyway (see CrawlJobService._ensure_not_indexing). */
+  isIndexing: boolean;
 }
 
 const CollectionContext = createContext<CollectionContextValue | null>(null);
@@ -44,6 +49,8 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     return stored ? Number(stored) : null;
   });
   const [latestIndexJob, setLatestIndexJob] = useState<IndexJob | null>(null);
+  const [activeIndexJobId, setActiveIndexJobId] = useState<number | null>(null);
+  const { progress: liveIndexJob } = useIndexJobProgress(activeIndexJobId);
 
   const setSelectedId = useCallback((id: number | null) => {
     setSelectedIdState(id);
@@ -85,6 +92,28 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     void refreshIndexStatus();
   }, [refreshIndexStatus]);
 
+  // Picks up a running job as soon as latestIndexJob reflects it (whether
+  // this tab started it or refreshIndexStatus just noticed one already in
+  // flight), then subscribes to its live progress so isIndexing stays
+  // correct without every page re-implementing this polling.
+  useEffect(() => {
+    if (latestIndexJob && (latestIndexJob.status === "pending" || latestIndexJob.status === "running")) {
+      setActiveIndexJobId(latestIndexJob.id);
+    }
+  }, [latestIndexJob]);
+
+  useEffect(() => {
+    if (liveIndexJob && (liveIndexJob.status === "completed" || liveIndexJob.status === "failed")) {
+      setActiveIndexJobId(null);
+      void refreshIndexStatus();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveIndexJob]);
+
+  const displayedIndexJob = liveIndexJob ?? latestIndexJob;
+  const isIndexing =
+    displayedIndexJob?.status === "pending" || displayedIndexJob?.status === "running";
+
   const selected = collections.find((c) => c.id === selectedId) ?? null;
 
   return (
@@ -98,6 +127,7 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
         refreshCollections,
         latestIndexJob,
         refreshIndexStatus,
+        isIndexing,
       }}
     >
       {children}

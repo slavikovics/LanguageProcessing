@@ -33,6 +33,15 @@ def test_lemmatize_reduces_inflected_forms():
     assert "run" in lemmas
 
 
+def test_lemmatize_many_matches_lemmatize_per_text():
+    texts = ["The cats were running", "Dogs bark loudly", ""]
+    assert tokenization.lemmatize_many(texts) == [tokenization.lemmatize(t) for t in texts]
+
+
+def test_lemmatize_many_empty_input():
+    assert tokenization.lemmatize_many([]) == []
+
+
 def test_clean_html_strips_tags_and_scripts():
     html = "<html><body><script>evil()</script><p>Hello <b>world</b></p></body></html>"
     assert tokenization.clean_html(html) == "Hello world"

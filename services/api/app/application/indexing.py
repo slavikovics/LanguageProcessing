@@ -1,25 +1,37 @@
 from __future__ import annotations
 
+import datetime as dt
+
 from ips_db import Collection, IndexJob, SearchModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.indexing import IndexingError, IndexingSummary
+from app.domain.indexing import IndexingCancelled, IndexingError, IndexingSummary, chunk_text
 from app.infrastructure.embedding_padding import pad_to_max_dim
 from app.infrastructure.nlp_client import NlpServiceClient
 from app.infrastructure.repositories import (
+    ChunkEmbeddingRepository,
+    ChunkRepository,
     DocumentRepository,
-    EmbeddingRepository,
     IndexJobRepository,
     IndexRepository,
     SearchModelRepository,
     TermRepository,
 )
 
-# Small enough that a progress bar visibly moves for lab-scale collections
-# (tens to a few hundred documents per docs/PROJECT_PLAN.md), large enough
-# to keep the number of nlp-service round trips reasonable.
-CHUNK_SIZE = 5
+# Large enough to keep nlp-service round trips few (each /lemmatize-batch
+# call now runs spaCy's nlp.pipe() over the whole chunk in one batch — see
+# nlp_core.tokenization.lemmatize_many — so a bigger chunk is strictly
+# cheaper, not just fewer-but-bigger HTTP calls), small enough that a
+# progress bar still visibly moves for lab-scale collections (tens to a few
+# hundred documents per docs/PROJECT_PLAN.md).
+CHUNK_SIZE = 32
 EMBEDDING_CHUNK_SIZE = 16
+
+_ACTIVE_STATUSES = {"pending", "running"}
+
+
+class IndexJobNotFound(Exception):
+    pass
 
 
 class IndexingService:
@@ -27,10 +39,12 @@ class IndexingService:
     collection under every active search model, in one tracked job:
     TF-IDF's lemmatize -> corpus IDF (1.5) -> per-document normalized
     TF-IDF vector (1.6) -> persisted document_terms/term_weights, then any
-    active dense-embedding model's encode -> persisted document_embeddings
-    (see app/domain/search_models.py). One "Индексировать" click covers
-    every active model — see app/infrastructure/repositories.py's
-    SearchModelRepository for the registry this loops over.
+    active dense-embedding model's encode -> persisted document_chunks +
+    document_chunk_embeddings, one or more chunks per document (see
+    app.domain.indexing.chunk_text and app/domain/search_models.py). One
+    "Индексировать" click covers every active model — see
+    app/infrastructure/repositories.py's SearchModelRepository for the
+    registry this loops over.
 
     Runs as a tracked background job (IndexJob) so the frontend can show
     live progress the same way it does for crawling — see
@@ -45,7 +59,8 @@ class IndexingService:
         self._documents = DocumentRepository(session)
         self._terms = TermRepository(session)
         self._index = IndexRepository(session)
-        self._embeddings = EmbeddingRepository(session)
+        self._chunks = ChunkRepository(session)
+        self._chunk_embeddings = ChunkEmbeddingRepository(session)
         self._models = SearchModelRepository(session)
         self._jobs = IndexJobRepository(session)
         self._nlp = nlp_client or NlpServiceClient()
@@ -75,12 +90,36 @@ class IndexingService:
             return
         try:
             await self._run(job)
+        except IndexingCancelled:
+            # request_cancel() already wrote status="cancelled"/finished_at
+            # to the DB the moment cancellation was requested — nothing
+            # left to finalize here, and calling mark_completed/mark_failed
+            # would only clobber that with a misleading terminal status.
+            pass
         except Exception as exc:  # pragma: no cover - top-level safety net
             # Some exceptions (e.g. httpx.ReadTimeout) stringify to "" —
             # always include the type so a failed job's message is never
             # blank in the UI.
             message = str(exc) or type(exc).__name__
             await self._jobs.mark_failed(job_id, error_message=f"{type(exc).__name__}: {message}")
+
+    async def cancel_job(self, job_id: int) -> None:
+        job = await self._jobs.get(job_id)
+        if job is None:
+            raise IndexJobNotFound(f"index job {job_id} not found")
+        if job.status not in _ACTIVE_STATUSES:
+            raise IndexingError(f"index job {job_id} is already {job.status}")
+        await self._jobs.request_cancel(job_id)
+        # request_cancel writes via a Core UPDATE, which bypasses the ORM
+        # identity map — without this, a caller re-fetching this job in the
+        # same session (e.g. the router building its response) would keep
+        # seeing this now-stale in-memory copy instead of "cancelled".
+        job.status = "cancelled"
+        job.finished_at = dt.datetime.utcnow()
+
+    async def _ensure_not_cancelled(self, job_id: int) -> None:
+        if await self._jobs.get_status(job_id) == "cancelled":
+            raise IndexingCancelled()
 
     async def _run(self, job: IndexJob) -> None:
         collection = await self._session.get(Collection, job.collection_id)
@@ -94,9 +133,14 @@ class IndexingService:
         embedding_models = [m for m in active_models if m.kind == "dense_embedding"]
 
         total_units = len(documents) * (1 + len(embedding_models))
-        await self._jobs.mark_running(job.id, documents_total=total_units)
+        started = await self._jobs.mark_running(job.id, documents_total=total_units)
+        if not started:
+            # Only false when the job wasn't "pending" any more — i.e. it
+            # was cancelled before this background task got to run it.
+            raise IndexingCancelled()
 
         processed, terms_indexed = await self._run_tfidf_pass(job, collection, documents)
+        await self._ensure_not_cancelled(job.id)
         for model_row in embedding_models:
             processed = await self._run_embedding_pass(job, documents, document_ids, model_row, processed)
 
@@ -112,6 +156,7 @@ class IndexingService:
             lemma_lists.extend(chunk_lemmas)
             processed = len(lemma_lists)
             await self._jobs.update_progress(job.id, documents_processed=processed)
+            await self._ensure_not_cancelled(job.id)
 
         indexed = await self._nlp.index(lemma_lists)
         idf: dict[str, float] = indexed["idf"]
@@ -150,21 +195,39 @@ class IndexingService:
         model_row: SearchModel,
         processed: int,
     ) -> int:
-        await self._embeddings.clear_for_documents(document_ids, model_row.id)
+        # clear_for_documents cascades document_chunks -> document_chunk_
+        # embeddings (FK ondelete=CASCADE), so re-chunking on reindex can't
+        # leave stale chunks from a previous, differently-split pass around.
+        await self._chunks.clear_for_documents(document_ids)
         for start in range(0, len(documents), EMBEDDING_CHUNK_SIZE):
-            chunk = documents[start : start + EMBEDDING_CHUNK_SIZE]
-            vectors = await self._nlp.embed_documents([doc.clean_text for doc in chunk])
-            rows = [
-                {
-                    "document_id": document.id,
-                    "search_model_id": model_row.id,
-                    "embedding": pad_to_max_dim(vector),
-                }
-                for document, vector in zip(chunk, vectors)
+            batch = documents[start : start + EMBEDDING_CHUNK_SIZE]
+            # Flatten (document, chunk text) pairs across the whole batch so
+            # one nlp-service call embeds every chunk in it, regardless of
+            # how many chunks any single long document split into — see
+            # app.domain.indexing.chunk_text.
+            chunk_rows = [
+                {"document_id": document.id, "chunk_index": index, "text": text}
+                for document in batch
+                for index, text in enumerate(chunk_text(document.clean_text))
             ]
-            await self._embeddings.bulk_write(rows)
-            processed += len(chunk)
+            if chunk_rows:
+                chunks = await self._chunks.bulk_create(chunk_rows)
+                vectors = await self._nlp.embed_documents([c.text for c in chunks])
+                embedding_rows = [
+                    {
+                        "chunk_id": db_chunk.id,
+                        "search_model_id": model_row.id,
+                        "embedding": pad_to_max_dim(vector),
+                    }
+                    for db_chunk, vector in zip(chunks, vectors)
+                ]
+                await self._chunk_embeddings.bulk_write(embedding_rows)
+            # Progress is tracked per document (matching documents_total),
+            # not per chunk — a document with 5 chunks still counts as one
+            # unit of work toward the bar, same as the tfidf pass.
+            processed += len(batch)
             await self._jobs.update_progress(job.id, documents_processed=processed)
+            await self._ensure_not_cancelled(job.id)
         return processed
 
     async def reindex_collection_now(self, collection_id: int) -> IndexingSummary:

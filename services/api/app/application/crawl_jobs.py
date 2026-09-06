@@ -6,6 +6,7 @@ from ips_db import CrawlJob, CrawlUrl
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.crawl_jobs import InvalidCrawlJobConfig, build_crawl_job_config, build_refresh_job_config
+from app.domain.enums import CrawlJobStatus
 from app.infrastructure.repositories import (
     CollectionRepository,
     CrawlJobRepository,
@@ -14,6 +15,14 @@ from app.infrastructure.repositories import (
     DocumentRepository,
     IndexJobRepository,
 )
+
+
+_ACTIVE_INDEX_STATUSES = {"pending", "running"}
+_ACTIVE_CRAWL_STATUSES = {"pending", "running"}
+
+
+class CrawlJobNotFound(Exception):
+    pass
 
 
 class CrawlJobService:
@@ -29,6 +38,18 @@ class CrawlJobService:
         self._index_jobs = IndexJobRepository(session)
         self._collections = CollectionRepository(session)
 
+    async def _ensure_not_indexing(self, collection_id: int) -> None:
+        """An index job reads the collection's documents over several
+        chunked round trips (see IndexingService._run) — crawling fresh
+        content into it, refreshing existing documents in place, or wiping
+        it for a recrawl while that's happening would race the read and can
+        leave the index half built from stale/mismatched documents."""
+        latest = await self._index_jobs.latest_for_collection(collection_id)
+        if latest is not None and latest.status in _ACTIVE_INDEX_STATUSES:
+            raise InvalidCrawlJobConfig(
+                "collection is being indexed; wait for indexing to finish before crawling or refreshing it"
+            )
+
     async def create_job(
         self,
         *,
@@ -37,6 +58,7 @@ class CrawlJobService:
         max_documents: int,
         max_depth: int,
     ) -> CrawlJob:
+        await self._ensure_not_indexing(collection_id)
         config = build_crawl_job_config(
             collection_id=collection_id,
             seed_urls=seed_urls,
@@ -57,6 +79,7 @@ class CrawlJobService:
         """Re-fetches every document in the collection that has a URL,
         updating each row in place — see docs on build_refresh_job_config
         and CrawlWorker's 'refresh' mode."""
+        await self._ensure_not_indexing(collection_id)
         urls = await self._documents.list_urls_by_collection(collection_id)
         if not urls:
             raise InvalidCrawlJobConfig("collection has no documents with a URL to refresh")
@@ -85,6 +108,7 @@ class CrawlJobService:
         only ever reflects the current seed list, never a mix of old and
         new crawls.
         """
+        await self._ensure_not_indexing(collection_id)
         seeds = await self._seeds.list_by_collection(collection_id)
         if not seeds:
             raise InvalidCrawlJobConfig("collection has no configured crawl addresses")
@@ -108,6 +132,24 @@ class CrawlJobService:
 
         await self._session.commit()
         return jobs
+
+    async def cancel_job(self, job_id: int) -> CrawlJob:
+        """Flips the job to "cancelled" — crawler-service's own worker loop
+        already re-reads a job's status from the DB before claiming each
+        next URL (see CrawlWorker._drain_frontier/_run_job), so it notices
+        and stops on its own within roughly one in-flight fetch; nothing
+        here talks to that separate process directly."""
+        job = await self._jobs.get(job_id)
+        if job is None:
+            raise CrawlJobNotFound(f"crawl job {job_id} not found")
+        if job.status not in _ACTIVE_CRAWL_STATUSES:
+            raise InvalidCrawlJobConfig(f"crawl job {job_id} is already {job.status}")
+        await self._jobs.mark_status(job_id, CrawlJobStatus.CANCELLED)
+        # mark_status writes via a Core UPDATE, which bypasses the ORM
+        # identity map — this in-memory `job` instance wouldn't otherwise
+        # reflect the new status for the response returned to the caller.
+        job.status = CrawlJobStatus.CANCELLED.value
+        return job
 
     async def list_jobs(self, *, collection_id: int | None = None) -> list[CrawlJob]:
         return await self._jobs.list(collection_id=collection_id)

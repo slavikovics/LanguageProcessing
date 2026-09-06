@@ -34,7 +34,12 @@ class IndexJobStatus(str, Enum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
     @property
     def is_terminal(self) -> bool:
-        return self in {IndexJobStatus.COMPLETED, IndexJobStatus.FAILED}
+        return self in {
+            IndexJobStatus.COMPLETED,
+            IndexJobStatus.FAILED,
+            IndexJobStatus.CANCELLED,
+        }

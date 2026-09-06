@@ -22,10 +22,10 @@ class MetricsService:
     """Оценка качества (docs/PROJECT_PLAN.md, stage 5; formulas from the
     official ROMIP'2004 methodology, tasks/romip_metrics.pdf): scores one
     search run against its query's relevance judgments (qrels), or rolls up
-    every judged query in a collection into MAP + micro-averaged P/R/F1 + an
-    averaged 11-point curve for the report — scoped to one search model at a
-    time, so multiple models' summaries can be compared side by side (see
-    compare()).
+    every judged query in a collection into MAP + mean R-precision/P@5/P@10
+    + an averaged 11-point curve for the report — scoped to one search model
+    at a time, so multiple models' summaries can be compared side by side
+    (see compare()).
     """
 
     def __init__(self, session: AsyncSession, nlp_client: NlpServiceClient | None = None) -> None:
@@ -88,7 +88,6 @@ class MetricsService:
         queries = await self._queries.list_queries_by_collection(collection_id)
 
         per_query: list[QueryMetrics] = []
-        runs_for_aggregate: list[tuple[list[int], list[int]]] = []
         unscored_judged_queries = 0
         for query in queries:
             judgments = await self._judgments.list_for_query(query.id)
@@ -110,9 +109,6 @@ class MetricsService:
             query_metrics = await self.evaluate_run(run.id)
             per_query.append(query_metrics)
 
-            results = await self._queries.list_results(run.id)
-            runs_for_aggregate.append(([row.document_id for row in results], list(relevant_ids)))
-
         if not per_query:
             return CollectionMetricsSummary(
                 collection_id=collection_id,
@@ -122,32 +118,25 @@ class MetricsService:
                 mean_r_precision=0.0,
                 mean_precision_at_5=0.0,
                 mean_precision_at_10=0.0,
-                micro_precision=0.0,
-                micro_recall=0.0,
-                micro_f1=0.0,
                 queries=[],
                 curve=[],
                 unscored_judged_queries=unscored_judged_queries,
             )
 
-        aggregate = await self._nlp.aggregate_metrics(runs_for_aggregate)
         curve = average_curves([q.curve for q in per_query])
 
         return CollectionMetricsSummary(
             collection_id=collection_id,
             model=model_row.key,
             model_label=model_row.label,
-            map=aggregate["map"],
-            # romip_metrics.pdf doesn't state how R-precision/precision(n)
-            # roll up across queries, only that AP does (as MAP). We use the
-            # same macro-average (mean of each query's own value) for
-            # consistency — the standard trec_eval convention.
+            # MAP is defined as the mean of each query's own AP
+            # (romip_metrics.pdf section 1.3.3), same macro-average as
+            # R-precision/precision(n) below — no separate aggregation call
+            # needed.
+            map=mean_of([q.average_precision for q in per_query]),
             mean_r_precision=mean_of([q.r_precision for q in per_query]),
             mean_precision_at_5=mean_of([q.precision_at_5 for q in per_query]),
             mean_precision_at_10=mean_of([q.precision_at_10 for q in per_query]),
-            micro_precision=aggregate["micro_precision"],
-            micro_recall=aggregate["micro_recall"],
-            micro_f1=aggregate["micro_f1"],
             queries=per_query,
             curve=curve,
             unscored_judged_queries=unscored_judged_queries,

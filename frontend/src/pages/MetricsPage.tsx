@@ -6,9 +6,8 @@ import type { CollectionMetricsSummary, QueryMetrics } from "../api/types";
 
 import { CurveSeries, PrecisionRecallChart } from "@/components/PrecisionRecallChart";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Table,
   TableBody,
@@ -37,12 +36,6 @@ const HEADLINE_METRICS: { key: keyof CollectionMetricsSummary; label: string; hi
   { key: "mean_r_precision", label: "R-precision (среднее)", hint: "отсечка = число релевантных" },
   { key: "mean_precision_at_5", label: "P@5 (среднее)" },
   { key: "mean_precision_at_10", label: "P@10 (среднее)" },
-];
-
-const MICRO_METRICS: { key: keyof CollectionMetricsSummary; label: string }[] = [
-  { key: "micro_precision", label: "Precision (микро)" },
-  { key: "micro_recall", label: "Recall (микро)" },
-  { key: "micro_f1", label: "F1 (микро, не из методики)" },
 ];
 
 function MetricComparisonTable({
@@ -163,7 +156,13 @@ function QueryMetricBarChart({
   const toY = (value: number) => padding.top + (1 - value) * innerH;
 
   return (
-    <div ref={ref} className="w-full">
+    // minHeight is set unconditionally (not just while the SVG is present)
+    // so the container never collapses to 0 during the one-frame gap
+    // between a hidden tab becoming visible (display:none -> block) and its
+    // ResizeObserver callback reporting the real width — without this, that
+    // gap made the whole page reflow for a frame on every tab switch,
+    // which is what made the scroll position jump.
+    <div ref={ref} className="w-full" style={{ minHeight: height }}>
       {width > 0 && (
         <svg width={width} height={height} role="img" aria-label="Метрика по запросам">
           {BAR_CHART_LEVELS.map((level) => (
@@ -263,11 +262,27 @@ function MetricsByQueryChart({ series }: { series: QuerySeries[] }) {
           </TabsTrigger>
         ))}
       </TabsList>
-      {RANKING_METRICS.map((m) => (
-        <TabsContent key={m.value} value={m.value}>
-          <QueryMetricBarChart series={series} metricKey={m.key} />
-        </TabsContent>
-      ))}
+      {/* relative + forceMount + absolute-when-inactive keeps every tab's
+          chart laid out (never display:none) instead of just mounted —
+          display:none reports width 0 to useMeasuredWidth's ResizeObserver
+          until the tab becomes visible again, and that callback only fires
+          a frame later, so the bars visibly popped in late on every switch
+          even though the container height itself no longer collapsed.
+          Stacking all four with inset-0 means each one's width is known
+          from first paint, so switching tabs is a pure visibility toggle
+          with nothing left to measure asynchronously. */}
+      <div className="relative">
+        {RANKING_METRICS.map((m) => (
+          <TabsContent
+            key={m.value}
+            value={m.value}
+            forceMount
+            className="data-[state=inactive]:invisible data-[state=inactive]:pointer-events-none data-[state=inactive]:absolute data-[state=inactive]:inset-0"
+          >
+            <QueryMetricBarChart series={series} metricKey={m.key} />
+          </TabsContent>
+        ))}
+      </div>
     </Tabs>
   );
 }
@@ -332,240 +347,152 @@ export function MetricsPage() {
     color: colorForModel(s.model),
     queries: s.queries,
   }));
-  const tableRows = withQueries.flatMap((s) =>
-    s.queries.map((q) => ({ ...q, modelKey: s.model, modelLabel: s.model_label })),
-  );
-
   return (
     <div className="flex flex-col gap-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">Метрики качества</CardTitle>
+          <CardTitle>Метрики качества</CardTitle>
           <CardDescription>
+            Оценка качества работы системы по каждой из решаемых задач — у каждой задачи свой
+            раздел ниже. Сейчас доступна оценка качества поиска; в следующих лабораторных здесь
+            появятся и другие разделы (например, качество классификации по языку, реферирования
+            и т. д.).
+          </CardDescription>
+        </CardHeader>
+      </Card>
+
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold tracking-tight">Метрики поиска</h2>
+            <div className="flex flex-wrap gap-2">
+              {selectedId !== null && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refresh(selectedId, selectedModelKeys)}
+                  disabled={loading}
+                >
+                  <RotateCw className={loading ? "size-3.5 animate-spin" : "size-3.5"} />
+                  {loading ? "Обновление…" : "Обновить"}
+                </Button>
+              )}
+              <Button type="button" variant="outline" size="sm" asChild>
+                <Link to="/help#metrics">
+                  <HelpCircle className="size-3.5" />
+                  Подробнее о методике
+                </Link>
+              </Button>
+            </div>
+          </div>
+          <p className="text-sm text-muted-foreground">
             Метрики считаются только по запросам с проставленной вручную разметкой
             релевантности. Выполните поиск на странице «Поиск», отметьте документы, затем
             вернитесь сюда.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <div className="flex flex-wrap gap-2">
-            {selectedId !== null && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => refresh(selectedId, selectedModelKeys)}
-                disabled={loading}
-              >
-                <RotateCw className={loading ? "size-3.5 animate-spin" : "size-3.5"} />
-                {loading ? "Обновление…" : "Обновить"}
-              </Button>
-            )}
-            <Button type="button" variant="outline" size="sm" asChild>
-              <Link to="/help#metrics">
-                <HelpCircle className="size-3.5" />
-                Подробнее о методике
-              </Link>
-            </Button>
+          </p>
+        </div>
+
+        {models.length > 1 && (
+          <div className="flex flex-wrap items-center gap-4">
+            <span className="text-xs text-muted-foreground">Сравнить модели:</span>
+            {models.map((m) => (
+              <label key={m.key} className="flex items-center gap-1.5 text-sm">
+                <Checkbox
+                  checked={selectedModelKeys.includes(m.key)}
+                  onCheckedChange={(checked) => toggleModel(m.key, checked === true)}
+                />
+                <ModelSwatch label={m.label} color={colorForModel(m.key)} />
+              </label>
+            ))}
           </div>
-          {models.length > 1 && (
-            <div className="flex flex-wrap items-center gap-4 border-t pt-3">
-              <span className="text-xs text-muted-foreground">Сравнить модели:</span>
-              {models.map((m) => (
-                <label key={m.key} className="flex items-center gap-1.5 text-sm">
-                  <Checkbox
-                    checked={selectedModelKeys.includes(m.key)}
-                    onCheckedChange={(checked) => toggleModel(m.key, checked === true)}
-                  />
-                  <ModelSwatch label={m.label} color={colorForModel(m.key)} />
-                </label>
-              ))}
-            </div>
-          )}
-          {error && <p className="text-sm text-destructive">{error}</p>}
-        </CardContent>
-      </Card>
+        )}
+        {error && <p className="text-sm text-destructive">{error}</p>}
 
-      {selectedId === null && (
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">
-              Выберите коллекцию вверху страницы, чтобы увидеть метрики качества поиска.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+        {selectedId === null && (
+          <p className="text-sm text-muted-foreground">
+            Выберите коллекцию вверху страницы, чтобы увидеть метрики качества поиска.
+          </p>
+        )}
 
-      {selectedId !== null && withQueries.length === 0 && totalUnscored === 0 && !loading && (
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">
-              Пока нет ни одного запроса с разметкой релевантности в этой коллекции. Выполните поиск
-              на странице «Поиск» и отметьте найденные документы как релевантные/нерелевантные —
-              разметка (qrels) появится здесь автоматически.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+        {selectedId !== null && withQueries.length === 0 && totalUnscored === 0 && !loading && (
+          <p className="text-sm text-muted-foreground">
+            Пока нет ни одного запроса с разметкой релевантности в этой коллекции. Выполните поиск
+            на странице «Поиск» и отметьте найденные документы как релевантные — разметка (qrels)
+            появится здесь автоматически.
+          </p>
+        )}
 
-      {selectedId !== null && withQueries.length === 0 && totalUnscored > 0 && (
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">
-              {(() => {
-                const n = totalUnscored;
-                const mod10 = n % 10;
-                const mod100 = n % 100;
-                const word =
-                  mod10 === 1 && mod100 !== 11
-                    ? "запрос размечен"
-                    : [2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)
-                      ? "запроса размечено"
-                      : "запросов размечено";
-                return `${n} ${word}, но`;
-              })()}{" "}
-              ни для одного из них не отмечено ни одного релевантного документа — при нуле
-              релевантных документов Precision/Recall/AP не определены (методика ROMIP), поэтому
-              такие запросы не попадают в сводку. Отметьте 👍 хотя бы один найденный документ как
-              релевантный на странице «Поиск», чтобы запрос учитывался в метриках.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+        {selectedId !== null && withQueries.length === 0 && totalUnscored > 0 && (
+          <p className="text-sm text-muted-foreground">
+            {(() => {
+              const n = totalUnscored;
+              const mod10 = n % 10;
+              const mod100 = n % 100;
+              const word =
+                mod10 === 1 && mod100 !== 11
+                  ? "запрос размечен"
+                  : [2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)
+                    ? "запроса размечено"
+                    : "запросов размечено";
+              return `${n} ${word}, но`;
+            })()}{" "}
+            ни для одного из них не отмечено ни одного релевантного документа — при нуле
+            релевантных документов Precision/Recall/AP не определены (методика ROMIP), поэтому
+            такие запросы не попадают в сводку. Отметьте 👍 хотя бы один найденный документ как
+            релевантный на странице «Поиск», чтобы запрос учитывался в метриках.
+          </p>
+        )}
 
-      {withQueries.length > 0 && (
-        <>
-          {withoutQueries.length > 0 && (
-            <p className="text-xs text-muted-foreground">
-              Ещё нет размеченных запросов для сравнения по модели
-              {withoutQueries.length === 1 ? "" : "м"}:{" "}
-              {withoutQueries.map((s) => s.model_label).join(", ")}. Выполните поиск с этой моделью
-              на странице «Поиск» и отметьте документы.
-            </p>
-          )}
+        {withQueries.length > 0 && (
+          <>
+            {withoutQueries.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Ещё нет размеченных запросов для сравнения по модели
+                {withoutQueries.length === 1 ? "" : "м"}:{" "}
+                {withoutQueries.map((s) => s.model_label).join(", ")}. Выполните поиск с этой моделью
+                на странице «Поиск» и отметьте документы.
+              </p>
+            )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Метрики ранжирования</CardTitle>
-              <CardDescription>
-                Не зависят от числа результатов в поиске (Топ-K) — среднее по размеченным запросам.
-                Как считаются — см. «Подробнее о методике» выше.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+            <div className="flex flex-col gap-3 border-t pt-6">
+              <div>
+                <h3 className="text-base font-semibold">Метрики ранжирования</h3>
+                <p className="text-sm text-muted-foreground">
+                  Не зависят от числа результатов в поиске (Топ-K) — среднее по размеченным
+                  запросам. Как считаются — см. «Подробнее о методике» выше.
+                </p>
+              </div>
               <MetricComparisonTable summaries={withQueries} metrics={HEADLINE_METRICS} />
-            </CardContent>
-          </Card>
+            </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>11-точечная P/R-кривая (TREC)</CardTitle>
-              <CardDescription>
-                Интерполированная точность на 11 уровнях полноты, усреднённая по размеченным
-                запросам — подробнее в{" "}
-                <Link to="/help#metric-curve" className="text-primary underline-offset-2 hover:underline">
-                  Справке
-                </Link>
-                .
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+            <div className="flex flex-col gap-3 border-t pt-6">
+              <div>
+                <h3 className="text-base font-semibold">11-точечная P/R-кривая (TREC)</h3>
+                <p className="text-sm text-muted-foreground">
+                  Интерполированная точность на 11 уровнях полноты, усреднённая по размеченным
+                  запросам — подробнее в{" "}
+                  <Link to="/help#metric-curve" className="text-primary underline-offset-2 hover:underline">
+                    Справке
+                  </Link>
+                  .
+                </p>
+              </div>
               <PrecisionRecallChart curves={curves} />
-            </CardContent>
-          </Card>
+            </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Метрики ранжирования по запросам</CardTitle>
-              <CardDescription>Сравнение между запросами и моделями — выберите метрику</CardDescription>
-            </CardHeader>
-            <CardContent>
+            <div className="flex flex-col gap-3 border-t pt-6">
+              <div>
+                <h3 className="text-base font-semibold">Метрики ранжирования по запросам</h3>
+                <p className="text-sm text-muted-foreground">
+                  Сравнение между запросами и моделями — выберите метрику
+                </p>
+              </div>
               <MetricsByQueryChart series={querySeries} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Метрики по запросам</CardTitle>
-              <CardDescription>
-                Строка — запрос под одной моделью. Слева — метрики ранжирования (не зависят от
-                Топ-K), справа — Precision/Recall/F1 по всему ранжированному списку. Формулы и
-                определения — в{" "}
-                <Link to="/help#metrics" className="text-primary underline-offset-2 hover:underline">
-                  Справке
-                </Link>
-                .
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {(() => {
-                const table = (
-                  <Table>
-                    <TableHeader className="sticky top-0 z-10">
-                      <TableRow>
-                        <TableHead>Запрос</TableHead>
-                        {withQueries.length > 1 && <TableHead>Модель</TableHead>}
-                        <TableHead className="w-24">Релевантных</TableHead>
-                        <TableHead className="w-16">AP</TableHead>
-                        <TableHead className="w-20">R-Prec.</TableHead>
-                        <TableHead className="w-16">P@5</TableHead>
-                        <TableHead className="w-16">P@10</TableHead>
-                        <TableHead
-                          className="w-24 text-muted-foreground"
-                          title="Документов в полном ранжировании с ненулевым сходством — не то, что показано на экране поиска"
-                        >
-                          В ранжир.
-                        </TableHead>
-                        <TableHead className="w-16 text-muted-foreground">P</TableHead>
-                        <TableHead className="w-16 text-muted-foreground">R</TableHead>
-                        <TableHead className="w-16 text-muted-foreground" title="Гармоническое среднее Precision и Recall">
-                          F1
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {tableRows.map((q) => (
-                        <TableRow key={`${q.modelKey}-${q.search_run_id}`}>
-                          <TableCell className="max-w-xs truncate">{q.query_text}</TableCell>
-                          {withQueries.length > 1 && (
-                            <TableCell>
-                              <ModelSwatch label={q.modelLabel} color={colorForModel(q.modelKey)} />
-                            </TableCell>
-                          )}
-                          <TableCell>{q.relevant_count}</TableCell>
-                          <TableCell className="font-medium">{q.average_precision.toFixed(2)}</TableCell>
-                          <TableCell className="font-medium">{q.r_precision.toFixed(2)}</TableCell>
-                          <TableCell className="font-medium">{q.precision_at_5.toFixed(2)}</TableCell>
-                          <TableCell className="font-medium">{q.precision_at_10.toFixed(2)}</TableCell>
-                          <TableCell className="text-muted-foreground">{q.retrieved_count}</TableCell>
-                          <TableCell className="text-muted-foreground">{q.precision.toFixed(2)}</TableCell>
-                          <TableCell className="text-muted-foreground">{q.recall.toFixed(2)}</TableCell>
-                          <TableCell className="text-muted-foreground">{q.f1.toFixed(2)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                );
-                return tableRows.length > 10 ? <ScrollArea className="h-96">{table}</ScrollArea> : table;
-              })()}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Дополнительно: микроусреднённые Precision/Recall/F1</CardTitle>
-              <CardDescription>
-                Микроусреднение по всем размеченным запросам коллекции сразу — сначала
-                суммируются найденные и релевантные документы по всем запросам, и только потом
-                делятся друг на друга.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <MetricComparisonTable summaries={withQueries} metrics={MICRO_METRICS} />
-            </CardContent>
-          </Card>
-        </>
-      )}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

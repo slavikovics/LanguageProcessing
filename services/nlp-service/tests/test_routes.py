@@ -92,25 +92,6 @@ def test_metrics_evaluate_endpoint():
     assert len(body["curve"]) == 11
 
 
-def test_metrics_aggregate_endpoint():
-    response = client.post(
-        "/metrics/aggregate",
-        json={
-            "runs": [
-                {"ranked_ids": [1, 2, 3], "relevant_ids": [1]},
-                {"ranked_ids": [1, 2, 3], "relevant_ids": [2]},
-            ]
-        },
-    )
-    assert response.status_code == 200
-    body = response.json()
-    assert len(body["average_precisions"]) == 2
-    assert math.isclose(body["map"], sum(body["average_precisions"]) / 2)
-    # micro: 2 hits total / 6 retrieved total, 2 hits / 2 relevant total
-    assert math.isclose(body["micro_precision"], 2 / 6)
-    assert math.isclose(body["micro_recall"], 1.0)
-
-
 def _model_available() -> bool:
     try:
         tokenization.get_pipeline()

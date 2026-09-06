@@ -74,7 +74,7 @@ export interface CrawlSeed {
   created_at: string;
 }
 
-export type IndexJobStatus = "pending" | "running" | "completed" | "failed";
+export type IndexJobStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
 
 export interface IndexJob {
   id: number;
@@ -89,7 +89,7 @@ export interface IndexJob {
   finished_at: string | null;
 }
 
-export const TERMINAL_INDEX_STATUSES: readonly IndexJobStatus[] = ["completed", "failed"];
+export const TERMINAL_INDEX_STATUSES: readonly IndexJobStatus[] = ["completed", "failed", "cancelled"];
 
 export interface SearchModel {
   id: number;
@@ -157,9 +157,6 @@ export interface CollectionMetricsSummary {
   mean_r_precision: number;
   mean_precision_at_5: number;
   mean_precision_at_10: number;
-  micro_precision: number;
-  micro_recall: number;
-  micro_f1: number;
   queries: QueryMetrics[];
   curve: PrecisionRecallCurve;
   unscored_judged_queries: number;

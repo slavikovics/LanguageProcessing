@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from ips_db import Collection
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.search_embedding import EmbeddingSearchBackend
@@ -12,7 +13,14 @@ from app.domain.search import (
     build_snippet,
 )
 from app.infrastructure.nlp_client import NlpServiceClient
-from app.infrastructure.repositories import CollectionRepository, DocumentRepository, QueryRepository, SearchModelRepository
+from app.infrastructure.repositories import (
+    CollectionRepository,
+    DocumentRepository,
+    IndexRepository,
+    QueryRepository,
+    SearchModelRepository,
+    TermRepository,
+)
 
 
 class SearchService:
@@ -30,10 +38,35 @@ class SearchService:
         self._collections = CollectionRepository(session)
         self._queries = QueryRepository(session)
         self._models = SearchModelRepository(session)
-        nlp = nlp_client or NlpServiceClient()
+        self._terms = TermRepository(session)
+        self._index = IndexRepository(session)
+        self._nlp = nlp_client or NlpServiceClient()
         self._backends = {
-            "tfidf": TfidfSearchBackend(session, nlp),
-            "dense_embedding": EmbeddingSearchBackend(session, nlp),
+            "tfidf": TfidfSearchBackend(session, self._nlp),
+            "dense_embedding": EmbeddingSearchBackend(session, self._nlp),
+        }
+
+    async def _matched_terms_for(
+        self, *, collection: Collection, text: str, document_ids: list[int]
+    ) -> dict[int, list[str]]:
+        """Which of the query's lemmas each document contains, straight
+        from the indexed TF-IDF vocabulary (document_terms/term_weights) —
+        a lexical-overlap fact about a document, independent of which
+        backend actually ranked it. Every collection gets a TF-IDF pass
+        during indexing regardless of which search models are active (see
+        IndexingService._run), so this is available for dense-embedding
+        hits too, not just tfidf ones."""
+        if not document_ids:
+            return {}
+        query_lemmas = await self._nlp.lemmatize(text)
+        term_id_by_lemma = await self._terms.get_existing(set(query_lemmas), collection.language)
+        if not term_id_by_lemma:
+            return {}
+        lemma_by_term_id = {term_id: lemma for lemma, term_id in term_id_by_lemma.items()}
+        doc_vectors = await self._index.load_document_vectors(document_ids, list(term_id_by_lemma.values()))
+        return {
+            doc_id: sorted(lemma_by_term_id[term_id] for term_id in vector if term_id in lemma_by_term_id)
+            for doc_id, vector in doc_vectors.items()
         }
 
     async def search(
@@ -52,12 +85,13 @@ class SearchService:
         if backend is None:
             raise SearchError(f"no backend registered for model kind '{model_row.kind}'")
 
-        ranked, matched_terms_by_doc = await backend.rank(
-            collection=collection, text=config.text, model_row=model_row
-        )
+        ranked = await backend.rank(collection=collection, text=config.text, model_row=model_row)
 
         top = ranked[: config.top_k]
         documents_by_id = {doc.id: doc for doc in await self._documents.list_by_ids([d for d, _ in top])}
+        matched_terms_by_doc = await self._matched_terms_for(
+            collection=collection, text=config.text, document_ids=[d for d, _ in top]
+        )
         focus_words = config.text.split()
 
         hits: list[SearchHit] = []

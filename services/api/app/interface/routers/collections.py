@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.collections import CollectionBusy, CollectionNotFound, CollectionService
 from app.application.crawl_jobs import CrawlJobService
 from app.core.database import get_db
 from app.domain.crawl_jobs import InvalidCrawlJobConfig
@@ -42,6 +43,17 @@ async def list_collections(db: AsyncSession = Depends(get_db)) -> list[Collectio
         )
         for collection, count in rows
     ]
+
+
+@router.delete("/{collection_id}", status_code=204)
+async def delete_collection(collection_id: int, db: AsyncSession = Depends(get_db)) -> None:
+    service = CollectionService(db)
+    try:
+        await service.delete(collection_id)
+    except CollectionNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except CollectionBusy as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.post("/{collection_id}/refresh", response_model=CrawlJobOut, status_code=201)

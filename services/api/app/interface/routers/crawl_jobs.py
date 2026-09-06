@@ -3,7 +3,7 @@ import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.crawl_jobs import CrawlJobService
+from app.application.crawl_jobs import CrawlJobNotFound, CrawlJobService
 from app.core.config import get_settings
 from app.core.database import SessionLocal, get_db
 from app.domain.crawl_jobs import InvalidCrawlJobConfig
@@ -50,6 +50,17 @@ async def get_crawl_job(job_id: int, db: AsyncSession = Depends(get_db)) -> Craw
     if job is None:
         raise HTTPException(status_code=404, detail="crawl job not found")
     return CrawlJobProgressOut(job=job, recent_urls=recent_urls)
+
+
+@router.post("/{job_id}/cancel", response_model=CrawlJobOut)
+async def cancel_crawl_job(job_id: int, db: AsyncSession = Depends(get_db)) -> CrawlJobOut:
+    service = CrawlJobService(db)
+    try:
+        return await service.cancel_job(job_id)
+    except CrawlJobNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except InvalidCrawlJobConfig as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.websocket("/ws/{job_id}")

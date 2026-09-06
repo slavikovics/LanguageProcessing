@@ -83,6 +83,26 @@ def lemmatize(text: str) -> list[str]:
     return [t.lemma for t in tokenize(text)]
 
 
+def lemmatize_many(texts: list[str], *, batch_size: int = 50) -> list[list[str]]:
+    """Batch counterpart to lemmatize(): runs every text through spaCy's
+    nlp.pipe() instead of one nlp() call per text.
+
+    A single nlp(text) call pays spaCy's per-call pipeline overhead on top
+    of processing the text itself; nlp.pipe() amortizes that overhead across
+    the whole batch (internal batching + multiprocessing-free vectorized
+    steps), which is dramatically faster for the many-small-documents case
+    an indexing job is — see IndexingService._run_tfidf_pass, the only
+    caller that matters for this batch size.
+    """
+    if not texts:
+        return []
+    pipeline = get_pipeline()
+    return [
+        [tok.lemma_.lower() for tok in doc if tok.is_alpha and not tok.is_stop]
+        for doc in pipeline.pipe(texts, batch_size=batch_size)
+    ]
+
+
 def char_ngrams(text: str, n: int = 5) -> list[str]:
     """Word-boundary-padded character n-grams, e.g. char_ngrams("the", 5) ->
     [" the "]. Groundwork for the N-gram language-identification method

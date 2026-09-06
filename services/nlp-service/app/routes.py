@@ -20,8 +20,6 @@ from app.schemas import (
     LemmatizeBatchResponse,
     LemmatizeRequest,
     LemmatizeResponse,
-    MetricsAggregateRequest,
-    MetricsAggregateResponse,
     MetricsEvaluateRequest,
     MetricsEvaluateResponse,
     QueryVectorRequest,
@@ -53,7 +51,14 @@ async def lemmatize(payload: LemmatizeRequest) -> LemmatizeResponse:
 
 @router.post("/lemmatize-batch", response_model=LemmatizeBatchResponse)
 async def lemmatize_batch(payload: LemmatizeBatchRequest) -> LemmatizeBatchResponse:
-    return LemmatizeBatchResponse(lemmas=[tokenization.lemmatize(text) for text in payload.texts])
+    """Uses spaCy's nlp.pipe() (via lemmatize_many) instead of one nlp() call
+    per text — meaningfully faster for the document-batch case an indexing
+    job sends (see IndexingService). Run in a worker thread like
+    /embeddings/documents: CPU-bound spaCy processing would otherwise block
+    this single-process event loop for the whole batch.
+    """
+    lemmas = await asyncio.to_thread(tokenization.lemmatize_many, payload.texts)
+    return LemmatizeBatchResponse(lemmas=lemmas)
 
 
 @router.post("/idf", response_model=IdfResponse)
@@ -151,24 +156,4 @@ async def evaluate_metrics(payload: MetricsEvaluateRequest) -> MetricsEvaluateRe
         average_precision=metrics.average_precision(payload.ranked_ids, relevant),
         r_precision=metrics.r_precision(payload.ranked_ids, relevant),
         curve=metrics.interpolated_precision_recall(payload.ranked_ids, relevant),
-    )
-
-
-@router.post("/metrics/aggregate", response_model=MetricsAggregateResponse)
-async def aggregate_metrics(payload: MetricsAggregateRequest) -> MetricsAggregateResponse:
-    """Rolls up several query runs: MAP (macro-average of AP) plus
-    micro-averaged precision/recall/F1 — the averaging method ROMIP'2004
-    section 1.2 specifies for the search track. Callers should already have
-    excluded queries with no relevant documents (section 1: "запросы, для
-    которых нет релевантных документов, не рассматриваются").
-    """
-    runs = [(run.ranked_ids, set(run.relevant_ids)) for run in payload.runs]
-    average_precisions = [metrics.average_precision(ranked, relevant) for ranked, relevant in runs]
-    micro_precision, micro_recall = metrics.micro_average_precision_recall(runs)
-    return MetricsAggregateResponse(
-        map=metrics.mean_average_precision(runs),
-        micro_precision=micro_precision,
-        micro_recall=micro_recall,
-        micro_f1=metrics.f1_score(micro_precision, micro_recall),
-        average_precisions=average_precisions,
     )

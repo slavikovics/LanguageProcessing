@@ -51,21 +51,33 @@ class CrawlUrlHandle:
 
 
 class DomainThrottle:
-    """Enforces a minimum delay between requests to the same domain."""
+    """Enforces a minimum delay between requests to the same domain — locked
+    per domain so concurrent fetchers (see CrawlWorker's per-job fetch pool)
+    queue up cleanly instead of racing the same last-fetch timestamp and
+    both firing at once."""
 
     def __init__(self, delay_seconds: float) -> None:
         self._delay = delay_seconds
         self._last_fetch: dict[str, float] = {}
+        self._locks: dict[str, asyncio.Lock] = {}
+
+    def _lock_for(self, domain: str) -> asyncio.Lock:
+        lock = self._locks.get(domain)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._locks[domain] = lock
+        return lock
 
     async def wait(self, url: str) -> None:
         domain = urlsplit(url).netloc
-        now = time.monotonic()
-        last = self._last_fetch.get(domain)
-        if last is not None:
-            elapsed = now - last
-            if elapsed < self._delay:
-                await asyncio.sleep(self._delay - elapsed)
-        self._last_fetch[domain] = time.monotonic()
+        async with self._lock_for(domain):
+            now = time.monotonic()
+            last = self._last_fetch.get(domain)
+            if last is not None:
+                elapsed = now - last
+                if elapsed < self._delay:
+                    await asyncio.sleep(self._delay - elapsed)
+            self._last_fetch[domain] = time.monotonic()
 
 
 class CrawlWorker:
@@ -79,32 +91,37 @@ class CrawlWorker:
             headers={"User-Agent": self._settings.crawler_user_agent}
         ) as client:
             robots = RobotsCache(self._settings.crawler_user_agent, client)
+            # Several crawl_jobs run concurrently (e.g. run_collection_crawl's
+            # one-job-per-seed, or independent collections) instead of one at
+            # a time — jobs on different domains no longer have to wait for
+            # each other just because the worker only ever looked at one job.
+            running: dict[int, asyncio.Task[None]] = {}
             while True:
-                try:
-                    job_id = await self._next_pending_job_id()
-                except Exception as exc:
-                    # Transient DB hiccups (e.g. the schema not migrated yet
-                    # on first boot) should not kill the whole worker process
-                    # — just log and retry on the next tick.
-                    print(f"crawler-service: poll failed, will retry: {exc!r}", flush=True)
-                    await asyncio.sleep(self._settings.poll_interval_seconds)
-                    continue
-                if job_id is not None:
-                    await self._run_job(job_id, client, robots)
-                else:
-                    await asyncio.sleep(self._settings.poll_interval_seconds)
+                running = {jid: task for jid, task in running.items() if not task.done()}
+                slots = self._settings.max_concurrent_jobs - len(running)
+                job_ids: list[int] = []
+                if slots > 0:
+                    try:
+                        job_ids = await self._next_pending_job_ids(slots, exclude=set(running))
+                    except Exception as exc:
+                        # Transient DB hiccups (e.g. the schema not migrated
+                        # yet on first boot) should not kill the whole worker
+                        # process — just log and retry on the next tick.
+                        print(f"crawler-service: poll failed, will retry: {exc!r}", flush=True)
+                for job_id in job_ids:
+                    running[job_id] = asyncio.create_task(self._run_job(job_id, client, robots))
+                await asyncio.sleep(self._settings.poll_interval_seconds if not running else 1.0)
 
     # -- job lifecycle ----------------------------------------------------
 
-    async def _next_pending_job_id(self) -> int | None:
+    async def _next_pending_job_ids(self, limit: int, *, exclude: set[int]) -> list[int]:
         async with self._sessionmaker() as session:
-            result = await session.execute(
-                select(CrawlJob.id)
-                .where(CrawlJob.status == "pending")
-                .order_by(CrawlJob.id)
-                .limit(1)
-            )
-            return result.scalar_one_or_none()
+            query = select(CrawlJob.id).where(CrawlJob.status == "pending")
+            if exclude:
+                query = query.where(CrawlJob.id.not_in(exclude))
+            query = query.order_by(CrawlJob.id).limit(limit)
+            result = await session.execute(query)
+            return [row[0] for row in result.all()]
 
     async def _load_context(self, job_id: int) -> JobContext | None:
         async with self._sessionmaker() as session:
@@ -148,19 +165,71 @@ class CrawlWorker:
         if ctx is None:
             return
         try:
-            while True:
-                fetched, status = await self._current_progress(job_id)
-                if status in _TERMINAL_STATUSES:
-                    return
-                if fetched >= ctx.max_documents:
-                    break
-                handle = await self._claim_next_url(job_id)
-                if handle is None:
-                    break
-                await self._process_url(ctx, handle, client, robots)
-            await self._mark_job_status(job_id, "completed")
+            await self._drain_frontier(ctx, client, robots)
+            _, status = await self._current_progress(job_id)
+            if status not in _TERMINAL_STATUSES:
+                await self._mark_job_status(job_id, "completed")
         except Exception as exc:  # pragma: no cover - top-level safety net
             await self._mark_job_status(job_id, "failed", error=str(exc)[:1000])
+
+    async def _drain_frontier(
+        self, ctx: JobContext, client: httpx.AsyncClient, robots: RobotsCache
+    ) -> None:
+        """Runs several fetch lanes concurrently against one job's URL
+        frontier — fetching a page (network-bound, and rate-limited per
+        domain by DomainThrottle) used to fully block claiming and
+        processing the next one, even when there was nothing domain-specific
+        to wait for. _claim_next_url uses SELECT ... FOR UPDATE SKIP LOCKED,
+        so lanes never double-claim a URL.
+
+        A lane that finds the frontier empty can't just stop: a sibling lane
+        may still be mid-fetch and about to enqueue more links, so "queue
+        empty" alone doesn't mean "job done" — only "queue empty AND no lane
+        is in flight" does.
+
+        `in_flight` also doubles as a budget reservation: a lane reserves a
+        slot (counts itself against max_documents) *before* claiming a URL,
+        not after saving a document, so several lanes checking
+        documents_fetched at once can't all see room for "one more" and
+        collectively overshoot max_documents.
+        """
+        in_flight = 0
+        lock = asyncio.Lock()
+
+        async def lane() -> None:
+            nonlocal in_flight
+            while True:
+                fetched, status = await self._current_progress(ctx.id)
+                if status in _TERMINAL_STATUSES:
+                    return
+                async with lock:
+                    if fetched + in_flight >= ctx.max_documents:
+                        if in_flight == 0:
+                            return
+                        at_capacity = True
+                    else:
+                        in_flight += 1
+                        at_capacity = False
+                if at_capacity:
+                    await asyncio.sleep(0.2)
+                    continue
+                handle = await self._claim_next_url(ctx.id)
+                if handle is None:
+                    async with lock:
+                        in_flight -= 1
+                        others_active = in_flight > 0
+                    if not others_active:
+                        return
+                    await asyncio.sleep(0.2)
+                    continue
+                try:
+                    await self._process_url(ctx, handle, client, robots)
+                finally:
+                    async with lock:
+                        in_flight -= 1
+
+        concurrency = max(1, self._settings.max_concurrent_fetches_per_job)
+        await asyncio.gather(*(lane() for _ in range(concurrency)))
 
     async def _mark_job_status(
         self, job_id: int, status: str, *, started: bool = False, error: str | None = None
@@ -291,7 +360,14 @@ class CrawlWorker:
                 .where(CrawlJob.id == job_id)
                 .values(urls_queued=CrawlJob.urls_queued + len(new_urls))
             )
-            await session.commit()
+            try:
+                await session.commit()
+            except IntegrityError:
+                # A sibling fetch lane (see _drain_frontier) discovered and
+                # inserted the same link between our SELECT above and this
+                # COMMIT — uq_crawl_url_job_url caught the race. It's queued
+                # either way, so drop this batch instead of failing the job.
+                await session.rollback()
 
     # -- fetch + save one page ----------------------------------------------
 

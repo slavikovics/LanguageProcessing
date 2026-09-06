@@ -17,7 +17,10 @@ HTML = """
 def test_extract_links_resolves_relative_and_drops_fragments():
     links = extract_links(HTML, base_url="https://example.com/dir/")
     assert "https://example.com/relative" in links
-    assert "https://other.example.com/page?x=1" in links
+    # Query strings are dropped too, not just fragments — see the comment in
+    # extract_links about tracking-parameter blowup.
+    assert "https://other.example.com/page" in links
+    assert not any("?" in link for link in links)
 
 
 def test_extract_links_skips_anchors_js_and_mailto():

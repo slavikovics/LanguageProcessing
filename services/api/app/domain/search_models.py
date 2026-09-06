@@ -17,11 +17,13 @@ from ips_db import Collection, SearchModel
 class SearchBackend(Protocol):
     async def rank(
         self, *, collection: Collection, text: str, model_row: SearchModel
-    ) -> tuple[list[tuple[int, float]], dict[int, list[str]]]:
-        """Returns (ranked (document_id, score) pairs for every scored
-        document, best first — not just top_k, since rank-sensitive metrics
-        like AP/R-precision/the 11-point curve need the full ranking) and
-        (document_id -> matched term lemmas, meaningful only for term-based
-        backends; empty for dense-embedding backends, which have no
-        discrete "matched term" concept)."""
+    ) -> list[tuple[int, float]]:
+        """Ranked (document_id, score) pairs for every scored document, best
+        first — not just top_k, since rank-sensitive metrics like AP/
+        R-precision/the 11-point curve need the full ranking. "Matched
+        terms" for the UI is computed separately in SearchService, from the
+        indexed TF-IDF vocabulary — it's a lexical-overlap fact about a
+        document, independent of which backend ranked it, so every backend
+        (including dense-embedding ones with no discrete "matched term"
+        concept of their own) gets it for free."""
         ...

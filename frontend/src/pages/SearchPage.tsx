@@ -7,25 +7,23 @@ import {
   ListChecks,
   SearchIcon,
   SlidersHorizontal,
-  ThumbsDown,
   ThumbsUp,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { getDocument, listDocuments, listJudgments, search, setJudgment } from "../api/client";
+import { clearJudgment, getDocument, listDocuments, listJudgments, search, setJudgment } from "../api/client";
 import type { DocumentSummary, SearchHit, SearchResponse } from "../api/types";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useCollectionContext } from "@/context/CollectionContext";
 import { useSearchModelContext } from "@/context/SearchModelContext";
-import { cn } from "@/lib/utils";
+import { clampNumberInput, cn } from "@/lib/utils";
 
 const JUDGMENT_MODE_STORAGE_KEY = "ips-judgment-mode";
 
@@ -49,20 +47,18 @@ function highlightSnippet(snippet: string, words: string[]): ReactNode {
   );
 }
 
-type JudgmentState = "relevant" | "not_relevant" | null;
-
 function ResultCard({
   hit,
-  judgment,
+  isRelevant,
   judgmentMode,
   submittedWords,
-  onJudge,
+  onToggleRelevant,
 }: {
   hit: SearchHit;
-  judgment: JudgmentState;
+  isRelevant: boolean;
   judgmentMode: boolean;
   submittedWords: string[];
-  onJudge: (documentId: number, isRelevant: boolean) => void;
+  onToggleRelevant: (documentId: number) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [fullText, setFullText] = useState<string | null>(null);
@@ -101,13 +97,13 @@ function ResultCard({
       </div>
 
       {!expanded ? (
-        <p className="text-sm leading-relaxed text-muted-foreground">
+        <p className="text-sm leading-relaxed break-words text-muted-foreground">
           {highlightSnippet(hit.snippet, submittedWords)}
         </p>
       ) : (
         <div className="flex flex-col gap-2 duration-200 animate-in fade-in slide-in-from-top-1">
           <ScrollArea className="h-56 rounded-md border bg-muted/20">
-            <p className="whitespace-pre-wrap p-3 text-sm leading-relaxed">
+            <p className="whitespace-pre-wrap break-words p-3 text-sm leading-relaxed">
               {loadingFull ? "Загрузка…" : highlightSnippet(fullText ?? hit.snippet, submittedWords)}
             </p>
           </ScrollArea>
@@ -151,36 +147,20 @@ function ResultCard({
           )}
         </div>
         {judgmentMode && (
-          <div className="flex shrink-0 items-center gap-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => onJudge(hit.document_id, true)}
-              aria-label="Релевантен"
-              aria-pressed={judgment === "relevant"}
-              className={cn(
-                "transition-all duration-150 hover:scale-110",
-                judgment === "relevant" && "bg-emerald-600/15 text-emerald-600 dark:text-emerald-400",
-              )}
-            >
-              <ThumbsUp className="size-4" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => onJudge(hit.document_id, false)}
-              aria-label="Не релевантен"
-              aria-pressed={judgment === "not_relevant"}
-              className={cn(
-                "transition-all duration-150 hover:scale-110",
-                judgment === "not_relevant" && "bg-destructive/15 text-destructive",
-              )}
-            >
-              <ThumbsDown className="size-4" />
-            </Button>
-          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => onToggleRelevant(hit.document_id)}
+            aria-label={isRelevant ? "Убрать отметку «релевантен»" : "Отметить как релевантный"}
+            aria-pressed={isRelevant}
+            className={cn(
+              "shrink-0 transition-all duration-150 hover:scale-110",
+              isRelevant && "bg-emerald-600/15 text-emerald-600 dark:text-emerald-400",
+            )}
+          >
+            <ThumbsUp className="size-4" />
+          </Button>
         )}
       </div>
     </div>
@@ -194,13 +174,13 @@ function CollectionJudgmentBrowser({
   documentTotal,
   excludeIds,
   judgments,
-  onJudge,
+  onToggleRelevant,
 }: {
   collectionId: number;
   documentTotal: number;
   excludeIds: Set<number>;
-  judgments: Record<number, JudgmentState>;
-  onJudge: (documentId: number, isRelevant: boolean) => void;
+  judgments: Record<number, boolean>;
+  onToggleRelevant: (documentId: number) => void;
 }) {
   const [documents, setDocuments] = useState<DocumentSummary[]>([]);
   const [offset, setOffset] = useState(0);
@@ -224,7 +204,7 @@ function CollectionJudgmentBrowser({
   const visible = documents.filter((doc) => !excludeIds.has(doc.id));
 
   return (
-    <div className="flex flex-col gap-3 rounded-md border border-dashed p-4">
+    <div className="flex flex-col gap-3 rounded-md border p-4">
       <p className="text-xs text-muted-foreground">
         Остальные документы коллекции — не входят в текущую выдачу. Отметьте здесь те, что
         релевантны запросу, но поиск их не нашёл: без этого Recall всегда будет считаться по
@@ -240,7 +220,7 @@ function CollectionJudgmentBrowser({
             </p>
           )}
           {visible.map((doc) => {
-            const judgment = judgments[doc.id] ?? null;
+            const isRelevant = judgments[doc.id] ?? false;
             return (
               <div
                 key={doc.id}
@@ -252,36 +232,20 @@ function CollectionJudgmentBrowser({
                     <div className="truncate text-xs text-muted-foreground">{doc.url}</div>
                   )}
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => onJudge(doc.id, true)}
-                    aria-label="Релевантен"
-                    aria-pressed={judgment === "relevant"}
-                    className={cn(
-                      "transition-all duration-150 hover:scale-110",
-                      judgment === "relevant" && "bg-emerald-600/15 text-emerald-600 dark:text-emerald-400",
-                    )}
-                  >
-                    <ThumbsUp className="size-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => onJudge(doc.id, false)}
-                    aria-label="Не релевантен"
-                    aria-pressed={judgment === "not_relevant"}
-                    className={cn(
-                      "transition-all duration-150 hover:scale-110",
-                      judgment === "not_relevant" && "bg-destructive/15 text-destructive",
-                    )}
-                  >
-                    <ThumbsDown className="size-4" />
-                  </Button>
-                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => onToggleRelevant(doc.id)}
+                  aria-label={isRelevant ? "Убрать отметку «релевантен»" : "Отметить как релевантный"}
+                  aria-pressed={isRelevant}
+                  className={cn(
+                    "shrink-0 transition-all duration-150 hover:scale-110",
+                    isRelevant && "bg-emerald-600/15 text-emerald-600 dark:text-emerald-400",
+                  )}
+                >
+                  <ThumbsUp className="size-4" />
+                </Button>
               </div>
             );
           })}
@@ -321,13 +285,14 @@ export function SearchPage() {
   const { selected, selectedId, latestIndexJob } = useCollectionContext();
   const { models, selectedModelKey, setSelectedModelKey } = useSearchModelContext();
   const [text, setText] = useState("");
-  const [topK, setTopK] = useState(10);
+  const [topK, setTopK] = useState<number | "">(10);
   const [submittedWords, setSubmittedWords] = useState<string[]>([]);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [response, setResponse] = useState<SearchResponse | null>(null);
-  const [judgments, setJudgments] = useState<Record<number, JudgmentState>>({});
+  const [judgments, setJudgments] = useState<Record<number, boolean>>({});
   const [judgmentMode, setJudgmentMode] = useState(
     () => localStorage.getItem(JUDGMENT_MODE_STORAGE_KEY) === "1",
   );
@@ -365,7 +330,7 @@ export function SearchPage() {
       const result = await search({
         collection_id: selectedId,
         text,
-        top_k: topK,
+        top_k: clampNumberInput(topK, 1, 100),
         model: selectedModelKey,
       });
       setResponse(result);
@@ -373,13 +338,13 @@ export function SearchPage() {
       // The query text may already have prior runs/judgments (queries are
       // deduped by collection+text) — hydrate from those instead of
       // starting blank, otherwise previously marked documents would look
-      // unjudged until re-clicked.
+      // unjudged until re-clicked. Only "relevant" is a real mark now
+      // (see handleToggleRelevant) — any leftover is_relevant=false rows
+      // from before that change are treated the same as unmarked.
       try {
         const existing = await listJudgments(result.query_id);
         setJudgments(
-          Object.fromEntries(
-            existing.map((j) => [j.document_id, j.is_relevant ? "relevant" : "not_relevant"]),
-          ),
+          Object.fromEntries(existing.filter((j) => j.is_relevant).map((j) => [j.document_id, true])),
         );
       } catch {
         // Non-critical: results still render, just without pre-filled marks.
@@ -397,14 +362,26 @@ export function SearchPage() {
     }
   }
 
-  async function handleJudgment(documentId: number, isRelevant: boolean) {
+  // Only "relevant" is a markable state — per ROMIP pooling, everything
+  // not explicitly marked relevant is treated as not relevant, so there is
+  // nothing a separate "not relevant" mark would add. Clicking again clears
+  // the judgment entirely (back to unmarked) rather than recording a
+  // negative, keeping the qrels set to exactly "found and confirmed".
+  async function handleToggleRelevant(documentId: number) {
     if (!response) return;
+    const nextRelevant = !judgments[documentId];
     try {
-      await setJudgment(response.query_id, documentId, isRelevant);
-      setJudgments((prev) => ({
-        ...prev,
-        [documentId]: isRelevant ? "relevant" : "not_relevant",
-      }));
+      if (nextRelevant) {
+        await setJudgment(response.query_id, documentId, true);
+      } else {
+        await clearJudgment(response.query_id, documentId);
+      }
+      setJudgments((prev) => {
+        const next = { ...prev };
+        if (nextRelevant) next[documentId] = true;
+        else delete next[documentId];
+        return next;
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -450,56 +427,66 @@ export function SearchPage() {
                 className="pl-9"
               />
             </div>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button type="button" variant="outline" size="icon" aria-label="Параметры поиска">
-                  <SlidersHorizontal className="size-4" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-72">
-                <div className="flex flex-col gap-3">
-                  <div className="grid gap-1.5">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="search-model">Модель поиска</Label>
-                      <Link
-                        to="/help#search-models"
-                        aria-label="Подробнее о моделях поиска"
-                        className="text-muted-foreground transition-colors hover:text-primary"
-                      >
-                        <HelpCircle className="size-3.5" />
-                      </Link>
-                    </div>
-                    <Select value={selectedModelKey} onValueChange={setSelectedModelKey}>
-                      <SelectTrigger id="search-model" className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {models.map((m) => (
-                          <SelectItem key={m.key} value={m.key}>
-                            {m.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-1.5">
-                    <Label htmlFor="search-top-k">Число результатов (Топ-K)</Label>
-                    <Input
-                      id="search-top-k"
-                      type="number"
-                      min={1}
-                      max={100}
-                      value={topK}
-                      onChange={(e) => setTopK(Number(e.target.value))}
-                    />
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
+            <Button
+              type="button"
+              variant={settingsOpen ? "secondary" : "outline"}
+              size="icon"
+              aria-label="Параметры поиска"
+              aria-expanded={settingsOpen}
+              onClick={() => setSettingsOpen((v) => !v)}
+            >
+              <SlidersHorizontal className="size-4" />
+            </Button>
             <Button type="submit" size="icon" disabled={loading} aria-label="Искать">
               <SearchIcon className="size-4" />
             </Button>
+            <Button asChild variant="outline" size="icon" aria-label="Справка о поиске" className="text-muted-foreground">
+              <Link to="/help#searching">
+                <HelpCircle className="size-4" />
+              </Link>
+            </Button>
           </form>
+
+          {settingsOpen && (
+            <div className="flex flex-wrap items-end gap-4 rounded-md border bg-muted/30 p-4 duration-150 animate-in fade-in slide-in-from-top-1">
+              <div className="flex min-w-52 flex-1 flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="search-model">Модель поиска</Label>
+                  <Link
+                    to="/help#search-models"
+                    aria-label="Подробнее о моделях поиска"
+                    className="text-muted-foreground transition-colors hover:text-primary"
+                  >
+                    <HelpCircle className="size-3.5" />
+                  </Link>
+                </div>
+                <Select value={selectedModelKey} onValueChange={setSelectedModelKey}>
+                  <SelectTrigger id="search-model" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {models.map((m) => (
+                      <SelectItem key={m.key} value={m.key}>
+                        {m.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex w-56 flex-col gap-1.5">
+                <Label htmlFor="search-top-k">Число результатов (Топ-K)</Label>
+                <Input
+                  id="search-top-k"
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={topK}
+                  onChange={(e) => setTopK(e.target.value === "" ? "" : Number(e.target.value))}
+                  onBlur={() => setTopK((v) => clampNumberInput(v, 1, 100))}
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -524,10 +511,10 @@ export function SearchPage() {
                 <ResultCard
                   key={hit.document_id}
                   hit={hit}
-                  judgment={judgments[hit.document_id] ?? null}
+                  isRelevant={judgments[hit.document_id] ?? false}
                   judgmentMode={judgmentMode}
                   submittedWords={submittedWords}
-                  onJudge={handleJudgment}
+                  onToggleRelevant={handleToggleRelevant}
                 />
               ))}
             </div>
@@ -539,7 +526,7 @@ export function SearchPage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="w-fit"
+                className="w-fit self-center"
                 onClick={() => setShowFullCollection((v) => !v)}
               >
                 <ListChecks className="size-4" />
@@ -551,7 +538,7 @@ export function SearchPage() {
                   documentTotal={selected.document_count}
                   excludeIds={new Set(response.hits.map((hit) => hit.document_id))}
                   judgments={judgments}
-                  onJudge={handleJudgment}
+                  onToggleRelevant={handleToggleRelevant}
                 />
               )}
             </div>

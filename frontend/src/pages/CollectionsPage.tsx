@@ -1,8 +1,12 @@
-import { FileUp, Pencil, Plus, RefreshCw, RotateCw, Trash2 } from "lucide-react";
+import { FileUp, HelpCircle, Pencil, Plus, RefreshCw, RotateCw, Square, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import {
+  cancelCrawlJob,
+  cancelIndexJob,
   createDocument,
   createIndexJob,
+  deleteCollection,
   deleteDocument,
   getDocument,
   listDocuments,
@@ -41,9 +45,9 @@ const PAGE_SIZE = 10;
 
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="flex flex-col">
-      <span className="text-2xl font-semibold tabular-nums">{value}</span>
-      <span className="text-xs text-muted-foreground">{label}</span>
+    <div className="flex flex-col items-center text-center">
+      <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{label}</span>
+      <span className="text-2xl leading-tight font-semibold tracking-tight tabular-nums">{value}</span>
     </div>
   );
 }
@@ -70,10 +74,12 @@ export function CollectionsPage() {
   const [indexError, setIndexError] = useState<string | null>(null);
   const [activeJobId, setActiveJobId] = useState<number | null>(null);
   const { progress: liveJob } = useIndexJobProgress(activeJobId);
+  const [cancellingIndex, setCancellingIndex] = useState(false);
 
   const [refreshJobId, setRefreshJobId] = useState<number | null>(null);
   const { progress: refreshProgress } = useCrawlJobProgress(refreshJobId);
   const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [cancellingRefresh, setCancellingRefresh] = useState(false);
 
   const [formMode, setFormMode] = useState<FormMode>("closed");
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -83,6 +89,7 @@ export function CollectionsPage() {
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deletingCollection, setDeletingCollection] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
@@ -163,6 +170,30 @@ export function CollectionsPage() {
     }
   }
 
+  async function handleCancelIndex(jobId: number) {
+    setCancellingIndex(true);
+    setIndexError(null);
+    try {
+      await cancelIndexJob(jobId);
+    } catch (err) {
+      setIndexError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCancellingIndex(false);
+    }
+  }
+
+  async function handleCancelRefresh(jobId: number) {
+    setCancellingRefresh(true);
+    setRefreshError(null);
+    try {
+      await cancelCrawlJob(jobId);
+    } catch (err) {
+      setRefreshError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCancellingRefresh(false);
+    }
+  }
+
   function openCreateForm() {
     setFormMode("create");
     setEditingId(null);
@@ -229,6 +260,26 @@ export function CollectionsPage() {
     }
   }
 
+  async function handleDeleteCollection() {
+    if (!selected) return;
+    if (
+      !window.confirm(
+        `Удалить коллекцию «${selected.name}» вместе со всеми документами, индексом и историей запросов? Это действие необратимо.`,
+      )
+    ) {
+      return;
+    }
+    setDeletingCollection(true);
+    try {
+      await deleteCollection(selected.id);
+      await refreshCollections();
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDeletingCollection(false);
+    }
+  }
+
   async function handleDelete(doc: DocumentSummary) {
     if (!window.confirm(`Удалить документ «${doc.title}»? Это действие необратимо.`)) return;
     setDeletingId(doc.id);
@@ -270,46 +321,61 @@ export function CollectionsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Card>
-        <CardContent className="grid gap-6 sm:grid-cols-[1fr_auto]">
-          <div className="flex flex-col gap-4">
-            <div>
-              <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                Коллекция
-              </p>
-              <h2 className="text-2xl leading-tight font-semibold tracking-tight">{selected.name}</h2>
-            </div>
-            <div className="flex flex-wrap items-center gap-8">
-              <Stat label="Документов" value={selected.document_count} />
-              <Stat
-                label="Терминов в индексе"
-                value={displayedJob?.status === "completed" ? (displayedJob.terms_indexed ?? "—") : "—"}
-              />
-              <Stat
-                label="Последняя индексация"
-                value={
-                  displayedJob?.status === "completed" && displayedJob.finished_at
-                    ? new Date(displayedJob.finished_at).toLocaleString()
-                    : "не выполнялась"
-                }
-              />
-            </div>
-            {isStale && !isIndexing && (
-              <span className="text-xs text-amber-600 dark:text-amber-400">
-                Документы менялись после индексации — результаты поиска могут быть неточными.
-              </span>
-            )}
-            {indexError && <p className="text-xs text-destructive">{indexError}</p>}
-            {refreshError && <p className="text-xs text-destructive">{refreshError}</p>}
+      <Card className="relative py-4">
+        <Button
+          asChild
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Справка о коллекциях"
+          className="absolute top-3 right-3 text-muted-foreground"
+        >
+          <Link to="/help#collections">
+            <HelpCircle className="size-4" />
+          </Link>
+        </Button>
+        <CardContent className="flex flex-col items-center gap-3">
+          <div className="mx-auto flex w-full flex-wrap items-start justify-center gap-x-12 gap-y-5">
+            <Stat label="Коллекция" value={selected.name} />
+            <Stat label="Документов" value={selected.document_count} />
+            <Stat
+              label="Терминов в индексе"
+              value={displayedJob?.status === "completed" ? (displayedJob.terms_indexed ?? "—") : "—"}
+            />
+            <Stat
+              label="Последняя индексация"
+              value={
+                displayedJob?.status === "completed" && displayedJob.finished_at
+                  ? new Date(displayedJob.finished_at).toLocaleString()
+                  : "не выполнялась"
+              }
+            />
           </div>
+          {isStale && !isIndexing && (
+            <span className="text-xs text-amber-600 dark:text-amber-400">
+              Документы менялись после индексации — результаты поиска могут быть неточными.
+            </span>
+          )}
+          {indexError && <p className="text-xs text-destructive">{indexError}</p>}
+          {refreshError && <p className="text-xs text-destructive">{refreshError}</p>}
 
-          <div className="flex flex-col justify-center gap-2 rounded-lg border bg-muted/30 p-3 sm:w-56">
+          <div className="flex w-full flex-wrap items-center justify-center gap-2 border-t pt-4">
             <Button
               type="button"
               variant="outline"
-              className="justify-start"
+              onClick={handleDeleteCollection}
+              disabled={deletingCollection || isIndexing || isRefreshing}
+              title={isIndexing ? "Коллекция сейчас индексируется" : undefined}
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+            >
+              <Trash2 className="size-4" />
+              {deletingCollection ? "Удаление…" : "Удалить коллекцию"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
               onClick={handleRefreshCollection}
-              disabled={isRefreshing || selected.document_count === 0}
+              disabled={isRefreshing || isIndexing || selected.document_count === 0}
+              title={isIndexing ? "Коллекция сейчас индексируется" : undefined}
             >
               <RefreshCw className="size-4" />
               {isRefreshing ? "Обновление…" : "Обновить"}
@@ -317,14 +383,13 @@ export function CollectionsPage() {
             <Button
               type="button"
               variant="outline"
-              className="justify-start"
               onClick={handleIndex}
               disabled={isIndexing || selected.document_count === 0}
             >
               <RotateCw className="size-4" />
               {isIndexing ? "Индексация…" : "Переиндексировать"}
             </Button>
-            <Button type="button" className="justify-start" onClick={openCreateForm}>
+            <Button type="button" onClick={openCreateForm}>
               <Plus className="size-4" />
               Добавить документ
             </Button>
@@ -333,11 +398,24 @@ export function CollectionsPage() {
 
         {isIndexing && displayedJob && (
           <CardContent className="flex flex-col gap-2 border-t pt-4">
-            <p className="text-sm text-muted-foreground">
-              {displayedJob.status === "pending"
-                ? "Задача поставлена в очередь…"
-                : `Обработано документов: ${displayedJob.documents_processed} из ${displayedJob.documents_total}`}
-            </p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-muted-foreground">
+                {displayedJob.status === "pending"
+                  ? "Задача поставлена в очередь…"
+                  : `Обработано документов: ${displayedJob.documents_processed} из ${displayedJob.documents_total}`}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleCancelIndex(displayedJob.id)}
+                disabled={cancellingIndex}
+                className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                <Square className="size-3.5" />
+                {cancellingIndex ? "Прерывание…" : "Прервать"}
+              </Button>
+            </div>
             <ProgressBar
               value={displayedJob.documents_processed}
               max={Math.max(displayedJob.documents_total, 1)}
@@ -349,12 +427,30 @@ export function CollectionsPage() {
             <p className="text-sm text-destructive">Ошибка индексации: {displayedJob.error_message}</p>
           </CardContent>
         )}
+        {displayedJob?.status === "cancelled" && (
+          <CardContent className="border-t pt-4">
+            <p className="text-sm text-muted-foreground">Индексация прервана.</p>
+          </CardContent>
+        )}
         {isRefreshing && refreshProgress && (
           <CardContent className="flex flex-col gap-2 border-t pt-4">
-            <p className="text-sm text-muted-foreground">
-              Перезагружено документов: {refreshProgress.job.documents_fetched} из{" "}
-              {refreshProgress.job.max_documents}
-            </p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-muted-foreground">
+                Перезагружено документов: {refreshProgress.job.documents_fetched} из{" "}
+                {refreshProgress.job.max_documents}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleCancelRefresh(refreshProgress.job.id)}
+                disabled={cancellingRefresh}
+                className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                <Square className="size-3.5" />
+                {cancellingRefresh ? "Прерывание…" : "Прервать"}
+              </Button>
+            </div>
             <ProgressBar
               value={refreshProgress.job.documents_fetched}
               max={Math.max(refreshProgress.job.max_documents, 1)}

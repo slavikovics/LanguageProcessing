@@ -20,6 +20,7 @@ const STATUS_DOT: Record<IndexJobStatus, string> = {
   running: "bg-primary animate-pulse",
   completed: "bg-emerald-500",
   failed: "bg-destructive",
+  cancelled: "bg-destructive",
 };
 
 const STATUS_LABEL: Record<IndexJobStatus, string> = {
@@ -27,6 +28,7 @@ const STATUS_LABEL: Record<IndexJobStatus, string> = {
   running: "индексация…",
   completed: "проиндексировано",
   failed: "ошибка индексации",
+  cancelled: "индексация прервана",
 };
 
 /** Single source of "what am I working with right now": picks the active

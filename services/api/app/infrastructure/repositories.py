@@ -11,7 +11,8 @@ from ips_db import (
     CrawlSeed,
     CrawlUrl,
     Document,
-    DocumentEmbedding,
+    DocumentChunk,
+    DocumentChunkEmbedding,
     DocumentTerm,
     IndexJob,
     MetricResult,
@@ -39,6 +40,12 @@ class CollectionRepository:
 
     async def get(self, collection_id: int) -> Collection | None:
         return await self._session.get(Collection, collection_id)
+
+    async def delete(self, collection: Collection) -> None:
+        """Relies on the DB-level ON DELETE CASCADE from documents/
+        crawl_seeds/crawl_jobs/index_jobs/queries (see migrations 0001-0004)
+        to clear everything the collection owns."""
+        await self._session.delete(collection)
 
     async def list(self) -> list[Collection]:
         result = await self._session.execute(select(Collection).order_by(Collection.id))
@@ -288,52 +295,77 @@ class SearchModelRepository:
         return list(result.scalars().all())
 
 
-class EmbeddingRepository:
-    """Writes/reads document_embeddings — the dense-model counterpart to
-    IndexRepository's term_weights. Vectors are stored zero-padded to
-    MAX_EMBEDDING_DIM by the caller (see embedding_padding.pad_to_max_dim)
-    before reaching this repository."""
+class ChunkRepository:
+    """Writes/reads document_chunks — the pieces app.domain.indexing.
+    chunk_text splits a document's clean_text into so a dense embedding
+    model encodes each piece within its own context window instead of one
+    vector per whole document (which would silently drop anything past the
+    model's token limit)."""
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def clear_for_documents(self, document_ids: list[int], search_model_id: int) -> None:
+    async def clear_for_documents(self, document_ids: list[int]) -> None:
         if not document_ids:
             return
-        await self._session.execute(
-            delete(DocumentEmbedding).where(
-                DocumentEmbedding.search_model_id == search_model_id,
-                DocumentEmbedding.document_id.in_(document_ids),
-            )
-        )
+        await self._session.execute(delete(DocumentChunk).where(DocumentChunk.document_id.in_(document_ids)))
+
+    async def bulk_create(self, rows: list[dict[str, object]]) -> list[DocumentChunk]:
+        """rows: [{document_id, chunk_index, text}, ...]. Returns the
+        persisted rows (with ids assigned) in the same order, so callers can
+        zip them against a same-order list of encoded vectors."""
+        if not rows:
+            return []
+        chunks = [DocumentChunk(**row) for row in rows]
+        self._session.add_all(chunks)
+        await self._session.flush()
+        return chunks
+
+
+class ChunkEmbeddingRepository:
+    """Writes/reads document_chunk_embeddings — the dense-model counterpart
+    to IndexRepository's term_weights, one row per chunk rather than per
+    document. Vectors are stored zero-padded to MAX_EMBEDDING_DIM by the
+    caller (see embedding_padding.pad_to_max_dim) before reaching this
+    repository."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
 
     async def bulk_write(self, rows: list[dict[str, object]]) -> None:
-        """rows: [{document_id, search_model_id, embedding}, ...]."""
+        """rows: [{chunk_id, search_model_id, embedding}, ...]."""
         if not rows:
             return
-        await self._session.execute(insert(DocumentEmbedding), rows)
+        await self._session.execute(insert(DocumentChunkEmbedding), rows)
 
-    async def nearest(
+    async def nearest_documents(
         self, document_ids: list[int], search_model_id: int, query_vector: list[float]
     ) -> list[tuple[int, float]]:
-        """Every document in `document_ids` that has a stored vector under
-        this model, ranked by cosine similarity, best first — not limited,
-        so rank-sensitive metrics (AP/R-precision/the curve) stay correct
-        the same way TF-IDF's full ranking does. pgvector's `<=>` operator
-        returns cosine *distance*; we return `1 - distance` so the score
-        scale matches TF-IDF's dot product (higher is better)."""
+        """Every document in `document_ids` that has at least one chunk
+        vector under this model, ranked by its single best-matching chunk's
+        cosine similarity, best first — not limited, so rank-sensitive
+        metrics (AP/R-precision/the curve) stay correct the same way TF-
+        IDF's full ranking does. pgvector's `<=>` operator returns cosine
+        *distance*; we return `1 - distance` so the score scale matches
+        TF-IDF's dot product (higher is better), then take the max per
+        document (= the min distance = the closest chunk)."""
         if not document_ids:
             return []
-        distance = DocumentEmbedding.embedding.cosine_distance(query_vector)
-        result = await self._session.execute(
-            select(DocumentEmbedding.document_id, distance.label("distance"))
-            .where(
-                DocumentEmbedding.search_model_id == search_model_id,
-                DocumentEmbedding.document_id.in_(document_ids),
-            )
-            .order_by(distance)
+        similarity = (1.0 - DocumentChunkEmbedding.embedding.cosine_distance(query_vector)).label(
+            "similarity"
         )
-        return [(doc_id, 1.0 - dist) for doc_id, dist in result.all()]
+        best_similarity = func.max(similarity)
+        result = await self._session.execute(
+            select(DocumentChunk.document_id, best_similarity)
+            .join(DocumentChunkEmbedding, DocumentChunkEmbedding.chunk_id == DocumentChunk.id)
+            .where(
+                DocumentChunkEmbedding.search_model_id == search_model_id,
+                DocumentChunk.document_id.in_(document_ids),
+            )
+            .group_by(DocumentChunk.document_id)
+            .order_by(best_similarity.desc())
+        )
+        return [(doc_id, score) for doc_id, score in result.all()]
 
 
 class IndexJobRepository:
@@ -363,14 +395,23 @@ class IndexJobRepository:
         )
         return result.scalars().first()
 
-    async def mark_running(self, job_id: int, *, documents_total: int) -> None:
-        job = await self._session.get(IndexJob, job_id)
-        if job is None:
-            return
-        job.status = IndexJobStatus.RUNNING.value
-        job.documents_total = documents_total
-        job.started_at = dt.datetime.utcnow()
+    async def mark_running(self, job_id: int, *, documents_total: int) -> bool:
+        """A conditional UPDATE, not an unconditional ORM assignment: a job
+        can be cancelled while still "pending" (before the background task
+        even starts running it), and an unconditional write here would
+        silently resurrect it back to "running", erasing that cancellation.
+        Returns whether the transition actually happened."""
+        result = await self._session.execute(
+            update(IndexJob)
+            .where(IndexJob.id == job_id, IndexJob.status == IndexJobStatus.PENDING.value)
+            .values(
+                status=IndexJobStatus.RUNNING.value,
+                documents_total=documents_total,
+                started_at=dt.datetime.utcnow(),
+            )
+        )
         await self._session.commit()
+        return result.rowcount > 0
 
     async def update_progress(self, job_id: int, *, documents_processed: int) -> None:
         job = await self._session.get(IndexJob, job_id)
@@ -396,6 +437,31 @@ class IndexJobRepository:
         job.error_message = error_message[:1000]
         job.finished_at = dt.datetime.utcnow()
         await self._session.commit()
+
+    async def get_status(self, job_id: int) -> str | None:
+        """A raw column read, deliberately bypassing the session's identity
+        map: the running job's own long-lived session already holds this
+        row cached from when it first loaded it, so re-fetching the mapped
+        entity via .get() would keep returning that stale copy instead of
+        seeing a concurrent cancel request's UPDATE — see IndexingService's
+        cancellation checkpoints."""
+        result = await self._session.execute(select(IndexJob.status).where(IndexJob.id == job_id))
+        row = result.first()
+        return row[0] if row else None
+
+    async def request_cancel(self, job_id: int) -> bool:
+        """Marks a pending/running job cancelled — a no-op (returns False)
+        if it already finished on its own, so a cancel request racing the
+        job's own completion can't resurrect a finished job into
+        "cancelled". The running job notices via get_status() at its next
+        checkpoint and stops itself; this call doesn't touch it directly."""
+        result = await self._session.execute(
+            update(IndexJob)
+            .where(IndexJob.id == job_id, IndexJob.status.in_(["pending", "running"]))
+            .values(status=IndexJobStatus.CANCELLED.value, finished_at=dt.datetime.utcnow())
+        )
+        await self._session.commit()
+        return result.rowcount > 0
 
     async def delete_all_by_collection(self, collection_id: int) -> None:
         await self._session.execute(delete(IndexJob).where(IndexJob.collection_id == collection_id))

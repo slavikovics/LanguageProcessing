@@ -111,15 +111,6 @@ class MetricsEvaluateResponse(BaseModel):
     curve: list[tuple[float, float]]
 
 
-class MetricsRunInput(BaseModel):
-    ranked_ids: list[int]
-    relevant_ids: list[int]
-
-
-class MetricsAggregateRequest(BaseModel):
-    runs: list[MetricsRunInput]
-
-
 class EmbedDocumentsRequest(BaseModel):
     texts: list[str]
 
@@ -134,19 +125,3 @@ class EmbedQueryRequest(BaseModel):
 
 class EmbedQueryResponse(BaseModel):
     vector: list[float]
-
-
-class MetricsAggregateResponse(BaseModel):
-    """Aggregate over several query runs. MAP is the mean of each run's
-    average_precision (macro-average — that's what "mean" in MAP means).
-    micro_precision/micro_recall/micro_f1 follow ROMIP'2004 section 1.2:
-    the search track uses *micro*-averaging for set-based metrics — sum the
-    contingency-table counts across all queries first, then divide — rather
-    than averaging each query's own precision/recall.
-    """
-
-    map: float
-    micro_precision: float
-    micro_recall: float
-    micro_f1: float
-    average_precisions: list[float]

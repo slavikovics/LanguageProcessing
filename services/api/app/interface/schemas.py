@@ -229,9 +229,6 @@ class CollectionMetricsSummaryOut(BaseModel):
     mean_r_precision: float
     mean_precision_at_5: float
     mean_precision_at_10: float
-    micro_precision: float
-    micro_recall: float
-    micro_f1: float
     queries: list[QueryMetricsOut]
     curve: list[tuple[float, float]]
     unscored_judged_queries: int = 0

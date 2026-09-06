@@ -68,14 +68,6 @@ class NlpServiceClient:
             "/metrics/evaluate", {"ranked_ids": ranked_ids, "relevant_ids": relevant_ids}
         )
 
-    async def aggregate_metrics(self, runs: list[tuple[list[int], list[int]]]) -> dict[str, Any]:
-        """MAP (macro-average of AP) plus micro-averaged precision/recall/F1
-        over several query runs — see nlp-service's /metrics/aggregate."""
-        return await self._post(
-            "/metrics/aggregate",
-            {"runs": [{"ranked_ids": ranked, "relevant_ids": relevant} for ranked, relevant in runs]},
-        )
-
     async def embed_documents(self, texts: list[str]) -> list[list[float]]:
         body = await self._post(
             "/embeddings/documents", {"texts": texts}, timeout=self.EMBEDDING_TIMEOUT

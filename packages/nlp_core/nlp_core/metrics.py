@@ -10,7 +10,7 @@ later, lab 2/3's own accuracy measurements.
 
 from __future__ import annotations
 
-from typing import Hashable, Iterable, Sequence
+from typing import Hashable, Sequence
 
 DocId = Hashable
 
@@ -56,39 +56,6 @@ def average_precision(ranked_ids: Sequence[DocId], relevant_ids: set[DocId]) -> 
             hits += 1
             precision_sum += hits / k
     return precision_sum / len(relevant_ids)
-
-
-def mean_average_precision(
-    runs: Iterable[tuple[Sequence[DocId], set[DocId]]],
-) -> float:
-    """MAP: average of average_precision() over several query runs."""
-    aps = [average_precision(ranked, relevant) for ranked, relevant in runs]
-    if not aps:
-        return 0.0
-    return sum(aps) / len(aps)
-
-
-def micro_average_precision_recall(
-    runs: Iterable[tuple[Sequence[DocId], set[DocId]]],
-) -> tuple[float, float]:
-    """Micro-averaged precision/recall over several query runs — the
-    ROMIP'2004 methodology (section 1.2) specifies micro-averaging (not
-    macro/mean-of-per-query) for precision/recall on the search track: sum
-    the contingency-table counts (a = relevant∩retrieved, over all queries)
-    first, then divide, rather than averaging each query's own ratio.
-    """
-    total_hits = 0
-    total_retrieved = 0
-    total_relevant = 0
-    for ranked_ids, relevant_ids in runs:
-        hits = sum(1 for doc_id in ranked_ids if doc_id in relevant_ids)
-        total_hits += hits
-        total_retrieved += len(ranked_ids)
-        total_relevant += len(relevant_ids)
-
-    precision = total_hits / total_retrieved if total_retrieved else 0.0
-    recall = total_hits / total_relevant if total_relevant else 0.0
-    return precision, recall
 
 
 def r_precision(ranked_ids: Sequence[DocId], relevant_ids: set[DocId]) -> float:

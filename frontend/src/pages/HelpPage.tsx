@@ -4,7 +4,6 @@ import {
   Library,
   ListOrdered,
   Search,
-  ThumbsDown,
   ThumbsUp,
   Waypoints,
 } from "lucide-react";
@@ -110,12 +109,30 @@ export function HelpPage() {
 
   useEffect(() => {
     if (!hash) return;
-    // React has already committed this page's DOM by the time effects run,
-    // so the target element is ready immediately. Instant rather than
-    // smooth: a smooth scroll's animation can silently stall if the tab
-    // loses focus/visibility right as it starts (e.g. switching apps mid-
-    // click), leaving the page stuck at the top instead of at the anchor.
-    document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: "instant", block: "start" });
+    // The page scrolls inside a Radix ScrollArea viewport, not the window —
+    // native scrollIntoView() has to guess which ancestor is "the" scroll
+    // container, and on the very first paint (before the ScrollArea has
+    // finished sizing its viewport) it sometimes guesses wrong or computes
+    // against a not-yet-final layout, snapping the scroll position away
+    // right after landing. Scrolling the viewport directly, after a paint,
+    // sidesteps both problems. Instant rather than smooth: a smooth
+    // scroll's animation can silently stall if the tab loses focus/
+    // visibility right as it starts, leaving the page stuck at the top.
+    const id = hash.slice(1);
+    const raf = requestAnimationFrame(() => {
+      const target = document.getElementById(id);
+      if (!target) return;
+      const viewport = target.closest<HTMLElement>('[data-slot="scroll-area-viewport"]');
+      if (!viewport) {
+        target.scrollIntoView({ behavior: "instant", block: "start" });
+        return;
+      }
+      const scrollMarginTop = parseFloat(getComputedStyle(target).scrollMarginTop) || 0;
+      const targetTop =
+        target.getBoundingClientRect().top - viewport.getBoundingClientRect().top + viewport.scrollTop;
+      viewport.scrollTo({ top: targetTop - scrollMarginTop, behavior: "instant" });
+    });
+    return () => cancelAnimationFrame(raf);
   }, [hash]);
 
   return (
@@ -131,7 +148,41 @@ export function HelpPage() {
         </CardHeader>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ListOrdered className="size-4" />
+            Типичный порядок действий
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ProcessSteps
+            steps={[
+              {
+                title: "Соберите коллекцию",
+                children: "Создайте коллекцию и запустите краулинг с одного или нескольких стартовых адресов.",
+              },
+              {
+                title: "Приведите документы в порядок",
+                children:
+                  "При необходимости отредактируйте документы или добавьте свои HTML-файлы на вкладке «Коллекции», затем постройте индекс.",
+              },
+              {
+                title: "Найдите и разметьте",
+                children:
+                  "Выполните поисковые запросы и, включив режим разметки, отметьте лайком найденные релевантные документы.",
+              },
+              {
+                title: "Оцените качество",
+                children: "Оцените качество поиска на вкладке «Метрики».",
+              },
+            ]}
+          />
+        </CardContent>
+      </Card>
+
       <Section
+        id="crawling"
         icon={Waypoints}
         title="Краулинг"
         description="Наполнение коллекции документами путём обхода веб-страниц по ссылкам."
@@ -160,9 +211,14 @@ export function HelpPage() {
           счётчики (найдено/обработано/ошибок) через WebSocket, с откатом на опрос сервера, если
           соединение недоступно.
         </Feature>
+        <Feature title="Прерывание">
+          Кнопка «Прервать» на карточке задачи останавливает обход в течение нескольких секунд —
+          уже сохранённые документы остаются в коллекции, задача помечается как «отменён».
+        </Feature>
       </Section>
 
       <Section
+        id="collections"
         icon={Library}
         title="Коллекции"
         description="Управление коллекциями документов: полный CRUD, загрузка файлов, переиндексация."
@@ -183,9 +239,15 @@ export function HelpPage() {
           Если документы менялись после последней индексации, коллекция помечается как
           «индекс устарел» — предупреждение видно и здесь, и на странице поиска.
         </Feature>
+        <Feature title="Прерывание индексации и обновления">
+          Пока идёт построение индекса или обновление документов по URL, рядом с прогрессом
+          доступна кнопка «Прервать» — задача останавливается в течение нескольких секунд, а уже
+          обработанные документы/термины не откатываются.
+        </Feature>
       </Section>
 
       <Section
+        id="searching"
         icon={Search}
         title="Поиск"
         description="Векторная модель: запрос и документы — TF-IDF векторы, ранжирование по косинусной мере."
@@ -200,17 +262,18 @@ export function HelpPage() {
           области и список терминов, совпавших с запросом.
         </Feature>
         <Feature title="Режим разметки">
-          Включается переключателем над списком результатов. В этом режиме становятся активны
-          кнопки-иконки {" "}
-          <ThumbsUp className="inline size-3.5 align-text-bottom" /> /{" "}
-          <ThumbsDown className="inline size-3.5 align-text-bottom" /> в правом нижнем углу
-          каждой карточки — выбранная подсвечивается зелёным (релевантен) или красным
-          (нерелевантен). Карточка при этом не меняет размер.
+          Включается переключателем над списком результатов. В этом режиме в правом нижнем углу
+          каждой карточки становится активна кнопка{" "}
+          <ThumbsUp className="inline size-3.5 align-text-bottom" /> — отмечает документ как
+          релевантный запросу и подсвечивается зелёным. Отдельной кнопки «нерелевантен» нет: по
+          методике ROMIP всё, что не отмечено релевантным, при подсчёте метрик и так считается
+          нерелевантным, так что вторая отметка ничего бы не меняла. Повторное нажатие снимает
+          отметку. Карточка при этом не меняет размер.
         </Feature>
         <Feature title="Эталонная разметка (qrels)">
-          Проставленные оценки релевантности сохраняются как эталонная разметка запроса и
-          используются для расчёта метрик качества на вкладке «Метрики». Повторный поиск по тому
-          же тексту запроса — та же разметка: оценки накапливаются, а не начинаются заново.
+          Отмеченные лайком документы сохраняются как эталонная разметка запроса и используются
+          для расчёта метрик качества на вкладке «Метрики». Повторный поиск по тому же тексту
+          запроса — та же разметка: отметки накапливаются, а не начинаются заново.
         </Feature>
         <Feature title="Разметка вне выдачи">
           В режиме разметки под результатами есть кнопка «Проверить остальные документы
@@ -231,17 +294,21 @@ export function HelpPage() {
           взвешиваются по TF-IDF и сравниваются косинусной мерой. Быстро, объяснимо — карточки
           результатов показывают, какие именно термины запроса совпали с документом.
         </Feature>
-        <Feature title="Alibaba GTE Multilingual Base (эмбеддинги)">
-          Семантическая модель: документ и запрос кодируются в единый плотный вектор (768 чисел),
-          учитывающий смысл текста, а не только совпадение слов — поэтому находит документы на
-          других языках или без общей лексики с запросом. Контекст модели — 8192 токена, этого
-          достаточно почти для любого документа целиком, без разбиения на фрагменты. У таких
-          результатов нет списка «совпавших терминов» — это не про буквальное совпадение слов.
+        <Feature title="Multilingual E5 Small (эмбеддинги)">
+          Семантическая модель: документ и запрос кодируются в плотные векторы (384 числа),
+          учитывающие смысл текста, а не только совпадение слов — поэтому находит документы на
+          других языках или без общей лексики с запросом. Контекст модели — 512 токенов, поэтому
+          длинные документы при индексации разбиваются на перекрывающиеся фрагменты (чанки) —
+          каждый кодируется отдельно, а результатом документа становится его лучший по сходству
+          фрагмент. Так ни один фрагмент длинного документа не теряется. У таких результатов нет
+          списка «совпавших терминов» — это не про буквальное совпадение слов.
         </Feature>
         <Feature title="Общая разметка релевантности">
-          Оценки 👍/👎, проставленные для запроса на странице «Поиск», используются при подсчёте
-          метрик для любой модели — разметку достаточно сделать один раз, независимо от того, какой
-          моделью её проставили.
+          Лайки, проставленные для запроса на странице «Поиск», используются при подсчёте метрик
+          для любой модели — разметку достаточно сделать один раз, независимо от того, какой
+          моделью её проставили. Стоит проверить «Проверить остальные документы коллекции» под
+          обеими моделями: у них разные топ-выдачи, и документ, который одна модель не показала бы
+          вовсе, не будет размечен, если оценивать только видимые карточки.
         </Feature>
         <Feature title="Сравнение на странице «Метрики»">
           Отметьте нужные модели чекбоксами вверху страницы — таблицы и графики построятся сразу
@@ -267,7 +334,7 @@ export function HelpPage() {
             {
               title: "Вы отмечаете релевантность",
               children:
-                "На странице «Поиск», в режиме разметки, отмечайте 👍/👎 у найденных документов. Для документов, которых поиск не показал, — кнопка «Проверить остальные документы коллекции».",
+                "На странице «Поиск», в режиме разметки, отмечайте лайком найденные релевантные документы. Для документов, которых поиск не показал, — кнопка «Проверить остальные документы коллекции».",
             },
             {
               title: "Метрики по запросу",
@@ -277,7 +344,7 @@ export function HelpPage() {
             {
               title: "Метрики по коллекции",
               children:
-                "Каждый размеченный запрос вносит вклад в сводку: MAP и средние R-Precision/P@5/P@10 — как среднее по запросам; Precision/Recall/F1 коллекции — микроусреднением (ROMIP'2004, п. 1.2).",
+                "Каждый размеченный запрос вносит вклад в сводку: MAP и средние R-Precision/P@5/P@10 — среднее по всем размеченным запросам коллекции.",
             },
           ]}
         />
@@ -337,39 +404,6 @@ export function HelpPage() {
           неопределённость вида 0/0 (п. 1).
         </MetricEntry>
       </Section>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ListOrdered className="size-4" />
-            Типичный порядок действий
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ProcessSteps
-            steps={[
-              {
-                title: "Соберите коллекцию",
-                children: "Создайте коллекцию и запустите краулинг с одного или нескольких стартовых адресов.",
-              },
-              {
-                title: "Приведите документы в порядок",
-                children:
-                  "При необходимости отредактируйте документы или добавьте свои HTML-файлы на вкладке «Коллекции», затем постройте индекс.",
-              },
-              {
-                title: "Найдите и разметьте",
-                children:
-                  "Выполните поисковые запросы и, включив режим разметки, отметьте релевантные и нерелевантные документы.",
-              },
-              {
-                title: "Оцените качество",
-                children: "Оцените качество поиска на вкладке «Метрики».",
-              },
-            ]}
-          />
-        </CardContent>
-      </Card>
     </div>
   );
 }

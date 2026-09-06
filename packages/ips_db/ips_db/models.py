@@ -32,7 +32,7 @@ class Base(DeclarativeBase):
 
 
 # Fixed width of the `document_embeddings.embedding` column. Every dense
-# model's native vector (e.g. 768 for gte-multilingual-base) is zero-padded
+# model's native vector (e.g. 384 for multilingual-e5-small) is zero-padded
 # up to this length before being stored — cosine similarity is invariant to
 # appending equal zero-padding to both compared vectors, and vectors are
 # only ever compared within the same search_model_id, so one shared column
@@ -53,8 +53,16 @@ class Collection(Base):
     # document doesn't happen automatically on every mutation.
     documents_changed_at: Mapped[dt.datetime | None] = mapped_column(nullable=True)
 
-    documents: Mapped[list["Document"]] = relationship(back_populates="collection")
-    crawl_jobs: Mapped[list["CrawlJob"]] = relationship(back_populates="collection")
+    # passive_deletes=True: leave cascading to the DB's ON DELETE CASCADE
+    # (see Document.collection_id/CrawlJob.collection_id) instead of
+    # SQLAlchemy's default of nulling out each child's FK via UPDATE first —
+    # that default fails outright here since both FK columns are NOT NULL.
+    documents: Mapped[list["Document"]] = relationship(
+        back_populates="collection", passive_deletes=True
+    )
+    crawl_jobs: Mapped[list["CrawlJob"]] = relationship(
+        back_populates="collection", passive_deletes=True
+    )
 
 
 class Document(Base):
@@ -124,14 +132,34 @@ class SearchModel(Base):
     created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
 
 
-class DocumentEmbedding(Base):
-    """A document's dense vector under one registered model, zero-padded to
-    MAX_EMBEDDING_DIM (see the constant's docstring above)."""
+class DocumentChunk(Base):
+    """A document split into (roughly) model-context-sized pieces for dense
+    embedding — see app.domain.indexing.chunk_text in the api service. Kept
+    as its own table (rather than one row per document) so a document
+    longer than a model's context window is fully represented across
+    several chunk vectors instead of having its tail silently truncated
+    away by the encoder."""
 
-    __tablename__ = "document_embeddings"
+    __tablename__ = "document_chunks"
 
-    document_id: Mapped[int] = mapped_column(
-        ForeignKey("documents.id", ondelete="CASCADE"), primary_key=True
+    id: Mapped[int] = mapped_column(primary_key=True)
+    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id", ondelete="CASCADE"))
+    chunk_index: Mapped[int] = mapped_column(Integer)
+    text: Mapped[str] = mapped_column(Text)
+
+    __table_args__ = (UniqueConstraint("document_id", "chunk_index", name="uq_document_chunk_index"),)
+
+
+class DocumentChunkEmbedding(Base):
+    """A chunk's dense vector under one registered model, zero-padded to
+    MAX_EMBEDDING_DIM (see the constant's docstring above). Search ranks
+    documents by their single best-matching chunk — see
+    ChunkEmbeddingRepository.nearest_documents."""
+
+    __tablename__ = "document_chunk_embeddings"
+
+    chunk_id: Mapped[int] = mapped_column(
+        ForeignKey("document_chunks.id", ondelete="CASCADE"), primary_key=True
     )
     search_model_id: Mapped[int] = mapped_column(
         ForeignKey("search_models.id", ondelete="CASCADE"), primary_key=True

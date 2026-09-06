@@ -3,7 +3,7 @@ import asyncio
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.indexing import IndexingService
+from app.application.indexing import IndexingService, IndexJobNotFound
 from app.core.config import get_settings
 from app.core.database import SessionLocal, get_db
 from app.domain.enums import IndexJobStatus
@@ -49,6 +49,20 @@ async def get_index_job(job_id: int, db: AsyncSession = Depends(get_db)) -> Inde
 async def get_latest_index_job(collection_id: int, db: AsyncSession = Depends(get_db)) -> IndexJobOut | None:
     service = IndexingService(db)
     return await service.get_latest_job(collection_id)
+
+
+@router.post("/index-jobs/{job_id}/cancel", response_model=IndexJobOut)
+async def cancel_index_job(job_id: int, db: AsyncSession = Depends(get_db)) -> IndexJobOut:
+    service = IndexingService(db)
+    try:
+        await service.cancel_job(job_id)
+    except IndexJobNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except IndexingError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    job = await service.get_job(job_id)
+    assert job is not None
+    return job
 
 
 @router.websocket("/index-jobs/ws/{job_id}")
