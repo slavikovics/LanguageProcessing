@@ -68,16 +68,19 @@ class _InProcessNlpClient(NlpServiceClient):
     async def evaluate_metrics(self, ranked_ids, relevant_ids) -> dict:
         relevant = set(relevant_ids)
         n = len(ranked_ids)
-        precision = metrics.precision_at_k(ranked_ids, relevant, n)
-        recall = metrics.recall_at_k(ranked_ids, relevant, n)
+        precision_at_5 = metrics.precision_at_k(ranked_ids, relevant, 5)
+        precision_at_10 = metrics.precision_at_k(ranked_ids, relevant, 10)
+        recall_at_5 = metrics.recall_at_k(ranked_ids, relevant, 5)
+        recall_at_10 = metrics.recall_at_k(ranked_ids, relevant, 10)
         return {
             "retrieved_count": n,
             "relevant_count": len(relevant),
-            "precision": precision,
-            "recall": recall,
-            "f1": metrics.f1_score(precision, recall),
-            "precision_at_5": metrics.precision_at_k(ranked_ids, relevant, 5),
-            "precision_at_10": metrics.precision_at_k(ranked_ids, relevant, 10),
+            "precision_at_5": precision_at_5,
+            "precision_at_10": precision_at_10,
+            "recall_at_5": recall_at_5,
+            "recall_at_10": recall_at_10,
+            "f1_at_5": metrics.f1_score(precision_at_5, recall_at_5),
+            "f1_at_10": metrics.f1_score(precision_at_10, recall_at_10),
             "average_precision": metrics.average_precision(ranked_ids, relevant),
             "r_precision": metrics.r_precision(ranked_ids, relevant),
             "curve": metrics.interpolated_precision_recall(ranked_ids, relevant),

@@ -62,8 +62,11 @@ class NlpServiceClient:
 
     async def evaluate_metrics(self, ranked_ids: list[int], relevant_ids: list[int]) -> dict[str, Any]:
         """The full ROMIP'2004 search-track metric set for one ranked list
-        against its qrels: whole-list Precision/Recall/F1, Precision(5),
-        Precision(10), Average Precision, R-Precision, 11-point curve."""
+        against its qrels: Precision(5)/Recall(5)/F1(5), Precision(10)/
+        Recall(10)/F1(10), Average Precision, R-Precision, 11-point curve.
+        Whole-list Precision/Recall/F1 are skipped — they degenerate for a
+        system that always ranks the entire collection (Recall is trivially
+        1.0, Precision collapses to relevant_count/collection_size)."""
         return await self._post(
             "/metrics/evaluate", {"ranked_ids": ranked_ids, "relevant_ids": relevant_ids}
         )

@@ -84,10 +84,12 @@ def test_metrics_evaluate_endpoint():
     body = response.json()
     assert body["retrieved_count"] == 4
     assert body["relevant_count"] == 2
-    assert math.isclose(body["precision"], 0.5)  # 2 hits / 4 retrieved
-    assert math.isclose(body["recall"], 1.0)
     assert math.isclose(body["precision_at_5"], 0.4)  # 2 hits / 5 (n < 5 padding per definition)
     assert math.isclose(body["precision_at_10"], 0.2)
+    assert math.isclose(body["recall_at_5"], 1.0)  # both relevant docs are within the top 5
+    assert math.isclose(body["recall_at_10"], 1.0)
+    assert math.isclose(body["f1_at_5"], 2 * 0.4 * 1.0 / (0.4 + 1.0))
+    assert math.isclose(body["f1_at_10"], 2 * 0.2 * 1.0 / (0.2 + 1.0))
     assert math.isclose(body["r_precision"], 0.5)  # precision@|relevant_ids|=2 -> top 2 has 1 hit
     assert len(body["curve"]) == 11
 

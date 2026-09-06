@@ -17,16 +17,25 @@ class MetricsError(ValueError):
 
 @dataclass(frozen=True)
 class QueryMetrics:
+    """Whole-list Precision/Recall/F1 (romip_metrics.pdf section 1.1) are
+    deliberately absent here: this system's ranking always covers the whole
+    collection, so a set-based "found/not found" split degenerates — Recall
+    is trivially 1.0 and Precision collapses to relevant_count/collection
+    size, neither reflecting ranking quality. precision_at_5/10 (already
+    part of section 1.3.1) are paired with recall_at_5/10 and f1_at_5/10 —
+    fixed-cutoff counterparts that stay meaningful for a ranked list."""
+
     query_id: int
     query_text: str
     search_run_id: int
     retrieved_count: int
     relevant_count: int
-    precision: float
-    recall: float
-    f1: float
     precision_at_5: float
     precision_at_10: float
+    recall_at_5: float
+    recall_at_10: float
+    f1_at_5: float
+    f1_at_10: float
     average_precision: float
     r_precision: float
     curve: list[tuple[float, float]]
@@ -38,6 +47,10 @@ class CollectionMetricsSummary:
     model: str
     model_label: str
     map: float
+    mean_recall_at_5: float
+    mean_recall_at_10: float
+    mean_f1_at_5: float
+    mean_f1_at_10: float
     mean_r_precision: float
     mean_precision_at_5: float
     mean_precision_at_10: float

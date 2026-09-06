@@ -209,11 +209,12 @@ class QueryMetricsOut(BaseModel):
     search_run_id: int
     retrieved_count: int
     relevant_count: int
-    precision: float
-    recall: float
-    f1: float
     precision_at_5: float
     precision_at_10: float
+    recall_at_5: float
+    recall_at_10: float
+    f1_at_5: float
+    f1_at_10: float
     average_precision: float
     r_precision: float
     curve: list[tuple[float, float]]
@@ -226,6 +227,10 @@ class CollectionMetricsSummaryOut(BaseModel):
     model: str
     model_label: str
     map: float
+    mean_recall_at_5: float
+    mean_recall_at_10: float
+    mean_f1_at_5: float
+    mean_f1_at_10: float
     mean_r_precision: float
     mean_precision_at_5: float
     mean_precision_at_10: float

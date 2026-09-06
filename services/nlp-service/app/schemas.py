@@ -93,19 +93,24 @@ class MetricsEvaluateRequest(BaseModel):
 
 class MetricsEvaluateResponse(BaseModel):
     """The full ROMIP'2004 search-track metric set (see tasks/romip_metrics.pdf)
-    for one query run. precision/recall are computed over the *entire*
-    retrieved list (the official set-based definition, section 1.1) —
-    precision_at_5/precision_at_10 are the separate fixed-cutoff metrics from
-    section 1.3.1.
+    for one query run. Section 1.1's whole-list Precision/Recall/F1 are
+    deliberately *not* computed here: this system's ranking always covers the
+    entire collection (there's no system-side "found/not found" cutoff), so
+    those degenerate — Recall is trivially 1.0 and Precision collapses to
+    relevant_count/collection_size, carrying no information about ranking
+    quality. precision_at_5/10, recall_at_5/10 and f1_at_5/10 are the
+    fixed-cutoff counterparts (section 1.3.1) that stay meaningful for a
+    ranked-list system.
     """
 
     retrieved_count: int
     relevant_count: int
-    precision: float
-    recall: float
-    f1: float
     precision_at_5: float
     precision_at_10: float
+    recall_at_5: float
+    recall_at_10: float
+    f1_at_5: float
+    f1_at_10: float
     average_precision: float
     r_precision: float
     curve: list[tuple[float, float]]

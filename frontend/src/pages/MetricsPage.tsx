@@ -37,6 +37,10 @@ const HEADLINE_METRICS: { key: keyof CollectionMetricsSummary; label: string; hi
   { key: "mean_r_precision", label: "R-precision (среднее)", hint: "отсечка = число релевантных" },
   { key: "mean_precision_at_5", label: "P@5 (среднее)" },
   { key: "mean_precision_at_10", label: "P@10 (среднее)" },
+  { key: "mean_recall_at_5", label: "R@5 (среднее)" },
+  { key: "mean_recall_at_10", label: "R@10 (среднее)" },
+  { key: "mean_f1_at_5", label: "F1@5 (среднее)" },
+  { key: "mean_f1_at_10", label: "F1@10 (среднее)" },
 ];
 
 function MetricComparisonTable({
@@ -84,6 +88,10 @@ const RANKING_METRICS: { value: string; key: keyof QueryMetrics; label: string }
   { value: "r-prec", key: "r_precision", label: "R-Precision" },
   { value: "p5", key: "precision_at_5", label: "P@5" },
   { value: "p10", key: "precision_at_10", label: "P@10" },
+  { value: "r5", key: "recall_at_5", label: "R@5" },
+  { value: "r10", key: "recall_at_10", label: "R@10" },
+  { value: "f1-5", key: "f1_at_5", label: "F1@5" },
+  { value: "f1-10", key: "f1_at_10", label: "F1@10" },
 ];
 
 const BAR_CHART_LEVELS = [0, 0.25, 0.5, 0.75, 1];

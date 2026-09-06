@@ -134,22 +134,26 @@ async def embed_query(payload: EmbedQueryRequest) -> EmbedQueryResponse:
 @router.post("/metrics/evaluate", response_model=MetricsEvaluateResponse)
 async def evaluate_metrics(payload: MetricsEvaluateRequest) -> MetricsEvaluateResponse:
     """The full ROMIP'2004 search-track metric set for one ranked list
-    against its qrels (see tasks/romip_metrics.pdf): Precision/Recall/F1
-    over the whole list, Precision(5), Precision(10), Average Precision,
-    R-Precision, and the 11-point interpolated curve.
+    against its qrels (see tasks/romip_metrics.pdf): Precision(5)/Recall(5)/
+    F1(5), Precision(10)/Recall(10)/F1(10), Average Precision, R-Precision,
+    and the 11-point interpolated curve. Whole-list Precision/Recall/F1
+    (section 1.1) are skipped — see MetricsEvaluateResponse's docstring.
     """
     relevant = set(payload.relevant_ids)
     n = len(payload.ranked_ids)
-    precision = metrics.precision_at_k(payload.ranked_ids, relevant, n)
-    recall = metrics.recall_at_k(payload.ranked_ids, relevant, n)
+    precision_at_5 = metrics.precision_at_k(payload.ranked_ids, relevant, 5)
+    precision_at_10 = metrics.precision_at_k(payload.ranked_ids, relevant, 10)
+    recall_at_5 = metrics.recall_at_k(payload.ranked_ids, relevant, 5)
+    recall_at_10 = metrics.recall_at_k(payload.ranked_ids, relevant, 10)
     return MetricsEvaluateResponse(
         retrieved_count=n,
         relevant_count=len(relevant),
-        precision=precision,
-        recall=recall,
-        f1=metrics.f1_score(precision, recall),
-        precision_at_5=metrics.precision_at_k(payload.ranked_ids, relevant, 5),
-        precision_at_10=metrics.precision_at_k(payload.ranked_ids, relevant, 10),
+        precision_at_5=precision_at_5,
+        precision_at_10=precision_at_10,
+        recall_at_5=recall_at_5,
+        recall_at_10=recall_at_10,
+        f1_at_5=metrics.f1_score(precision_at_5, recall_at_5),
+        f1_at_10=metrics.f1_score(precision_at_10, recall_at_10),
         average_precision=metrics.average_precision(payload.ranked_ids, relevant),
         r_precision=metrics.r_precision(payload.ranked_ids, relevant),
         curve=metrics.interpolated_precision_recall(payload.ranked_ids, relevant),
