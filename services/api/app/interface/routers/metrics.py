@@ -96,3 +96,23 @@ async def collection_metrics_compare(
     except MetricsError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return MetricsCompareResponseOut(summaries=summaries)
+
+
+@router.post("/collections/{collection_id}/metrics/rerun", response_model=MetricsCompareResponseOut)
+async def collection_metrics_rerun(
+    collection_id: int, models: str = "", db: AsyncSession = Depends(get_db)
+) -> MetricsCompareResponseOut:
+    """Like GET .../metrics/compare, but re-executes every judged query
+    against every requested model first, so the comparison reflects fresh
+    search_runs instead of whatever ran last (see
+    MetricsService.rerun_all_and_compare)."""
+    model_keys = [key for key in models.split(",") if key]
+    if not model_keys:
+        model_keys = [row.key for row in await SearchModelRepository(db).list_active()]
+
+    service = MetricsService(db)
+    try:
+        summaries = await service.rerun_all_and_compare(collection_id, model_keys)
+    except MetricsError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return MetricsCompareResponseOut(summaries=summaries)

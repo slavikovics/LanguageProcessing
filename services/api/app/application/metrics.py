@@ -9,6 +9,7 @@ from app.domain.metrics import (
     average_curves,
     mean_of,
 )
+from app.domain.search import DEFAULT_TOP_K, SearchError
 from app.infrastructure.nlp_client import NlpServiceClient
 from app.infrastructure.repositories import (
     MetricResultRepository,
@@ -147,3 +148,42 @@ class MetricsService:
         sizes here are course-project scale, so a sequential loop needs no
         concurrency machinery."""
         return [await self.collection_summary(collection_id, model=key) for key in models]
+
+    async def rerun_all_and_compare(
+        self, collection_id: int, models: list[str]
+    ) -> list[CollectionMetricsSummary]:
+        """Re-executes every judged query against every requested model
+        before comparing — used by the metrics page's "Обновить" button so
+        the numbers reflect the current index/model (e.g. after
+        reindexing, or after switching the dense-embedding model) instead
+        of whatever search_run happened to run last, possibly under a
+        since-replaced index or model.
+
+        Imports SearchService locally rather than at module load: it's the
+        only place metrics needs the search feature, and importing it at
+        the top would make every metrics-only test pull in the tfidf/dense
+        backend stack too.
+        """
+        from app.application.search import SearchService
+
+        queries = await self._queries.list_queries_by_collection(collection_id)
+        search_service = SearchService(self._session, self._nlp)
+        for query in queries:
+            if not await self._judgments.list_for_query(query.id):
+                # Unjudged queries never contribute to the summary (see
+                # collection_summary above), so rerunning them would just
+                # burn API calls for nothing.
+                continue
+            for model_key in models:
+                try:
+                    await search_service.search(
+                        collection_id=collection_id, text=query.text, top_k=DEFAULT_TOP_K, model=model_key
+                    )
+                except SearchError:
+                    # e.g. the dense-embedding model isn't configured
+                    # (missing OPENROUTER_API_KEY) — leave that model's
+                    # existing runs (if any) alone rather than failing the
+                    # whole rerun for every other model.
+                    continue
+
+        return await self.compare(collection_id, models)

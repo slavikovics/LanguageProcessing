@@ -289,6 +289,68 @@ async def test_metrics_are_scoped_per_model(session_factory, collection_with_doc
 
 
 @pytest.mark.asyncio
+async def test_rerun_all_and_compare_only_reruns_judged_queries(session_factory, collection_with_documents):
+    """The metrics page's "Обновить" button reruns every judged query
+    against every requested model, creating fresh search_runs, before
+    comparing — so a reindex/model swap is reflected instead of stale
+    scores. Unjudged queries must be left alone: they never feed the
+    summary regardless, so rerunning them would just waste API calls."""
+    collection_id = collection_with_documents
+    nlp = _InProcessNlpClient()
+
+    async with session_factory() as session:
+        await IndexingService(session, nlp).reindex_collection_now(collection_id)
+
+    async with session_factory() as session:
+        judged_response = await SearchService(session, nlp).search(
+            collection_id=collection_id, text="cats domestic animals", top_k=10, model="tfidf"
+        )
+    cats_doc_id = judged_response.hits[0].document_id
+
+    async with session_factory() as session:
+        unjudged_response = await SearchService(session, nlp).search(
+            collection_id=collection_id, text="stars and galaxies", top_k=10, model="tfidf"
+        )
+
+    async with session_factory() as session:
+        from app.infrastructure.repositories import QueryRepository, RelevanceJudgmentRepository, SearchModelRepository
+
+        await RelevanceJudgmentRepository(session).set_judgment(
+            query_id=judged_response.query_id, document_id=cats_doc_id, is_relevant=True
+        )
+        await session.commit()
+
+        tfidf_model = await SearchModelRepository(session).get_by_key("tfidf")
+        queries = QueryRepository(session)
+        original_unjudged_run = await queries.latest_search_run_for_query(
+            unjudged_response.query_id, model_id=tfidf_model.id
+        )
+
+    async with session_factory() as session:
+        compared = await MetricsService(session, nlp).rerun_all_and_compare(collection_id, ["tfidf"])
+
+    async with session_factory() as session:
+        tfidf_model = await SearchModelRepository(session).get_by_key("tfidf")
+        queries = QueryRepository(session)
+        fresh_judged_run = await queries.latest_search_run_for_query(
+            judged_response.query_id, model_id=tfidf_model.id
+        )
+        unchanged_unjudged_run = await queries.latest_search_run_for_query(
+            unjudged_response.query_id, model_id=tfidf_model.id
+        )
+
+    # The judged query got a brand-new search_run out of the rerun...
+    assert fresh_judged_run.id != judged_response.search_run_id
+    # ...but the unjudged one was never touched.
+    assert unchanged_unjudged_run.id == original_unjudged_run.id
+
+    assert len(compared) == 1
+    assert compared[0].model == "tfidf"
+    assert [q.query_id for q in compared[0].queries] == [judged_response.query_id]
+    assert compared[0].queries[0].search_run_id == fresh_judged_run.id
+
+
+@pytest.mark.asyncio
 async def test_index_job_reports_progress_across_multiple_chunks(session_factory):
     """CHUNK_SIZE is 5 — 12 documents should take 3 chunks, and the job
     should end up fully processed regardless of the chunk boundaries."""

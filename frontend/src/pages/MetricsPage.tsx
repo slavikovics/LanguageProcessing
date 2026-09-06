@@ -1,13 +1,14 @@
-import { HelpCircle, RotateCw } from "lucide-react";
+import { Check, Copy, HelpCircle, RotateCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { getMetricsComparison } from "../api/client";
+import { getMetricsComparison, rerunMetricsComparison } from "../api/client";
 import type { CollectionMetricsSummary, QueryMetrics } from "../api/types";
 
 import { CurveSeries, PrecisionRecallChart } from "@/components/PrecisionRecallChart";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -121,10 +122,15 @@ interface QuerySeries {
 function QueryMetricBarChart({
   series,
   metricKey,
+  onSelectQuery,
   height = 380,
 }: {
   series: QuerySeries[];
   metricKey: keyof QueryMetrics;
+  /** Called with the query's full (untruncated) text when its x-axis label
+   * is activated — the label itself only shows a wrapped, possibly
+   * ellipsized preview (see wrapLabel). */
+  onSelectQuery: (text: string) => void;
   height?: number;
 }) {
   const { ref, width } = useMeasuredWidth<HTMLDivElement>();
@@ -225,17 +231,41 @@ function QueryMetricBarChart({
                     </g>
                   );
                 })}
-                {lines.map((line, li) => (
-                  <text
-                    key={li}
-                    x={groupX + groupW / 2}
-                    y={padding.top + innerH + 16 + li * 13}
-                    textAnchor="middle"
-                    className="fill-muted-foreground text-[10px]"
-                  >
-                    {line}
-                  </text>
-                ))}
+                <g
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onSelectQuery(text)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onSelectQuery(text);
+                    }
+                  }}
+                  aria-label={`Показать полный текст запроса: ${text}`}
+                  className="cursor-pointer outline-none"
+                >
+                  {/* Widens the click/tap target past the label's own text
+                      bounds — otherwise a short wrapped line is a tiny hit
+                      area. */}
+                  <rect
+                    x={groupX - 4}
+                    y={padding.top + innerH}
+                    width={groupW + 8}
+                    height={BAR_LABEL_MAX_LINES * 13 + 16}
+                    fill="transparent"
+                  />
+                  {lines.map((line, li) => (
+                    <text
+                      key={li}
+                      x={groupX + groupW / 2}
+                      y={padding.top + innerH + 16 + li * 13}
+                      textAnchor="middle"
+                      className="fill-muted-foreground text-[10px] transition-colors hover:fill-foreground hover:underline"
+                    >
+                      {line}
+                    </text>
+                  ))}
+                </g>
               </g>
             );
           })}
@@ -252,7 +282,47 @@ function QueryMetricBarChart({
   );
 }
 
+/** Full query text + copy button, opened by clicking a query's x-axis label
+ * in QueryMetricBarChart — labels are wrapped and ellipsized to fit, so the
+ * only way to read (or copy) a long query in full is a popup like this. */
+function QueryTextDialog({ query, onClose }: { query: string | null; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    setCopied(false);
+  }, [query]);
+
+  async function handleCopy() {
+    if (!query) return;
+    try {
+      await navigator.clipboard.writeText(query);
+      setCopied(true);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  return (
+    <Dialog open={query !== null} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Текст запроса</DialogTitle>
+        </DialogHeader>
+        <p className="rounded-md border bg-muted/30 p-3 text-sm break-words whitespace-pre-wrap">{query}</p>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={handleCopy}>
+            {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+            {copied ? "Скопировано" : "Скопировать"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function MetricsByQueryChart({ series }: { series: QuerySeries[] }) {
+  const [selectedQuery, setSelectedQuery] = useState<string | null>(null);
+
   return (
     <Tabs defaultValue="ap">
       <TabsList>
@@ -279,10 +349,11 @@ function MetricsByQueryChart({ series }: { series: QuerySeries[] }) {
             forceMount
             className="data-[state=inactive]:invisible data-[state=inactive]:pointer-events-none data-[state=inactive]:absolute data-[state=inactive]:inset-0"
           >
-            <QueryMetricBarChart series={series} metricKey={m.key} />
+            <QueryMetricBarChart series={series} metricKey={m.key} onSelectQuery={setSelectedQuery} />
           </TabsContent>
         ))}
       </div>
+      <QueryTextDialog query={selectedQuery} onClose={() => setSelectedQuery(null)} />
     </Tabs>
   );
 }
@@ -306,7 +377,7 @@ export function MetricsPage() {
     setSelectedModelKeys((prev) => (checked ? [...prev, key] : prev.filter((k) => k !== key)));
   }
 
-  async function refresh(id: number, modelKeys: string[]) {
+  async function refresh(id: number, modelKeys: string[], { rerun = false }: { rerun?: boolean } = {}) {
     if (modelKeys.length === 0) {
       setSummaries([]);
       return;
@@ -314,7 +385,12 @@ export function MetricsPage() {
     setLoading(true);
     setError(null);
     try {
-      const result = await getMetricsComparison(id, modelKeys);
+      // The "Обновить" button reruns every judged query against every
+      // selected model (real searches, so noticeably slower) so the
+      // numbers reflect the current index/model instead of stale
+      // search_runs; the initial load and the model-checkbox toggles just
+      // recompute metrics from whatever already ran.
+      const result = rerun ? await rerunMetricsComparison(id, modelKeys) : await getMetricsComparison(id, modelKeys);
       setSummaries(result.summaries);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -371,8 +447,9 @@ export function MetricsPage() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => refresh(selectedId, selectedModelKeys)}
+                  onClick={() => refresh(selectedId, selectedModelKeys, { rerun: true })}
                   disabled={loading}
+                  title="Заново выполняет все размеченные запросы для каждой из выбранных моделей, затем пересчитывает метрики — может занять некоторое время"
                 >
                   <RotateCw className={loading ? "size-3.5 animate-spin" : "size-3.5"} />
                   {loading ? "Обновление…" : "Обновить"}
