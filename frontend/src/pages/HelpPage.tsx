@@ -75,6 +75,23 @@ function ProcessSteps({ steps }: { steps: { title: string; children: ReactNode }
   );
 }
 
+/** The ROMIP'2004 search-track methodology document (tasks/romip_metrics.pdf
+ * in the repo, served statically from frontend/public) that every metric on
+ * this page is drawn from — opens in a new tab so it doesn't navigate away
+ * from the reference material you're currently reading. */
+function RomipLink() {
+  return (
+    <a
+      href="/romip_metrics.pdf"
+      target="_blank"
+      rel="noreferrer"
+      className="text-primary underline-offset-2 hover:underline"
+    >
+      ROMIP&apos;2004
+    </a>
+  );
+}
+
 function Section({
   icon: Icon,
   title,
@@ -84,7 +101,7 @@ function Section({
 }: {
   icon: React.ComponentType<{ className?: string }>;
   title: string;
-  description: string;
+  description: ReactNode;
   id?: string;
   children: ReactNode;
 }) {
@@ -141,9 +158,10 @@ export function HelpPage() {
         <CardHeader>
           <CardTitle>Справка</CardTitle>
           <CardDescription>
-            Информационно-поисковая система: векторная модель (TF-IDF + косинусная мера),
-            построена вокруг четырёх этапов работы — краулинг источников, управление коллекциями
-            документов, поиск с оценкой релевантности и расчёт метрик качества (ROMIP&apos;2004).
+            Информационно-поисковая система с двумя независимыми моделями поиска — TF-IDF с
+            косинусной мерой и семантические эмбеддинги, — построена вокруг четырёх этапов работы:
+            краулинг источников, управление коллекциями документов, поиск с оценкой релевантности и
+            расчёт метрик качества (<RomipLink />).
           </CardDescription>
         </CardHeader>
       </Card>
@@ -250,7 +268,7 @@ export function HelpPage() {
         id="searching"
         icon={Search}
         title="Поиск"
-        description="Векторная модель: запрос и документы — TF-IDF векторы, ранжирование по косинусной мере."
+        description="Запрос сравнивается с документами коллекции и ранжируется по сходству — модель поиска выбирается отдельно (см. «Модели поиска» ниже)."
       >
         <Feature title="Карточка результата">
           Слева сверху — номер и заголовок, справа — оценка сходства и дата документа. Внизу
@@ -294,12 +312,13 @@ export function HelpPage() {
           взвешиваются по TF-IDF и сравниваются косинусной мерой. Быстро, объяснимо — карточки
           результатов показывают, какие именно термины запроса совпали с документом.
         </Feature>
-        <Feature title="Multilingual E5 Small (эмбеддинги)">
-          Семантическая модель: документ и запрос кодируются в плотные векторы (384 числа),
-          учитывающие смысл текста, а не только совпадение слов — поэтому находит документы на
-          других языках или без общей лексики с запросом. Контекст модели — 512 токенов, поэтому
-          длинные документы при индексации разбиваются на перекрывающиеся фрагменты (чанки) —
-          каждый кодируется отдельно, а результатом документа становится его лучший по сходству
+        <Feature title="Qwen3 Embedding 8B (эмбеддинги)">
+          Семантическая модель: документ и запрос кодируются в плотные векторы (4096 чисел) через
+          OpenRouter, учитывающие смысл текста, а не только совпадение слов — поэтому находит
+          документы на других языках или без общей лексики с запросом. Контекст модели — 32 000
+          токенов, но длинные документы при индексации всё равно разбиваются на перекрывающиеся
+          фрагменты (чанки) — каждый кодируется отдельно, а результатом документа становится его
+          лучший по сходству
           фрагмент. Так ни один фрагмент длинного документа не теряется. У таких результатов нет
           списка «совпавших терминов» — это не про буквальное совпадение слов.
         </Feature>
@@ -322,7 +341,11 @@ export function HelpPage() {
         id="metrics"
         icon={BarChart3}
         title="Метрики качества"
-        description="Как считается качество ранжирования — методика ROMIP'2004, дорожка поиска."
+        description={
+          <>
+            Как считается качество ранжирования — методика <RomipLink />, дорожка поиска.
+          </>
+        }
       >
         <ProcessSteps
           steps={[
@@ -352,7 +375,7 @@ export function HelpPage() {
         <div className="grid gap-3 sm:grid-cols-2">
           <MetricEntry id="metric-precision-recall" title="Precision и Recall" formula="p = a/(a+b), r = a/(a+c)">
             Precision — доля релевантных документов среди найденных; Recall — доля найденных из
-            всех релевантных документов коллекции (ROMIP&apos;2004, п. 1.1.1–1.1.2). Здесь обе
+            всех релевантных документов коллекции (<RomipLink />, п. 1.1.1–1.1.2). Здесь обе
             считаются по всему сохранённому ранжированию.
           </MetricEntry>
 
