@@ -247,10 +247,8 @@ export function CollectionsPage() {
       } else if (formMode === "edit" && editingId !== null) {
         await updateDocument(editingId, input);
       }
-      // Both branches touch Collection.documents_changed_at on the backend
-      // (create changes document_count too) — refresh the shared context so
-      // the stale-index badge and count update immediately, not just on
-      // next navigation.
+      // Both branches touch documents_changed_at on the backend — refresh
+      // the shared context so the stale-index badge updates immediately.
       await Promise.all([refreshCollections(), refreshDocuments()]);
       closeForm();
     } catch (err) {

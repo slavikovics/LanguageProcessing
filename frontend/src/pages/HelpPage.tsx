@@ -126,15 +126,10 @@ export function HelpPage() {
 
   useEffect(() => {
     if (!hash) return;
-    // The page scrolls inside a Radix ScrollArea viewport, not the window —
-    // native scrollIntoView() has to guess which ancestor is "the" scroll
-    // container, and on the very first paint (before the ScrollArea has
-    // finished sizing its viewport) it sometimes guesses wrong or computes
-    // against a not-yet-final layout, snapping the scroll position away
-    // right after landing. Scrolling the viewport directly, after a paint,
-    // sidesteps both problems. Instant rather than smooth: a smooth
-    // scroll's animation can silently stall if the tab loses focus/
-    // visibility right as it starts, leaving the page stuck at the top.
+    // Scrolls the Radix ScrollArea viewport directly, after a paint — native
+    // scrollIntoView() guesses the wrong ancestor before the viewport has
+    // finished sizing. Instant, not smooth: a smooth scroll can stall if the
+    // tab loses focus right as it starts.
     const id = hash.slice(1);
     const raf = requestAnimationFrame(() => {
       const target = document.getElementById(id);

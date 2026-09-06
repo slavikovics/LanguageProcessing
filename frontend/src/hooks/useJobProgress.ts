@@ -8,13 +8,8 @@ interface UseJobProgressOptions<T> {
   isTerminal: (data: T) => boolean;
 }
 
-/**
- * Live job progress for any long-running background job (crawling,
- * indexing, ...): subscribes over WebSocket to the api service, which
- * pushes diffs by polling its job table (see docs/PROJECT_PLAN.md, 3.1); if
- * the socket cannot connect or drops, falls back to plain REST polling of
- * the equivalent GET endpoint so the progress bar keeps moving either way.
- */
+/** Subscribes over WebSocket for job progress; falls back to REST polling
+ * of the equivalent GET endpoint if the socket can't connect or drops. */
 export function useJobProgress<T>(jobId: number | null, options: UseJobProgressOptions<T>) {
   const [progress, setProgress] = useState<T | null>(null);
   const [connection, setConnection] = useState<"websocket" | "polling" | "idle">("idle");

@@ -26,12 +26,8 @@ interface SearchModelContextValue {
 
 const SearchModelContext = createContext<SearchModelContextValue | null>(null);
 
-/**
- * Mirrors CollectionContext's pattern for "the thing you're currently
- * working with" — here, which search model the Search page uses. New
- * models show up automatically once the backend registers them (GET
- * /search-models), no frontend code change needed to list them.
- */
+/** Mirrors CollectionContext's pattern for the search model the Search page
+ * uses; new models show up automatically once the backend registers them. */
 export function SearchModelProvider({ children }: { children: ReactNode }) {
   const [models, setModels] = useState<SearchModel[]>([]);
   const [loading, setLoading] = useState(true);

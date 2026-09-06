@@ -27,20 +27,15 @@ interface CollectionContextValue {
   latestIndexJob: IndexJob | null;
   /** Re-fetches latestIndexJob (call after starting/finishing an index job). */
   refreshIndexStatus: () => Promise<void>;
-  /** Live (polled) "is the selected collection currently being indexed" —
-   * shared so any page can disable crawl/refresh/delete actions the backend
-   * would reject anyway (see CrawlJobService._ensure_not_indexing). */
+  /** Live "is the selected collection currently being indexed" — shared so
+   * any page can disable actions the backend would reject anyway. */
   isIndexing: boolean;
 }
 
 const CollectionContext = createContext<CollectionContextValue | null>(null);
 
-/**
- * The app is organized around "the collection you're currently working
- * with" — crawling into it, indexing it, searching it, evaluating it. This
- * context is the single source of truth for that selection so every page
- * shares one switcher instead of each re-implementing its own dropdown.
- */
+/** Single source of truth for "the collection you're currently working
+ * with", so every page shares one switcher. */
 export function CollectionProvider({ children }: { children: ReactNode }) {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,10 +87,8 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     void refreshIndexStatus();
   }, [refreshIndexStatus]);
 
-  // Picks up a running job as soon as latestIndexJob reflects it (whether
-  // this tab started it or refreshIndexStatus just noticed one already in
-  // flight), then subscribes to its live progress so isIndexing stays
-  // correct without every page re-implementing this polling.
+  // Picks up a running job as soon as latestIndexJob reflects it, then
+  // subscribes to its live progress.
   useEffect(() => {
     if (latestIndexJob && (latestIndexJob.status === "pending" || latestIndexJob.status === "running")) {
       setActiveIndexJobId(latestIndexJob.id);

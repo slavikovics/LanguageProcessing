@@ -1,286 +1,27 @@
 import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Globe,
   HelpCircle,
   ListChecks,
   Loader2,
   SearchIcon,
   SlidersHorizontal,
-  ThumbsUp,
 } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { clearJudgment, getDocument, listDocuments, listJudgments, search, setJudgment } from "../api/client";
-import type { DocumentSummary, SearchHit, SearchResponse } from "../api/types";
+import { clearJudgment, listJudgments, search, setJudgment } from "../api/client";
+import type { SearchResponse } from "../api/types";
 
-import { Badge } from "@/components/ui/badge";
+import { CollectionJudgmentBrowser } from "@/components/CollectionJudgmentBrowser";
+import { ResultCard } from "@/components/ResultCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useCollectionContext } from "@/context/CollectionContext";
 import { useSearchModelContext } from "@/context/SearchModelContext";
-import { clampNumberInput, cn } from "@/lib/utils";
+import { clampNumberInput } from "@/lib/utils";
 
 const JUDGMENT_MODE_STORAGE_KEY = "ips-judgment-mode";
-
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function highlightSnippet(snippet: string, words: string[]): ReactNode {
-  const cleaned = [...new Set(words.filter(Boolean))];
-  if (cleaned.length === 0) return snippet;
-  const pattern = new RegExp(`\\b(${cleaned.map(escapeRegExp).join("|")})\\b`, "gi");
-  const parts = snippet.split(pattern);
-  return parts.map((part, i) =>
-    cleaned.some((w) => w.toLowerCase() === part.toLowerCase()) ? (
-      <mark key={i} className="rounded bg-yellow-200 px-0.5 text-foreground dark:bg-yellow-900/60">
-        {part}
-      </mark>
-    ) : (
-      <span key={i}>{part}</span>
-    ),
-  );
-}
-
-function ResultCard({
-  hit,
-  isRelevant,
-  judgmentMode,
-  submittedWords,
-  onToggleRelevant,
-}: {
-  hit: SearchHit;
-  isRelevant: boolean;
-  judgmentMode: boolean;
-  submittedWords: string[];
-  onToggleRelevant: (documentId: number) => void;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const [fullText, setFullText] = useState<string | null>(null);
-  const [loadingFull, setLoadingFull] = useState(false);
-
-  async function toggleExpand() {
-    if (expanded) {
-      setExpanded(false);
-      return;
-    }
-    setExpanded(true);
-    if (fullText === null) {
-      setLoadingFull(true);
-      try {
-        const detail = await getDocument(hit.document_id);
-        setFullText(detail.clean_text);
-      } catch {
-        setFullText(hit.snippet);
-      } finally {
-        setLoadingFull(false);
-      }
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-2.5 rounded-md border p-4 transition-shadow duration-200 hover:shadow-md">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-baseline gap-2">
-          <span className="shrink-0 text-sm font-semibold text-muted-foreground">#{hit.rank}</span>
-          <span className="min-w-0 truncate font-medium">{hit.title}</span>
-        </div>
-        <div className="shrink-0 text-right text-xs text-muted-foreground">
-          <div>score {hit.score.toFixed(3)}</div>
-          <div>{new Date(hit.fetched_at).toLocaleDateString()}</div>
-        </div>
-      </div>
-
-      {!expanded ? (
-        <p className="text-sm leading-relaxed break-words text-muted-foreground">
-          {highlightSnippet(hit.snippet, submittedWords)}
-        </p>
-      ) : (
-        <div className="flex flex-col gap-2 duration-200 animate-in fade-in slide-in-from-top-1">
-          <ScrollArea className="h-56 rounded-md border bg-muted/20">
-            <p className="whitespace-pre-wrap break-words p-3 text-sm leading-relaxed">
-              {loadingFull ? "Загрузка…" : highlightSnippet(fullText ?? hit.snippet, submittedWords)}
-            </p>
-          </ScrollArea>
-          {hit.matched_terms.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {hit.matched_terms.map((term) => (
-                <Badge key={term} variant="outline">
-                  {term}
-                </Badge>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={toggleExpand}
-        className="flex w-fit items-center gap-1 text-xs text-primary transition-colors hover:text-primary/70"
-      >
-        <ChevronDown className={cn("size-3.5 transition-transform duration-200", expanded && "rotate-180")} />
-        {expanded ? "Свернуть" : "Показать полностью"}
-      </button>
-
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-          {hit.url ? (
-            <>
-              <Globe className="size-3.5 shrink-0" />
-              <a
-                href={hit.url}
-                target="_blank"
-                rel="noreferrer"
-                className="min-w-0 truncate transition-colors hover:text-primary hover:underline"
-              >
-                {hit.url}
-              </a>
-            </>
-          ) : (
-            <span className="italic text-muted-foreground/70">без источника</span>
-          )}
-        </div>
-        {judgmentMode && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => onToggleRelevant(hit.document_id)}
-            aria-label={isRelevant ? "Убрать отметку «релевантен»" : "Отметить как релевантный"}
-            aria-pressed={isRelevant}
-            className={cn(
-              "shrink-0 transition-all duration-150 hover:scale-110",
-              isRelevant && "bg-emerald-600/15 text-emerald-600 dark:text-emerald-400",
-            )}
-          >
-            <ThumbsUp className="size-4" />
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-const COLLECTION_DOCS_PAGE_SIZE = 20;
-
-function CollectionJudgmentBrowser({
-  collectionId,
-  documentTotal,
-  excludeIds,
-  judgments,
-  onToggleRelevant,
-}: {
-  collectionId: number;
-  documentTotal: number;
-  excludeIds: Set<number>;
-  judgments: Record<number, boolean>;
-  onToggleRelevant: (documentId: number) => void;
-}) {
-  const [documents, setDocuments] = useState<DocumentSummary[]>([]);
-  const [offset, setOffset] = useState(0);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    listDocuments(collectionId, { limit: COLLECTION_DOCS_PAGE_SIZE, offset })
-      .then((docs) => {
-        if (!cancelled) setDocuments(docs);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [collectionId, offset]);
-
-  const visible = documents.filter((doc) => !excludeIds.has(doc.id));
-
-  return (
-    <div className="flex flex-col gap-3 rounded-md border p-4">
-      <p className="text-xs text-muted-foreground">
-        Остальные документы коллекции — не входят в текущую выдачу. Отметьте здесь те, что
-        релевантны запросу, но поиск их не нашёл: без этого Recall всегда будет считаться по
-        документам, которые и так были найдены, то есть искусственно равен 1.
-      </p>
-      {loading ? (
-        <p className="text-sm text-muted-foreground">Загрузка…</p>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {visible.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              На этой странице все документы уже есть в выдаче выше.
-            </p>
-          )}
-          {visible.map((doc) => {
-            const isRelevant = judgments[doc.id] ?? false;
-            return (
-              <div
-                key={doc.id}
-                className="flex items-center justify-between gap-3 rounded-md border p-2.5"
-              >
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium">{doc.title}</div>
-                  {doc.url && (
-                    <div className="truncate text-xs text-muted-foreground">{doc.url}</div>
-                  )}
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => onToggleRelevant(doc.id)}
-                  aria-label={isRelevant ? "Убрать отметку «релевантен»" : "Отметить как релевантный"}
-                  aria-pressed={isRelevant}
-                  className={cn(
-                    "shrink-0 transition-all duration-150 hover:scale-110",
-                    isRelevant && "bg-emerald-600/15 text-emerald-600 dark:text-emerald-400",
-                  )}
-                >
-                  <ThumbsUp className="size-4" />
-                </Button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-      <div className="flex items-center justify-between">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={offset === 0 || loading}
-          onClick={() => setOffset((o) => Math.max(0, o - COLLECTION_DOCS_PAGE_SIZE))}
-        >
-          <ChevronLeft className="size-4" />
-          Назад
-        </Button>
-        <span className="text-xs text-muted-foreground">
-          {Math.min(offset + 1, documentTotal)}–{Math.min(offset + documents.length, documentTotal)} из{" "}
-          {documentTotal}
-        </span>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={loading || offset + COLLECTION_DOCS_PAGE_SIZE >= documentTotal}
-          onClick={() => setOffset((o) => o + COLLECTION_DOCS_PAGE_SIZE)}
-        >
-          Дальше
-          <ChevronRight className="size-4" />
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 export function SearchPage() {
   const { selected, selectedId, latestIndexJob } = useCollectionContext();
@@ -336,12 +77,9 @@ export function SearchPage() {
       });
       setResponse(result);
       setSubmittedWords(text.trim().split(/\s+/));
-      // The query text may already have prior runs/judgments (queries are
-      // deduped by collection+text) — hydrate from those instead of
-      // starting blank, otherwise previously marked documents would look
-      // unjudged until re-clicked. Only "relevant" is a real mark now
-      // (see handleToggleRelevant) — any leftover is_relevant=false rows
-      // from before that change are treated the same as unmarked.
+      // Queries are deduped by collection+text, so this text may already
+      // have prior judgments — hydrate from those instead of starting
+      // blank, otherwise previously marked documents would look unjudged.
       try {
         const existing = await listJudgments(result.query_id);
         setJudgments(
@@ -363,11 +101,10 @@ export function SearchPage() {
     }
   }
 
-  // Only "relevant" is a markable state — per ROMIP pooling, everything
-  // not explicitly marked relevant is treated as not relevant, so there is
-  // nothing a separate "not relevant" mark would add. Clicking again clears
-  // the judgment entirely (back to unmarked) rather than recording a
-  // negative, keeping the qrels set to exactly "found and confirmed".
+  // Only "relevant" is a markable state — everything not explicitly marked
+  // is treated as not relevant, so a separate "not relevant" mark would add
+  // nothing. Clicking again clears the judgment entirely rather than
+  // recording a negative, keeping the qrels set to exactly "confirmed relevant".
   async function handleToggleRelevant(documentId: number) {
     if (!response) return;
     const nextRelevant = !judgments[documentId];
