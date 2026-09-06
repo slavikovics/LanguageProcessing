@@ -1,11 +1,6 @@
-"""IR quality metrics in the ROMIP/TREC style: Precision, Recall, F1,
-Average Precision, MAP, R-Precision and the 11-point interpolated
-precision/recall curve.
-
-Each function takes a ranked list of document ids and the set of ids judged
-relevant for that query (qrels) — no dependency on how the ranking or the
-judgments were produced, so the same code evaluates lab 1's search and,
-later, lab 2/3's own accuracy measurements.
+"""IR quality metrics: Precision/Recall/F1@k, Average Precision, R-Precision,
+and the 11-point interpolated precision/recall curve. Each function takes a
+ranked list of document ids and the set of ids judged relevant (qrels).
 """
 
 from __future__ import annotations
@@ -16,13 +11,8 @@ DocId = Hashable
 
 
 def precision_at_k(ranked_ids: Sequence[DocId], relevant_ids: set[DocId], k: int) -> float:
-    """precision(n) per ROMIP'2004 section 1.3.1: relevant docs among the
-    first k, divided by k itself — *not* by the number actually retrieved.
-    A system that returns fewer than k documents is scored as if the
-    missing slots were non-relevant, so precision@k only ever drops as k
-    grows past what the system returned (matches the methodology's note
-    that a short result list can't score above the system's own overall
-    precision)."""
+    """Relevant docs among the first k, divided by k itself (not by the
+    number actually retrieved), so a short result list can't inflate the score."""
     if k <= 0:
         return 0.0
     top_k = ranked_ids[:k]
@@ -45,8 +35,7 @@ def f1_score(precision: float, recall: float) -> float:
 
 
 def average_precision(ranked_ids: Sequence[DocId], relevant_ids: set[DocId]) -> float:
-    """AP: mean of precision@k evaluated at every rank k holding a relevant
-    document, normalized by the total number of relevant documents."""
+    """Mean of precision@k at every rank holding a relevant document."""
     if not relevant_ids:
         return 0.0
     hits = 0
@@ -59,8 +48,7 @@ def average_precision(ranked_ids: Sequence[DocId], relevant_ids: set[DocId]) -> 
 
 
 def r_precision(ranked_ids: Sequence[DocId], relevant_ids: set[DocId]) -> float:
-    """Precision computed at rank R = |relevant_ids| — comparable across
-    queries with different numbers of relevant documents."""
+    """Precision at rank R = |relevant_ids|, comparable across queries."""
     r = len(relevant_ids)
     if r == 0:
         return 0.0
@@ -72,10 +60,8 @@ def interpolated_precision_recall(
     relevant_ids: set[DocId],
     recall_levels: Sequence[float] = tuple(i / 10 for i in range(11)),
 ) -> list[tuple[float, float]]:
-    """The classic 11-point interpolated precision/recall curve: for each
-    fixed recall level r, the interpolated precision is the maximum
-    precision observed anywhere in the ranking with actual recall >= r.
-    """
+    """11-point interpolated P/R curve: at each recall level r, the max
+    precision observed anywhere in the ranking with actual recall >= r."""
     if not relevant_ids:
         return [(level, 0.0) for level in recall_levels]
 

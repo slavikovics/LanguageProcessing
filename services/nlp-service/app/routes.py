@@ -51,12 +51,8 @@ async def lemmatize(payload: LemmatizeRequest) -> LemmatizeResponse:
 
 @router.post("/lemmatize-batch", response_model=LemmatizeBatchResponse)
 async def lemmatize_batch(payload: LemmatizeBatchRequest) -> LemmatizeBatchResponse:
-    """Uses spaCy's nlp.pipe() (via lemmatize_many) instead of one nlp() call
-    per text — meaningfully faster for the document-batch case an indexing
-    job sends (see IndexingService). Run in a worker thread like
-    /embeddings/documents: CPU-bound spaCy processing would otherwise block
-    this single-process event loop for the whole batch.
-    """
+    """Runs in a worker thread — CPU-bound spaCy processing would otherwise
+    block this single-process event loop for the whole batch."""
     lemmas = await asyncio.to_thread(tokenization.lemmatize_many, payload.texts)
     return LemmatizeBatchResponse(lemmas=lemmas)
 
@@ -87,11 +83,8 @@ async def compute_similarity(payload: SimilarityRequest) -> SimilarityResponse:
 
 @router.post("/index", response_model=IndexResponse)
 async def index_documents(payload: IndexRequest) -> IndexResponse:
-    """Full-corpus indexing step: given one lemma list per document, computes
-    the collection's IDF (1.5) plus each document's raw term frequencies and
-    normalized TF-IDF vector (1.6 + L2 norm) in one round trip — the
-    `/index` endpoint referenced by docs/ARCHITECTURE.md.
-    """
+    """Full-corpus indexing: given one lemma list per document, computes the
+    collection's IDF plus each document's term frequencies and TF-IDF vector."""
     total_documents = len(payload.document_term_lists)
     document_frequency = weighting.document_frequencies(payload.document_term_lists)
     idf = weighting.inverse_document_frequency(document_frequency, total_documents)
@@ -104,23 +97,17 @@ async def index_documents(payload: IndexRequest) -> IndexResponse:
 
 @router.post("/idf-from-frequency", response_model=IdfFromFrequencyResponse)
 async def idf_from_frequency(payload: IdfFromFrequencyRequest) -> IdfFromFrequencyResponse:
-    """Recomputes IDF (1.5) straight from already-known document frequencies —
-    used at search time, when the caller derives document_frequency from the
-    `document_terms` table instead of resending every document's term list.
-    """
+    """Recomputes IDF from already-known document frequencies, used at search
+    time instead of resending every document's term list."""
     idf = weighting.inverse_document_frequency(payload.document_frequency, payload.total_documents)
     return IdfFromFrequencyResponse(idf=idf)
 
 
 @router.post("/embeddings/documents", response_model=EmbedDocumentsResponse)
 async def embed_documents(payload: EmbedDocumentsRequest) -> EmbedDocumentsResponse:
-    """Batch-encode document texts with the dense embedding model (see
-    app/embeddings.py) — the second search model's counterpart to /index.
-
-    encode_documents() just awaits OpenRouter's hosted embeddings API, so
-    (unlike the local-model version this replaced) it doesn't block this
-    process's event loop and needs no worker thread.
-    """
+    """Batch-encode document texts with the dense embedding model — the
+    second search model's counterpart to /index. Awaits OpenRouter's hosted
+    API directly, so no worker thread is needed."""
     vectors = await embeddings.encode_documents(payload.texts)
     return EmbedDocumentsResponse(vectors=vectors)
 
@@ -133,12 +120,7 @@ async def embed_query(payload: EmbedQueryRequest) -> EmbedQueryResponse:
 
 @router.post("/metrics/evaluate", response_model=MetricsEvaluateResponse)
 async def evaluate_metrics(payload: MetricsEvaluateRequest) -> MetricsEvaluateResponse:
-    """The full ROMIP'2004 search-track metric set for one ranked list
-    against its qrels (see tasks/romip_metrics.pdf): Precision(5)/Recall(5)/
-    F1(5), Precision(10)/Recall(10)/F1(10), Average Precision, R-Precision,
-    and the 11-point interpolated curve. Whole-list Precision/Recall/F1
-    (section 1.1) are skipped — see MetricsEvaluateResponse's docstring.
-    """
+    """Computes rank-quality metrics for one ranked list against its qrels."""
     relevant = set(payload.relevant_ids)
     n = len(payload.ranked_ids)
     precision_at_5 = metrics.precision_at_k(payload.ranked_ids, relevant, 5)

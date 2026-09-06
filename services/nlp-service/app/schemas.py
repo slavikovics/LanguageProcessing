@@ -92,16 +92,10 @@ class MetricsEvaluateRequest(BaseModel):
 
 
 class MetricsEvaluateResponse(BaseModel):
-    """The full ROMIP'2004 search-track metric set (see tasks/romip_metrics.pdf)
-    for one query run. Section 1.1's whole-list Precision/Recall/F1 are
-    deliberately *not* computed here: this system's ranking always covers the
-    entire collection (there's no system-side "found/not found" cutoff), so
-    those degenerate — Recall is trivially 1.0 and Precision collapses to
-    relevant_count/collection_size, carrying no information about ranking
-    quality. precision_at_5/10, recall_at_5/10 and f1_at_5/10 are the
-    fixed-cutoff counterparts (section 1.3.1) that stay meaningful for a
-    ranked-list system.
-    """
+    """Rank-quality metrics for one query. Whole-list Precision/Recall/F1 are
+    omitted — this system always ranks the full collection, so they'd
+    degenerate (Recall≡1, Precision≈relevant/collection_size). The @5/@10
+    cutoff variants below stay meaningful instead."""
 
     retrieved_count: int
     relevant_count: int

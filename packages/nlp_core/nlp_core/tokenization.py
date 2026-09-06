@@ -1,9 +1,6 @@
-"""Text preprocessing shared by every lab: HTML cleanup, sentence splitting,
-tokenization/lemmatization (English, via spaCy) and character n-grams.
-
-Kept side-effect free (no DB, no network) so it can be unit tested directly
-and reused unchanged by the indexing pipeline (lab 1), language profiles
-(lab 2) and sentence scoring (lab 3).
+"""HTML cleanup, sentence splitting, tokenization/lemmatization (English, via
+spaCy) and character n-grams. Side-effect free (no DB, no network) so it's
+easy to unit test and reuse across callers.
 """
 
 from __future__ import annotations
@@ -58,8 +55,7 @@ def split_sentences(text: str) -> list[str]:
 
 
 def tokenize(text: str, *, keep_stopwords: bool = False) -> list[Token]:
-    """Alphabetic tokens only; non-alpha tokens (numbers, punctuation) are
-    dropped per the methodology's indexing rules."""
+    """Alphabetic tokens only — numbers and punctuation are dropped."""
     doc = get_pipeline()(text)
     tokens: list[Token] = []
     for tok in doc:
@@ -84,16 +80,7 @@ def lemmatize(text: str) -> list[str]:
 
 
 def lemmatize_many(texts: list[str], *, batch_size: int = 50) -> list[list[str]]:
-    """Batch counterpart to lemmatize(): runs every text through spaCy's
-    nlp.pipe() instead of one nlp() call per text.
-
-    A single nlp(text) call pays spaCy's per-call pipeline overhead on top
-    of processing the text itself; nlp.pipe() amortizes that overhead across
-    the whole batch (internal batching + multiprocessing-free vectorized
-    steps), which is dramatically faster for the many-small-documents case
-    an indexing job is — see IndexingService._run_tfidf_pass, the only
-    caller that matters for this batch size.
-    """
+    """Batch lemmatize via spaCy's nlp.pipe(), far faster than one nlp() call per text."""
     if not texts:
         return []
     pipeline = get_pipeline()
@@ -104,10 +91,7 @@ def lemmatize_many(texts: list[str], *, batch_size: int = 50) -> list[list[str]]
 
 
 def char_ngrams(text: str, n: int = 5) -> list[str]:
-    """Word-boundary-padded character n-grams, e.g. char_ngrams("the", 5) ->
-    [" the "]. Groundwork for the N-gram language-identification method
-    (lab 2) — kept here so both labs share one tokenizer/normalizer.
-    """
+    """Word-boundary-padded character n-grams, e.g. char_ngrams("the", 5) -> [" the "]."""
     words = _WORD_RE.findall(text.lower())
     grams: list[str] = []
     for word in words:

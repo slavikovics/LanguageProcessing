@@ -1,11 +1,7 @@
-"""The one place the database schema is defined. Both `api` and
-`crawler-service` import these models rather than one importing the other's
-internals — that is the actual service boundary, not the Python package
-boundary.
-
-Status columns use plain strings with literal defaults (not an import of
-either service's domain enums) so this package has zero dependency on any
-service's business logic — only `sqlalchemy`.
+"""The one place the database schema is defined; `api` and `crawler-service`
+both import these models instead of one importing the other's internals.
+Status columns use plain strings (not either service's domain enums) so this
+package depends on nothing but sqlalchemy.
 """
 
 from __future__ import annotations
@@ -31,12 +27,9 @@ class Base(DeclarativeBase):
     pass
 
 
-# Fixed width of the `document_embeddings.embedding` column. Every dense
-# model's native vector (e.g. 4096 for qwen3-embedding-8b) is zero-padded up
-# to this length before being stored — cosine similarity is invariant to
-# appending equal zero-padding to both compared vectors, and vectors are
-# only ever compared within the same search_model_id, so one shared column
-# width serves any number of dense models without a schema change per model.
+# Every dense model's vector is zero-padded to this width before storage —
+# cosine similarity is invariant to equal zero-padding on both sides, so one
+# column width serves any model without a schema change.
 MAX_EMBEDDING_DIM = 4096
 
 
@@ -47,16 +40,12 @@ class Collection(Base):
     name: Mapped[str] = mapped_column(String(200), unique=True)
     language: Mapped[str] = mapped_column(String(10), default="en")
     created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
-    # Bumped whenever a document in this collection is created/updated/
-    # deleted/re-fetched — compared against the latest completed IndexJob's
-    # finished_at to tell the UI the index is stale, since indexing a
-    # document doesn't happen automatically on every mutation.
+    # Bumped on any document change; compared to the latest IndexJob's
+    # finished_at so the UI can tell the index is stale.
     documents_changed_at: Mapped[dt.datetime | None] = mapped_column(nullable=True)
 
-    # passive_deletes=True: leave cascading to the DB's ON DELETE CASCADE
-    # (see Document.collection_id/CrawlJob.collection_id) instead of
-    # SQLAlchemy's default of nulling out each child's FK via UPDATE first —
-    # that default fails outright here since both FK columns are NOT NULL.
+    # passive_deletes: rely on the DB's ON DELETE CASCADE — SQLAlchemy's default
+    # of nulling child FKs first would fail since those FK columns are NOT NULL.
     documents: Mapped[list["Document"]] = relationship(
         back_populates="collection", passive_deletes=True
     )
@@ -115,11 +104,7 @@ class TermWeight(Base):
 
 
 class SearchModel(Base):
-    """Registry of pluggable search algorithms (TF-IDF, dense embedding
-    models, ...). This table's schema never changes when a new model is
-    added — a new model is just one seeded row (see migrations), keyed by a
-    stable `key` string that `search_runs.model_id` and the frontend refer
-    to."""
+    """Registry of pluggable search algorithms — a new model is just a seeded row."""
 
     __tablename__ = "search_models"
 
@@ -133,12 +118,8 @@ class SearchModel(Base):
 
 
 class DocumentChunk(Base):
-    """A document split into (roughly) model-context-sized pieces for dense
-    embedding — see app.domain.indexing.chunk_text in the api service. Kept
-    as its own table (rather than one row per document) so a document
-    longer than a model's context window is fully represented across
-    several chunk vectors instead of having its tail silently truncated
-    away by the encoder."""
+    """A document split into context-sized pieces for dense embedding, so a
+    long document isn't silently truncated by the encoder."""
 
     __tablename__ = "document_chunks"
 
@@ -151,10 +132,7 @@ class DocumentChunk(Base):
 
 
 class DocumentChunkEmbedding(Base):
-    """A chunk's dense vector under one registered model, zero-padded to
-    MAX_EMBEDDING_DIM (see the constant's docstring above). Search ranks
-    documents by their single best-matching chunk — see
-    ChunkEmbeddingRepository.nearest_documents."""
+    """A chunk's dense vector under one registered model, zero-padded to MAX_EMBEDDING_DIM."""
 
     __tablename__ = "document_chunk_embeddings"
 
@@ -215,11 +193,8 @@ class MetricResult(Base):
 
 
 class CrawlSeed(Base):
-    """A persisted, editable crawl address for a collection — the source of
-    truth the Crawl page's address list reads and writes. Each seed carries
-    its own max_documents/max_depth/same_domain_only, independent of every
-    other seed in the collection. Running the crawl spawns one CrawlJob per
-    seed (see CrawlJobService.run_collection_crawl)."""
+    """A persisted, editable crawl address for a collection; each seed has its
+    own max_documents/max_depth/same_domain_only and spawns one CrawlJob."""
 
     __tablename__ = "crawl_seeds"
 
@@ -228,9 +203,7 @@ class CrawlSeed(Base):
     url: Mapped[str] = mapped_column(String(2000))
     max_documents: Mapped[int] = mapped_column(Integer)
     max_depth: Mapped[int] = mapped_column(Integer)
-    # When true, the crawl for this seed never follows a link to a different
-    # host — including subdomains (en.example.com vs example.com) — useful
-    # when a site fans out into other-language subdomains or links out a lot.
+    # When true, never follow a link to a different host, subdomains included.
     same_domain_only: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
 
@@ -245,15 +218,10 @@ class CrawlJob(Base):
     seed_urls: Mapped[list[str]] = mapped_column(JSON)
     max_documents: Mapped[int] = mapped_column(Integer)
     max_depth: Mapped[int] = mapped_column(Integer)
-    # Copied from CrawlSeed.same_domain_only at job-creation time as the
-    # exact host to stay on (netloc of the seed URL), or null when the crawl
-    # may follow links anywhere — see CrawlWorker._enqueue_links.
+    # Host to stay on (from the seed URL), or null if links may go anywhere.
     allowed_domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="pending")
-    # "crawl" discovers new pages via BFS; "refresh" re-fetches a fixed set
-    # of already-known URLs in place (updates the existing Document rows
-    # instead of inserting/skipping-on-duplicate) — see CollectionsPage's
-    # "Обновить коллекцию" button.
+    # "crawl" discovers new pages via BFS; "refresh" re-fetches known URLs in place.
     mode: Mapped[str] = mapped_column(String(20), default="crawl")
 
     documents_fetched: Mapped[int] = mapped_column(Integer, default=0)

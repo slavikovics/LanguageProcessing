@@ -1,18 +1,7 @@
 """Dense-embedding encoding for the second search model, via OpenRouter's
-hosted embeddings API (https://openrouter.ai/docs/api_reference/embeddings)
-instead of a locally-run sentence-transformers model.
-
-Uses Qwen3-Embedding-8B — ranked #1 on the MTEB multilingual leaderboard
-(100+ languages) as of the model's release, with a 32K-token context, at
-roughly $0.01 per million input tokens (OpenRouter, comparable providers).
-Its native output is a 4096-dim vector — see ips_db.models.MAX_EMBEDDING_DIM,
-sized to hold it.
-
-Unlike the E5 family this service previously ran locally, documents need no
-instruction prefix. Queries do: Qwen3-Embedding's own usage guidance reports
-instruction-aware query prompting improves retrieval by roughly 1-5% over an
-unprefixed query, so encode_query() applies one fixed retrieval instruction
-(see _QUERY_INSTRUCTION) to every query.
+hosted embeddings API (Qwen3-Embedding-8B, 4096-dim). Queries get a fixed
+retrieval instruction prefix (_QUERY_INSTRUCTION) since the model's own
+guidance reports this measurably improves retrieval; documents don't need one.
 """
 
 from __future__ import annotations
@@ -32,23 +21,15 @@ _QUERY_INSTRUCTION = (
     "Query: {query}"
 )
 
-# Keeps any single request body (and the provider-side batch it triggers)
-# well clear of OpenRouter/provider request-size limits — course-project
-# collections run to at most a few hundred chunks per indexing pass.
+# Keeps each request body clear of OpenRouter's request-size limits.
 _BATCH_SIZE = 64
 
-# encode_documents() fires up to this many batch requests to OpenRouter
-# concurrently instead of one at a time — indexing time here is almost
-# entirely network round-trip latency (the model itself runs on OpenRouter's
-# infrastructure, not this process), so overlapping requests turns wall-clock
-# time into roughly (batches / this) round trips instead of one per batch.
+# Batches run concurrently since indexing time here is network-latency bound.
 _MAX_CONCURRENT_REQUESTS = int(os.environ.get("OPENROUTER_EMBEDDING_CONCURRENCY", "10"))
 
 
 class EmbeddingConfigError(RuntimeError):
-    """Raised when OPENROUTER_API_KEY isn't set. Dense-embedding search is
-    optional — TF-IDF search keeps working without it — so this is only
-    raised when a caller actually requests an embedding."""
+    """OPENROUTER_API_KEY isn't set; only raised when embeddings are actually requested."""
 
 
 def _api_key() -> str:
@@ -83,8 +64,7 @@ async def encode_documents(texts: list[str]) -> list[list[float]]:
             return await _embed_batch(client, api_key, batch)
 
     async with httpx.AsyncClient(timeout=120.0) as client:
-        # gather preserves the batches' order in its results, so vectors stay
-        # aligned with the input texts despite completing out of order.
+        # gather() preserves batch order, keeping vectors aligned with input texts.
         batch_results = await asyncio.gather(*(_bounded(client, batch) for batch in batches))
     return [vector for batch_vectors in batch_results for vector in batch_vectors]
 
