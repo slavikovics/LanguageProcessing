@@ -1,0 +1,104 @@
+% =====================================================================
+%  Дополнения preamble.tex для отчётов по лабораторным работам.
+%  Подключается ПОСЛЕ \input{preamble} в lab/lab_report.tex.
+%
+%  Компиляция требует ключ -shell-escape (нужен пакету minted для
+%  подсветки синтаксиса кода через Pygments). См. lab/README.md.
+% =====================================================================
+
+\usepackage{float} % на случай отдельной компиляции без полной цепочки minted
+
+% ---------------------------------------------------------------------
+% Сквозная нумерация рисунков/таблиц/листингов/формул (1, 2, 3, ...)
+% вместо "привязанной к разделу" (preamble.tex рассчитан на курсовые/
+% дипломные проекты с нумерованными \section; в лабораторных работах
+% используются ненумерованные заголовки \labpart, поэтому нумерацию
+% по разделам здесь отключаем).
+% ---------------------------------------------------------------------
+\AtBeginDocument{%
+  \renewcommand{\thefigure}{\arabic{figure}}
+  \renewcommand{\thetable}{\arabic{table}}
+  \renewcommand{\thelisting}{\arabic{listing}}
+  \renewcommand{\theequation}{\arabic{equation}}
+}
+
+% ---------------------------------------------------------------------
+% Код-листинги (пакет minted)
+% ---------------------------------------------------------------------
+
+\usemintedstyle{friendly}
+\setminted{
+  fontsize=\small,
+  breaklines=true,
+  breakanywhere=true,
+  linenos=true,
+  framesep=2mm,
+  tabsize=4,
+}
+
+% Листинг из отдельного файла с исходным кодом.
+% \codelistingfile[опции minted]{язык}{путь/к/файлу}{Подпись листинга}{метка-без-префикса}
+% Пример: \codelistingfile{python}{lab/code/example.py}{Пример скрипта}{example-script}
+%         -> ссылка в тексте: \autoref{lst:example-script}
+\newcommand{\codelistingfile}[5][]{%
+  \begin{listing}[H]
+    \inputminted[#1]{#2}{#3}
+    \caption{#4}
+    \label{lst:#5}
+  \end{listing}%
+}
+
+% Листинг, код которого пишется прямо в тексте отчёта.
+% \begin{codelisting}[опции minted]{язык}{Подпись листинга}{метка-без-префикса}
+%   ...код...
+% \end{codelisting}
+\newenvironment{codelisting}[4][]{%
+  \def\codelistingCurrentCaption{#3}%
+  \def\codelistingCurrentLabel{#4}%
+  \VerbatimEnvironment
+  \begin{listing}[H]
+  \begin{minted}[#1]{#2}%
+}{%
+  \end{minted}
+  \caption{\codelistingCurrentCaption}
+  \label{lst:\codelistingCurrentLabel}
+  \end{listing}%
+}
+
+% ---------------------------------------------------------------------
+% Диаграммы PlantUML (см. lab/diagrams/README.md)
+% ---------------------------------------------------------------------
+
+% \pumldiagram{имя-файла-без-расширения}{Подпись}{метка-без-префикса}{доля \textwidth}
+% Пример: \pumldiagram{sequence-query}{Диаграмма последовательности обработки запроса}{sequence-query}{0.9}
+%         -> ожидает файл lab/diagrams/generated/sequence-query.png
+%         -> ссылка в тексте: \autoref{fig:sequence-query}
+\newcommand{\pumldiagram}[4]{%
+  \begin{figure}[H]
+    \centering
+    \includegraphics[width=#4\textwidth]{lab/diagrams/generated/#1}
+    \caption{#2}
+    \label{fig:#3}
+  \end{figure}%
+}
+
+% ---------------------------------------------------------------------
+% Заголовки тематических блоков лабораторной работы
+% ---------------------------------------------------------------------
+% Ненумерованный, жирный, отцентрированный заголовок без изменения
+% регистра (как в примерах отчётов по лабораторным). По умолчанию НЕ
+% начинает новую страницу — если нужен разрыв, поставьте \clearpage
+% (или \newpage) перед вызовом сами.
+%
+% \labpart{Название блока}
+\newcommand{\labpart}[1]{%
+  \par\vspace{1.5em}%
+  \phantomsection
+  \begin{center}\bfseries #1\end{center}
+  \addcontentsline{toc}{section}{#1}
+  \markboth{#1}{}%
+}
+
+% Та же команда, но принудительно с новой страницы.
+% \labpartbreak{Название блока}
+\newcommand{\labpartbreak}[1]{\clearpage\labpart{#1}}

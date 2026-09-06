@@ -33,3 +33,10 @@ frontend/.vite/
 
 # Alembic (keep versions, ignore local sqlite if ever used)
 *.sqlite3
+
+# LaTeX report build artifacts (keep lab_report.pdf itself)
+reports/**/*.aux
+reports/**/*.fdb_latexmk
+reports/**/*.fls
+reports/**/*.out
+reports/**/_minted-*/

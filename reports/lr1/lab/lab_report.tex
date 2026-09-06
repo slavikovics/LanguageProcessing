@@ -1,0 +1,32 @@
+% =====================================================================
+%  Отчёт по лабораторной работе — главный файл.
+%  Компилировать из корня репозитория:
+%    make lab            (соберёт диаграммы и PDF)
+%  либо вручную:
+%    bash lab/diagrams/build.sh
+%    latexmk -pdf -shell-escape lab/lab_report.tex
+% =====================================================================
+
+\input{preamble}
+\input{lab/lab_preamble}
+\input{lab/lab_vars}
+
+\begin{document}
+
+\input{lab/lab_title}
+
+\input{lab/sections/goal}
+
+% Оглавление нужно только для длинных отчётов с несколькими \labpart.
+% Раскомментируйте при необходимости:
+% \input{table_of_contents}
+
+\input{lab/sections/body}
+
+\input{lab/sections/conclusion}
+
+% Список источников — раскомментируйте, если использовались библиотечные
+% ссылки, и добавьте их в biblio/othercites.bib:
+% \input{references}
+
+\end{document}

@@ -1,0 +1,160 @@
+@startuml database-erd
+
+' =====================================================================
+'  ER-диаграмма базы данных в нотации Crow's Foot (PlantUML умеет её
+'  рисовать нативно, без внешних библиотек). Показывает всю текущую
+'  схему -- в том числе таблицы под вторую, эмбеддинговую модель поиска
+'  (search_models, document_chunks, document_chunk_embeddings).
+' =====================================================================
+
+hide methods
+skinparam linetype ortho
+skinparam dpi 200
+
+entity "collections" as collections {
+  * id : integer <<generated>>
+  --
+  name : varchar
+  language : varchar
+}
+
+entity "documents" as documents {
+  * id : integer <<generated>>
+  --
+  collection_id : integer <<FK>>
+  title : varchar
+  url : varchar
+  clean_text : text
+  language : varchar
+}
+
+entity "terms" as terms {
+  * id : integer <<generated>>
+  --
+  lemma : varchar
+  language : varchar
+}
+
+entity "document_terms" as document_terms {
+  * document_id : integer <<FK>>
+  * term_id : integer <<FK>>
+  --
+  tf : integer
+}
+
+entity "term_weights" as term_weights {
+  * document_id : integer <<FK>>
+  * term_id : integer <<FK>>
+  --
+  weight : float
+}
+
+entity "queries" as queries {
+  * id : integer <<generated>>
+  --
+  collection_id : integer <<FK>>
+  text : text
+}
+
+entity "search_models" as search_models {
+  * id : integer <<generated>>
+  --
+  key : varchar
+  kind : varchar
+  dimension : integer
+}
+
+entity "search_runs" as search_runs {
+  * id : integer <<generated>>
+  --
+  query_id : integer <<FK>>
+  model_id : integer <<FK>>
+  executed_at : datetime
+}
+
+entity "search_results" as search_results {
+  * id : integer <<generated>>
+  --
+  search_run_id : integer <<FK>>
+  document_id : integer <<FK>>
+  rank : integer
+  score : float
+}
+
+entity "relevance_judgments" as relevance_judgments {
+  * query_id : integer <<FK>>
+  * document_id : integer <<FK>>
+  --
+  is_relevant : boolean
+}
+
+entity "metric_results" as metric_results {
+  * id : integer <<generated>>
+  --
+  search_run_id : integer <<FK>>
+  metric_name : varchar
+  value : float
+}
+
+entity "crawl_jobs" as crawl_jobs {
+  * id : integer <<generated>>
+  --
+  collection_id : integer <<FK>>
+  status : varchar
+  documents_fetched : integer
+}
+
+entity "crawl_urls" as crawl_urls {
+  * id : integer <<generated>>
+  --
+  job_id : integer <<FK>>
+  document_id : integer <<FK>>
+  discovered_from_id : integer <<FK>>
+  url : varchar
+  status : varchar
+}
+
+entity "document_chunks" as document_chunks {
+  * id : integer <<generated>>
+  --
+  document_id : integer <<FK>>
+  chunk_index : integer
+  text : text
+}
+
+entity "document_chunk_embeddings" as document_chunk_embeddings {
+  * chunk_id : integer <<FK>>
+  * search_model_id : integer <<FK>>
+  --
+  embedding : vector
+}
+
+collections ||--o{ documents
+collections ||--o{ queries
+collections ||--o{ crawl_jobs
+
+documents ||--o{ document_terms
+terms     ||--o{ document_terms
+
+documents ||--o{ term_weights
+terms     ||--o{ term_weights
+
+documents ||--o{ document_chunks
+document_chunks ||--o{ document_chunk_embeddings
+search_models   ||--o{ document_chunk_embeddings
+
+queries       ||--o{ search_runs
+search_models ||--o{ search_runs
+search_runs   ||--o{ search_results
+documents     ||--o{ search_results
+
+queries   ||--o{ relevance_judgments
+documents ||--o{ relevance_judgments
+
+search_runs ||--o{ metric_results
+
+crawl_jobs ||--o{ crawl_urls
+documents  |o--o{ crawl_urls
+crawl_urls |o--o{ crawl_urls
+
+@enduml
