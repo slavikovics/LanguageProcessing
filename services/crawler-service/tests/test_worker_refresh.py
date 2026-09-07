@@ -6,7 +6,8 @@ from ips_db import Base, Collection, Document
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.config import Settings
-from app.worker import CrawlWorker, JobContext
+from app.job_context import JobContext
+from app.worker import CrawlWorker
 
 
 @pytest_asyncio.fixture
@@ -43,7 +44,7 @@ async def test_save_document_refresh_mode_updates_existing_row_in_place(sessionm
         id=1, collection_id=collection_id, language="en", max_documents=10, max_depth=0, mode="refresh"
     )
 
-    saved_id = await worker._save_document(
+    saved_id = await worker._pipeline._save_document(
         ctx, "https://example.com/a", "<html><title>New title</title><body>x</body></html>", "new text"
     )
     assert saved_id == document_id
@@ -80,7 +81,7 @@ async def test_save_document_crawl_mode_still_inserts_new_rows(sessionmaker_):
         id=1, collection_id=collection_id, language="en", max_documents=10, max_depth=0, mode="crawl"
     )
 
-    saved_id = await worker._save_document(
+    saved_id = await worker._pipeline._save_document(
         ctx, "https://example.com/new", "<html><title>Fresh</title><body>x</body></html>", "fresh text"
     )
     assert saved_id is not None

@@ -3,7 +3,13 @@ import asyncio
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.lang_id import LanguageIdentificationService
+from app.application.lang_id import (
+    LangIdIdentificationService,
+    LangIdLabelingService,
+    LangIdProfileService,
+    LangIdTestRunService,
+    LangIdTrainingService,
+)
 from app.core.config import get_settings
 from app.core.database import SessionLocal, get_db
 from app.domain.lang_id import LangIdError
@@ -40,12 +46,12 @@ def _raise_for_lang_id_error(exc: LangIdError) -> None:
 
 async def _run_training_job(job_id: int) -> None:
     async with SessionLocal() as session:
-        await LanguageIdentificationService(session).run_neural_training(job_id)
+        await LangIdTrainingService(session).run_neural_training(job_id)
 
 
 async def _run_lang_id_run(run_id: int) -> None:
     async with SessionLocal() as session:
-        await LanguageIdentificationService(session).run_job(run_id)
+        await LangIdTestRunService(session).run_job(run_id)
 
 
 # -- labeling ----------------------------------------------------------
@@ -61,7 +67,7 @@ async def list_unlabeled_documents(
 
 @router.get("/collections/{collection_id}/lang-id/label-progress", response_model=LabelProgressOut)
 async def get_label_progress(collection_id: int, db: AsyncSession = Depends(get_db)) -> LabelProgressOut:
-    service = LanguageIdentificationService(db)
+    service = LangIdLabelingService(db)
     return LabelProgressOut(**await service.get_label_progress(collection_id))
 
 
@@ -69,7 +75,7 @@ async def get_label_progress(collection_id: int, db: AsyncSession = Depends(get_
 async def auto_split_train_test(
     collection_id: int, test_ratio: float = 0.2, db: AsyncSession = Depends(get_db)
 ) -> AutoSplitResultOut:
-    service = LanguageIdentificationService(db)
+    service = LangIdLabelingService(db)
     try:
         result = await service.auto_split(collection_id, test_ratio=test_ratio)
     except LangIdError as exc:
@@ -81,7 +87,7 @@ async def auto_split_train_test(
 async def set_language_label(
     document_id: int, payload: LanguageLabelIn, db: AsyncSession = Depends(get_db)
 ) -> DocumentOut:
-    service = LanguageIdentificationService(db)
+    service = LangIdLabelingService(db)
     try:
         return await service.set_language_label(
             document_id, confirmed_language=payload.confirmed_language, corpus_split=payload.corpus_split
@@ -95,7 +101,7 @@ async def set_language_label(
 
 @router.get("/lang-id/profiles", response_model=list[LangIdProfileOut])
 async def list_profiles(db: AsyncSession = Depends(get_db)) -> list[LangIdProfileOut]:
-    service = LanguageIdentificationService(db)
+    service = LangIdProfileService(db)
     return await service.list_profiles()
 
 
@@ -103,7 +109,7 @@ async def list_profiles(db: AsyncSession = Depends(get_db)) -> list[LangIdProfil
 async def build_frequent_words_profile(
     payload: BuildLexicalProfileRequest, db: AsyncSession = Depends(get_db)
 ) -> LangIdProfileOut:
-    service = LanguageIdentificationService(db)
+    service = LangIdProfileService(db)
     try:
         return await service.build_lexical_profile("frequent_words", payload.language)
     except LangIdError as exc:
@@ -114,7 +120,7 @@ async def build_frequent_words_profile(
 async def build_alphabetic_profile(
     payload: BuildLexicalProfileRequest, db: AsyncSession = Depends(get_db)
 ) -> LangIdProfileOut:
-    service = LanguageIdentificationService(db)
+    service = LangIdProfileService(db)
     try:
         return await service.build_lexical_profile("alphabetic", payload.language)
     except LangIdError as exc:
@@ -128,7 +134,7 @@ async def build_alphabetic_profile(
 async def start_neural_training(
     background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)
 ) -> LangIdTrainingJobOut:
-    service = LanguageIdentificationService(db)
+    service = LangIdTrainingService(db)
     try:
         job = await service.start_neural_training()
     except LangIdError as exc:
@@ -139,7 +145,7 @@ async def start_neural_training(
 
 @router.get("/lang-id/neural/train/{job_id}", response_model=LangIdTrainingJobOut)
 async def get_neural_training_job(job_id: int, db: AsyncSession = Depends(get_db)) -> LangIdTrainingJobOut:
-    service = LanguageIdentificationService(db)
+    service = LangIdTrainingService(db)
     job = await service.get_training_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="training job not found")
@@ -148,7 +154,7 @@ async def get_neural_training_job(job_id: int, db: AsyncSession = Depends(get_db
 
 @router.get("/lang-id/neural/train/latest", response_model=LangIdTrainingJobOut | None)
 async def get_latest_neural_training_job(db: AsyncSession = Depends(get_db)) -> LangIdTrainingJobOut | None:
-    service = LanguageIdentificationService(db)
+    service = LangIdTrainingService(db)
     return await service.get_latest_training_job()
 
 
@@ -162,7 +168,7 @@ async def neural_training_progress_ws(websocket: WebSocket, job_id: int) -> None
     try:
         while True:
             async with SessionLocal() as session:
-                service = LanguageIdentificationService(session)
+                service = LangIdTrainingService(session)
                 job = await service.get_training_job(job_id)
                 if job is None:
                     await websocket.send_json({"error": "training job not found"})
@@ -188,7 +194,7 @@ async def neural_training_progress_ws(websocket: WebSocket, job_id: int) -> None
 async def identify_document(
     payload: IdentifyDocumentRequest, db: AsyncSession = Depends(get_db)
 ) -> IdentifyResponseOut:
-    service = LanguageIdentificationService(db)
+    service = LangIdIdentificationService(db)
     try:
         outcomes = await service.identify_document(payload.document_id, payload.methods)
     except LangIdError as exc:
@@ -198,7 +204,7 @@ async def identify_document(
 
 @router.post("/lang-id/identify-url", response_model=IdentifyResponseOut)
 async def identify_url(payload: IdentifyUrlRequest, db: AsyncSession = Depends(get_db)) -> IdentifyResponseOut:
-    service = LanguageIdentificationService(db)
+    service = LangIdIdentificationService(db)
     try:
         outcomes = await service.identify_url(payload.url, payload.methods)
     except LangIdError as exc:
@@ -212,7 +218,7 @@ async def identify_url(payload: IdentifyUrlRequest, db: AsyncSession = Depends(g
 async def identify_text(
     payload: IdentifyTextRequest, db: AsyncSession = Depends(get_db)
 ) -> IdentifyResponseOut:
-    service = LanguageIdentificationService(db)
+    service = LangIdIdentificationService(db)
     try:
         if payload.is_html:
             outcomes = await service.identify_raw_html(payload.text, payload.methods)
@@ -230,7 +236,7 @@ async def identify_text(
 async def create_runs(
     payload: LangIdRunCreate, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)
 ) -> list[LangIdRunOut]:
-    service = LanguageIdentificationService(db)
+    service = LangIdTestRunService(db)
     try:
         runs = await service.start_run(payload.collection_id, payload.methods)
     except LangIdError as exc:
@@ -242,7 +248,7 @@ async def create_runs(
 
 @router.get("/lang-id/runs/{run_id}", response_model=LangIdRunOut)
 async def get_run(run_id: int, db: AsyncSession = Depends(get_db)) -> LangIdRunOut:
-    service = LanguageIdentificationService(db)
+    service = LangIdTestRunService(db)
     run = await service.get_run(run_id)
     if run is None:
         raise HTTPException(status_code=404, detail="lang-id run not found")
@@ -251,7 +257,7 @@ async def get_run(run_id: int, db: AsyncSession = Depends(get_db)) -> LangIdRunO
 
 @router.get("/collections/{collection_id}/lang-id/runs", response_model=list[LangIdRunOut])
 async def list_runs_by_collection(collection_id: int, db: AsyncSession = Depends(get_db)) -> list[LangIdRunOut]:
-    service = LanguageIdentificationService(db)
+    service = LangIdTestRunService(db)
     return await service.list_runs_by_collection(collection_id)
 
 
@@ -263,7 +269,7 @@ async def lang_id_run_progress_ws(websocket: WebSocket, run_id: int) -> None:
     try:
         while True:
             async with SessionLocal() as session:
-                service = LanguageIdentificationService(session)
+                service = LangIdTestRunService(session)
                 run = await service.get_run(run_id)
                 if run is None:
                     await websocket.send_json({"error": "lang-id run not found"})
@@ -284,13 +290,13 @@ async def lang_id_run_progress_ws(websocket: WebSocket, run_id: int) -> None:
 
 @router.get("/lang-id/runs/{run_id}/results", response_model=list[LangIdResultOut])
 async def get_run_results(run_id: int, db: AsyncSession = Depends(get_db)) -> list[LangIdResultOut]:
-    service = LanguageIdentificationService(db)
+    service = LangIdTestRunService(db)
     return await service.get_run_results(run_id)
 
 
 @router.get("/lang-id/runs/{run_id}/summary", response_model=LangIdRunSummaryOut)
 async def get_run_summary(run_id: int, db: AsyncSession = Depends(get_db)) -> LangIdRunSummaryOut:
-    service = LanguageIdentificationService(db)
+    service = LangIdTestRunService(db)
     try:
         return await service.get_run_summary(run_id)
     except LangIdError as exc:
@@ -301,7 +307,7 @@ async def get_run_summary(run_id: int, db: AsyncSession = Depends(get_db)) -> La
 async def compare(
     collection_id: int, methods: str = "frequent_words,alphabetic,neural", db: AsyncSession = Depends(get_db)
 ) -> LangIdCompareResponseOut:
-    service = LanguageIdentificationService(db)
+    service = LangIdTestRunService(db)
     method_list = [m for m in methods.split(",") if m]
     summaries = await service.compare(collection_id, method_list)
     return {"summaries": summaries}
@@ -312,7 +318,7 @@ async def rerun(payload: LangIdRunCreate, db: AsyncSession = Depends(get_db)) ->
     """Like GET /lang-id/compare, but runs fresh classification passes for
     every requested method first — the classification-quality analogue of
     POST /collections/{id}/metrics/rerun."""
-    service = LanguageIdentificationService(db)
+    service = LangIdTestRunService(db)
     try:
         summaries = await service.rerun_and_compare(payload.collection_id, payload.methods)
     except LangIdError as exc:

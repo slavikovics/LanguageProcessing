@@ -7,7 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.config import Settings
-from app.worker import CrawlWorker, JobContext
+from app.job_context import JobContext
+from app.worker import CrawlWorker
 
 
 @pytest_asyncio.fixture
@@ -59,9 +60,9 @@ async def test_drain_frontier_runs_lanes_concurrently_without_overshooting_budge
     async def fake_fetch_html(client, url):
         return "<html><title>t</title><body>irrelevant, extract_main_content is mocked</body></html>"
 
-    monkeypatch.setattr("app.worker.fetch_html", fake_fetch_html)
-    monkeypatch.setattr("app.worker.extract_main_content", lambda html: "a" * 300)
-    monkeypatch.setattr("app.worker.extract_links", lambda html, base_url: [])
+    monkeypatch.setattr("app.page_pipeline.fetch_html", fake_fetch_html)
+    monkeypatch.setattr("app.page_pipeline.extract_main_content", lambda html: "a" * 300)
+    monkeypatch.setattr("app.page_pipeline.extract_links", lambda html, base_url: [])
 
     ctx = JobContext(
         id=job_id, collection_id=collection_id, language="en", max_documents=3, max_depth=1, mode="crawl"
