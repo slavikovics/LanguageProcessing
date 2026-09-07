@@ -88,12 +88,19 @@ class Frontier:
                 )
                 for url in new_urls
             )
-            await session.execute(
-                update(CrawlJob)
-                .where(CrawlJob.id == job_id)
-                .values(urls_queued=CrawlJob.urls_queued + len(new_urls))
-            )
             try:
+                # The CrawlJob update below is a Core execute() call, which
+                # triggers a session-wide autoflush of the pending CrawlUrl
+                # inserts above BEFORE it runs — so a sibling lane's race
+                # (uq_crawl_url_job_url) can raise IntegrityError right here,
+                # not just at the final commit. Both statements must be
+                # inside the same try/except for the rollback to actually
+                # catch it.
+                await session.execute(
+                    update(CrawlJob)
+                    .where(CrawlJob.id == job_id)
+                    .values(urls_queued=CrawlJob.urls_queued + len(new_urls))
+                )
                 await session.commit()
             except IntegrityError:
                 # A sibling fetch lane discovered and inserted the same link

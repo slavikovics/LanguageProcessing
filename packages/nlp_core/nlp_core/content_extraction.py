@@ -1,16 +1,20 @@
 """Strips page chrome — navigation, headers, footers, sidebars, ad slots —
 before the raw-tag cleanup in nlp_core.tokenization.clean_html runs, so the
-indexed text is the article/body content a page is actually about, not the
+extracted text is the article/body content a page is actually about, not the
 site furniture repeated on every page. Uses readability-lxml, the Python
 port of Mozilla's Readability algorithm (the same one behind Firefox's
 Reader View), rather than hand-rolled heuristics.
+
+Lives in nlp_core (not crawler-service) so both the bulk crawler and api's
+ad-hoc single-URL language identification (LR2) share one implementation.
 """
 
 from __future__ import annotations
 
 from readability import Document
 from readability.readability import Unparseable
-from nlp_core.tokenization import clean_html
+
+from .tokenization import clean_html
 
 
 def extract_main_content(html: str) -> str:

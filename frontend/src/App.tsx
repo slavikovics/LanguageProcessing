@@ -5,6 +5,7 @@ import { SearchModelProvider } from "./context/SearchModelContext";
 import { CollectionsPage } from "./pages/CollectionsPage";
 import { CrawlPage } from "./pages/CrawlPage";
 import { HelpPage } from "./pages/HelpPage";
+import { LanguageIdPage } from "./pages/LanguageIdPage";
 import { MetricsPage } from "./pages/MetricsPage";
 import { SearchPage } from "./pages/SearchPage";
 
@@ -19,6 +20,7 @@ export default function App() {
             <Route path="/collections" element={<CollectionsPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/metrics" element={<MetricsPage />} />
+            <Route path="/lang-id" element={<LanguageIdPage />} />
             <Route path="/help" element={<HelpPage />} />
           </Route>
         </Routes>

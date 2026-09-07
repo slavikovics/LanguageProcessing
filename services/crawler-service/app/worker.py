@@ -19,8 +19,9 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from nlp_core.content_extraction import extract_main_content
+
 from app.config import Settings
-from app.content_extraction import extract_main_content
 from app.fetcher import FetchError, extract_links, extract_title, fetch_html
 from app.frontier import CrawlUrlHandle, Frontier
 from app.robots import RobotsCache
@@ -92,10 +93,8 @@ class CrawlWorker:
                     CrawlJob.max_depth,
                     CrawlJob.mode,
                     CrawlJob.allowed_domain,
-                    Collection.language,
-                )
-                .join(Collection, Collection.id == CrawlJob.collection_id)
-                .where(CrawlJob.id == job_id)
+                    CrawlJob.language,
+                ).where(CrawlJob.id == job_id)
             )
             row = result.first()
             if row is None:

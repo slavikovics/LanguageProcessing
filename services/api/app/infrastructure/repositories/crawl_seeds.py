@@ -34,6 +34,7 @@ class CrawlSeedRepository:
         max_documents: int,
         max_depth: int,
         same_domain_only: bool,
+        language: str,
     ) -> CrawlSeed:
         seed = CrawlSeed(
             collection_id=collection_id,
@@ -41,18 +42,27 @@ class CrawlSeedRepository:
             max_documents=max_documents,
             max_depth=max_depth,
             same_domain_only=same_domain_only,
+            language=language,
         )
         self._session.add(seed)
         await self._session.flush()
         return seed
 
     async def update(
-        self, seed: CrawlSeed, *, url: str, max_documents: int, max_depth: int, same_domain_only: bool
+        self,
+        seed: CrawlSeed,
+        *,
+        url: str,
+        max_documents: int,
+        max_depth: int,
+        same_domain_only: bool,
+        language: str,
     ) -> CrawlSeed:
         seed.url = url
         seed.max_documents = max_documents
         seed.max_depth = max_depth
         seed.same_domain_only = same_domain_only
+        seed.language = language
         await self._session.flush()
         return seed
 

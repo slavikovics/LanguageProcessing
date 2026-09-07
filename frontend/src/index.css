@@ -119,3 +119,34 @@
     background-color: var(--muted-foreground);
   }
 }
+
+/* LR2's "Печать" button (LanguageIdPage) just calls window.print() — this is
+   what makes that produce a readable page instead of a one-viewport-tall
+   snapshot: the fixed nav header disappears and every container that
+   normally clips content to the viewport (the h-screen/overflow-hidden app
+   shell itself, not just the ScrollArea viewport inside it) switches to
+   normal flowed height, so content past the first screenful isn't cut off.
+   Wide result tables get the same treatment horizontally, since their
+   scroll wrapper otherwise clips columns off the printed page too. */
+@media print {
+  header {
+    display: none !important;
+  }
+  [data-slot="app-shell"] {
+    height: auto !important;
+    overflow: visible !important;
+  }
+  main {
+    padding-top: 0 !important;
+  }
+  [data-slot="scroll-area-viewport"] {
+    overflow: visible !important;
+    height: auto !important;
+  }
+  [data-slot="scroll-area-scrollbar"] {
+    display: none !important;
+  }
+  .overflow-x-auto {
+    overflow-x: visible !important;
+  }
+}

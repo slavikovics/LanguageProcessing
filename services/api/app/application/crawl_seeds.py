@@ -34,12 +34,17 @@ class CrawlSeedService:
         max_documents: int,
         max_depth: int,
         same_domain_only: bool,
+        language: str = "en",
     ) -> CrawlSeed:
         existing = await self._seeds.count_by_collection(collection_id)
         if existing >= MAX_SEEDS_PER_COLLECTION:
             raise InvalidCrawlJobConfig(f"at most {MAX_SEEDS_PER_COLLECTION} addresses are allowed")
         config = build_crawl_seed_config(
-            url=url, max_documents=max_documents, max_depth=max_depth, same_domain_only=same_domain_only
+            url=url,
+            max_documents=max_documents,
+            max_depth=max_depth,
+            same_domain_only=same_domain_only,
+            language=language,
         )
         try:
             seed = await self._seeds.create(
@@ -48,6 +53,7 @@ class CrawlSeedService:
                 max_documents=config.max_documents,
                 max_depth=config.max_depth,
                 same_domain_only=config.same_domain_only,
+                language=config.language,
             )
             await self._session.commit()
         except IntegrityError as exc:
@@ -63,12 +69,17 @@ class CrawlSeedService:
         max_documents: int,
         max_depth: int,
         same_domain_only: bool,
+        language: str = "en",
     ) -> CrawlSeed:
         seed = await self._seeds.get(seed_id)
         if seed is None:
             raise CrawlSeedNotFound(f"crawl seed {seed_id} not found")
         config = build_crawl_seed_config(
-            url=url, max_documents=max_documents, max_depth=max_depth, same_domain_only=same_domain_only
+            url=url,
+            max_documents=max_documents,
+            max_depth=max_depth,
+            same_domain_only=same_domain_only,
+            language=language,
         )
         try:
             updated = await self._seeds.update(
@@ -77,6 +88,7 @@ class CrawlSeedService:
                 max_documents=config.max_documents,
                 max_depth=config.max_depth,
                 same_domain_only=config.same_domain_only,
+                language=config.language,
             )
             await self._session.commit()
         except IntegrityError as exc:

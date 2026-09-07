@@ -11,6 +11,12 @@ from functools import lru_cache
 
 _WORD_RE = re.compile(r"[A-Za-z]+(?:'[A-Za-z]+)?")
 
+# Unicode-letter based (not the ASCII-only _WORD_RE above), so accented
+# letters survive — needed for LR2's French/English frequent-words and
+# alphabetic methods, which must not depend on the English-only spaCy path
+# below.
+_UNICODE_WORD_RE = re.compile(r"[^\W\d_]+(?:'[^\W\d_]+)?", re.UNICODE)
+
 
 @dataclass(frozen=True)
 class Token:
@@ -24,12 +30,27 @@ def _load_spacy_pipeline():
     import spacy
 
     try:
-        return spacy.load("en_core_web_sm")
+        # tokenize()/lemmatize() only ever read tok.is_alpha/is_stop (lexical,
+        # need no pipeline component), tok.pos_ (tagger) and tok.lemma_
+        # (attribute_ruler + lemmatizer) — never doc.ents or the dependency
+        # tree, so "parser" and "ner" are dead weight here. They're also
+        # exactly the two components spaCy's own docs blame for needing
+        # roughly 1GB per 100,000 input characters, which is what forces the
+        # conservative default nlp.max_length=1_000_000 (a real crawled page
+        # can exceed that). Excluding them removes that memory driver, so
+        # max_length can be raised safely below.
+        nlp = spacy.load("en_core_web_sm", exclude=["parser", "ner"])
     except OSError as exc:  # pragma: no cover - exercised only without the model
         raise RuntimeError(
             "spaCy model 'en_core_web_sm' is not installed. "
             "Run: python -m spacy download en_core_web_sm"
         ) from exc
+    # split_sentences() needs doc.sents, which this model normally derives
+    # from the (now excluded) parser — a rule-based sentencizer replaces
+    # that without pulling the parser's cost back in.
+    nlp.add_pipe("sentencizer")
+    nlp.max_length = 5_000_000
+    return nlp
 
 
 @lru_cache(maxsize=1)
@@ -88,6 +109,13 @@ def lemmatize_many(texts: list[str], *, batch_size: int = 50) -> list[list[str]]
         [tok.lemma_.lower() for tok in doc if tok.is_alpha and not tok.is_stop]
         for doc in pipeline.pipe(texts, batch_size=batch_size)
     ]
+
+
+def simple_word_tokenize(text: str) -> list[str]:
+    """Language-agnostic lowercase word extraction — no spaCy, no stopword
+    removal. Used by LR2's frequent-words/alphabetic language-ID methods,
+    which run on French text as well as English."""
+    return [w.lower() for w in _UNICODE_WORD_RE.findall(text)]
 
 
 def char_ngrams(text: str, n: int = 5) -> list[str]:

@@ -61,11 +61,15 @@ class CrawlJobService:
             max_documents=max_documents,
             max_depth=max_depth,
         )
+        # No CrawlSeed here (this is the ad-hoc single-job path, not the
+        # per-seed one below) — fall back to the collection's language.
+        collection = await self._collections.get(collection_id)
         job = await self._jobs.create(
             collection_id=config.collection_id,
             seed_urls=list(config.seed_urls),
             max_documents=config.max_documents,
             max_depth=config.max_depth,
+            language=collection.language if collection else "en",
         )
         await self._urls.bulk_enqueue(job.id, list(config.seed_urls), depth=0)
         await self._session.commit()
@@ -73,7 +77,9 @@ class CrawlJobService:
 
     async def create_refresh_job(self, collection_id: int) -> CrawlJob:
         """Re-fetches every document in the collection that has a URL,
-        updating each row in place (CrawlWorker's "refresh" mode)."""
+        updating each row in place (CrawlWorker's "refresh" mode). The job's
+        `language` is irrelevant here — refreshing never creates a new
+        document, only updates existing ones in place, so it never gets read."""
         await self._ensure_not_indexing(collection_id)
         urls = await self._documents.list_urls_by_collection(collection_id)
         if not urls:
@@ -114,6 +120,7 @@ class CrawlJobService:
                 max_documents=seed.max_documents,
                 max_depth=seed.max_depth,
                 allowed_domain=allowed_domain,
+                language=seed.language,
             )
             await self._urls.bulk_enqueue(job.id, [seed.url], depth=0)
             jobs.append(job)

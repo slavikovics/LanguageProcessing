@@ -19,6 +19,29 @@ class ChunkEmbeddingRepository:
             return
         await self._session.execute(insert(DocumentChunkEmbedding), rows)
 
+    async def get_first_chunk_vectors(
+        self, document_ids: list[int], search_model_id: int
+    ) -> dict[int, list[float]]:
+        """Document -> its chunk_index=0 embedding, already computed and
+        stored during search indexing — lets a document-level consumer (e.g.
+        LR2's neural classifier) reuse that vector instead of re-requesting
+        it from the embedding model."""
+        if not document_ids:
+            return {}
+        result = await self._session.execute(
+            select(DocumentChunk.document_id, DocumentChunkEmbedding.embedding)
+            .join(DocumentChunkEmbedding, DocumentChunkEmbedding.chunk_id == DocumentChunk.id)
+            .where(
+                DocumentChunkEmbedding.search_model_id == search_model_id,
+                DocumentChunk.chunk_index == 0,
+                DocumentChunk.document_id.in_(document_ids),
+            )
+        )
+        # pgvector deserializes to a numpy float32 array; plain Python floats
+        # are needed so the vector can be JSON-serialized when sent on to
+        # lang-id-service.
+        return {document_id: [float(x) for x in embedding] for document_id, embedding in result.all()}
+
     async def nearest_documents(
         self, document_ids: list[int], search_model_id: int, query_vector: list[float]
     ) -> list[tuple[int, float]]:

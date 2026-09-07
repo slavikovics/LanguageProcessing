@@ -22,6 +22,7 @@ class CrawlJobRepository:
         max_depth: int,
         mode: str = "crawl",
         allowed_domain: str | None = None,
+        language: str = "en",
     ) -> CrawlJob:
         job = CrawlJob(
             collection_id=collection_id,
@@ -30,6 +31,7 @@ class CrawlJobRepository:
             max_depth=max_depth,
             mode=mode,
             allowed_domain=allowed_domain,
+            language=language,
             status=CrawlJobStatus.PENDING.value,
             urls_queued=len(seed_urls),
         )

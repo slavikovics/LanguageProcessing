@@ -28,6 +28,7 @@ async def create_crawl_seed(
             max_documents=payload.max_documents,
             max_depth=payload.max_depth,
             same_domain_only=payload.same_domain_only,
+            language=payload.language,
         )
     except InvalidCrawlJobConfig as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -45,6 +46,7 @@ async def update_crawl_seed(
             max_documents=payload.max_documents,
             max_depth=payload.max_depth,
             same_domain_only=payload.same_domain_only,
+            language=payload.language,
         )
     except CrawlSeedNotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

@@ -43,3 +43,25 @@ class IndexJobStatus(str, Enum):
             IndexJobStatus.FAILED,
             IndexJobStatus.CANCELLED,
         }
+
+
+class LangIdTrainingJobStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+    @property
+    def is_terminal(self) -> bool:
+        return self in {LangIdTrainingJobStatus.COMPLETED, LangIdTrainingJobStatus.FAILED}
+
+
+class LangIdRunStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+    @property
+    def is_terminal(self) -> bool:
+        return self in {LangIdRunStatus.COMPLETED, LangIdRunStatus.FAILED}

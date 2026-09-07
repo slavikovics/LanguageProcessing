@@ -30,6 +30,14 @@ def cosine_similarity(a: Mapping[Term, float], b: Mapping[Term, float]) -> float
     return dot_product(a, b) / (norm_a * norm_b)
 
 
+def manhattan_distance(a: Mapping[Term, float], b: Mapping[Term, float]) -> float:
+    """L1 distance over the union of keys (0.0 for a key missing from either
+    side) — used by LR2's alphabetic language-ID method to compare two
+    character-frequency distributions."""
+    keys = a.keys() | b.keys()
+    return sum(abs(a.get(term, 0.0) - b.get(term, 0.0)) for term in keys)
+
+
 def rank_documents(
     query_vector: Mapping[Term, float],
     document_vectors: Mapping[Hashable, Mapping[Term, float]],

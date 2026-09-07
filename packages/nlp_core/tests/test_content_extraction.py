@@ -1,4 +1,4 @@
-from app.content_extraction import extract_main_content
+from nlp_core.content_extraction import extract_main_content
 
 PAGE_WITH_CHROME = """
 <html><head><title>Test</title></head><body>

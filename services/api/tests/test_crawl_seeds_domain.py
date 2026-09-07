@@ -40,6 +40,38 @@ def test_build_crawl_seed_config_rejects_negative_depth():
         )
 
 
+def test_build_crawl_seed_config_defaults_language_to_en():
+    config = build_crawl_seed_config(
+        url="https://example.com/a", max_documents=10, max_depth=1, same_domain_only=False
+    )
+    assert config.language == "en"
+
+
+def test_build_crawl_seed_config_normalizes_language_case_and_whitespace():
+    config = build_crawl_seed_config(
+        url="https://example.com/a", max_documents=10, max_depth=1, same_domain_only=False, language=" FR "
+    )
+    assert config.language == "fr"
+
+
+def test_build_crawl_seed_config_rejects_empty_language():
+    with pytest.raises(InvalidCrawlJobConfig):
+        build_crawl_seed_config(
+            url="https://example.com/a", max_documents=10, max_depth=1, same_domain_only=False, language="   "
+        )
+
+
+def test_build_crawl_seed_config_rejects_overlong_language():
+    with pytest.raises(InvalidCrawlJobConfig):
+        build_crawl_seed_config(
+            url="https://example.com/a",
+            max_documents=10,
+            max_depth=1,
+            same_domain_only=False,
+            language="a" * 11,
+        )
+
+
 def test_build_crawl_seed_config_each_seed_independent_of_others():
     # The whole point of per-seed config: two seeds validated separately
     # keep their own max_documents/max_depth rather than sharing one.

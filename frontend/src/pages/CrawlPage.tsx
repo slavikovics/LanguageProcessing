@@ -25,6 +25,7 @@ import { clampNumberInput, cn } from "@/lib/utils";
 import {
   Check,
   FileStack,
+  Globe,
   HelpCircle,
   Layers,
   Link2,
@@ -36,6 +37,9 @@ import {
   Waypoints,
   X,
 } from "lucide-react";
+
+const QUICK_LANGUAGES = ["en", "fr"];
+const DEFAULT_LANGUAGE = "en";
 
 const STATUS_LABELS: Record<CrawlJob["status"], string> = {
   pending: "в очереди",
@@ -190,6 +194,7 @@ export function CrawlPage() {
   const [maxDocuments, setMaxDocuments] = useState<number | "">(DEFAULT_MAX_DOCUMENTS);
   const [maxDepth, setMaxDepth] = useState<number | "">(DEFAULT_MAX_DEPTH);
   const [sameDomainOnly, setSameDomainOnly] = useState(false);
+  const [language, setLanguage] = useState(DEFAULT_LANGUAGE);
   const [editingSeedId, setEditingSeedId] = useState<number | null>(null);
   const [savingSeed, setSavingSeed] = useState(false);
   const [deletingSeedId, setDeletingSeedId] = useState<number | null>(null);
@@ -248,6 +253,7 @@ export function CrawlPage() {
     setMaxDocuments(DEFAULT_MAX_DOCUMENTS);
     setMaxDepth(DEFAULT_MAX_DEPTH);
     setSameDomainOnly(false);
+    setLanguage(DEFAULT_LANGUAGE);
     setEditingSeedId(null);
     setFormError(null);
   }
@@ -258,6 +264,7 @@ export function CrawlPage() {
     setMaxDocuments(seed.max_documents);
     setMaxDepth(seed.max_depth);
     setSameDomainOnly(seed.same_domain_only);
+    setLanguage(seed.language);
     setFormError(null);
   }
 
@@ -273,6 +280,7 @@ export function CrawlPage() {
         max_documents: clampNumberInput(maxDocuments, 1, 2000),
         max_depth: clampNumberInput(maxDepth, 0, 5),
         same_domain_only: sameDomainOnly,
+        language: (language.trim() || DEFAULT_LANGUAGE).toLowerCase(),
       };
       if (editingSeedId !== null) {
         await updateCrawlSeed(editingSeedId, input);
@@ -440,6 +448,34 @@ export function CrawlPage() {
             </div>
           </div>
 
+          <div className="flex flex-col items-center gap-1.5">
+            <Label className="flex items-center gap-1.5">
+              <Globe className="size-4 text-muted-foreground" />
+              Язык
+            </Label>
+            <div className="flex h-9 items-center gap-1">
+              {QUICK_LANGUAGES.map((code) => (
+                <Button
+                  key={code}
+                  type="button"
+                  size="sm"
+                  variant={language === code ? "default" : "outline"}
+                  onClick={() => setLanguage(code)}
+                >
+                  {code.toUpperCase()}
+                </Button>
+              ))}
+              <Input
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                placeholder="en"
+                maxLength={10}
+                className="w-16"
+                title="Присваивается документам, собранным по этому адресу"
+              />
+            </div>
+          </div>
+
           <Button
             type="button"
             variant={editingSeedId !== null ? "default" : "outline"}
@@ -480,6 +516,10 @@ export function CrawlPage() {
                       {seed.url}
                     </span>
                     <span className="hidden shrink-0 items-center gap-1 sm:flex">
+                      <Badge variant="outline" className="gap-1 text-[10px]">
+                        <Globe className="size-3" />
+                        {seed.language.toUpperCase()}
+                      </Badge>
                       <Badge variant="outline" className="gap-1 text-[10px]">
                         <FileStack className="size-3" />
                         {seed.max_documents}

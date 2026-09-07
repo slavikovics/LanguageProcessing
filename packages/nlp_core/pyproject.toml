@@ -9,6 +9,7 @@ description = "Reusable NLP primitives shared across the IR labs (tokenization, 
 requires-python = ">=3.11"
 dependencies = [
     "beautifulsoup4>=4.12,<5",
+    "readability-lxml>=0.9,<0.10",
 ]
 
 [project.optional-dependencies]

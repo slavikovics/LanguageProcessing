@@ -1,10 +1,18 @@
 import { HelpCircle, RotateCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { getMetricsComparison, rerunMetricsComparison } from "../api/client";
-import type { CollectionMetricsSummary } from "../api/types";
+import { compareLangIdMethods, getMetricsComparison, rerunLangIdComparison, rerunMetricsComparison } from "../api/client";
+import {
+  LANG_ID_METHOD_LABELS,
+  LANG_ID_METHODS,
+  type CollectionMetricsSummary,
+  type LangIdMethod,
+  type LangIdRunSummary,
+} from "../api/types";
 
 import { CurveSeries, PrecisionRecallChart } from "@/components/PrecisionRecallChart";
+import { LangIdMethodComparisonTable } from "@/components/LangIdMethodComparisonTable";
+import { LangIdSummaryBarChart } from "@/components/LangIdSummaryBarChart";
 import { MetricComparisonTable } from "@/components/MetricComparisonTable";
 import { MetricsByQueryChart } from "@/components/MetricsByQueryChart";
 import { ModelSwatch } from "@/components/ModelSwatch";
@@ -74,6 +82,48 @@ export function MetricsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, modelKeysDependency]);
 
+  // -- language-classification metrics ------------------------------------
+  const [langIdMethodKeys, setLangIdMethodKeys] = useState<LangIdMethod[]>([...LANG_ID_METHODS]);
+  const [langIdSummaries, setLangIdSummaries] = useState<LangIdRunSummary[]>([]);
+  const [langIdLoading, setLangIdLoading] = useState(false);
+  const [langIdError, setLangIdError] = useState<string | null>(null);
+
+  function toggleLangIdMethod(method: LangIdMethod, checked: boolean) {
+    setLangIdMethodKeys((prev) => (checked ? [...prev, method] : prev.filter((m) => m !== method)));
+  }
+
+  async function refreshLangId(
+    id: number,
+    methods: LangIdMethod[],
+    { rerun = false }: { rerun?: boolean } = {},
+  ) {
+    if (methods.length === 0) {
+      setLangIdSummaries([]);
+      return;
+    }
+    setLangIdLoading(true);
+    setLangIdError(null);
+    try {
+      // "Обновить" runs a fresh classification pass for every selected
+      // method (slower); toggles/initial load just read each method's
+      // latest already-completed run.
+      const result = rerun ? await rerunLangIdComparison(id, methods) : await compareLangIdMethods(id, methods);
+      setLangIdSummaries(result.summaries);
+    } catch (err) {
+      setLangIdError(err instanceof Error ? err.message : String(err));
+      setLangIdSummaries([]);
+    } finally {
+      setLangIdLoading(false);
+    }
+  }
+
+  const langIdMethodKeysDependency = langIdMethodKeys.join(",");
+  useEffect(() => {
+    if (selectedId !== null) void refreshLangId(selectedId, langIdMethodKeys);
+    else setLangIdSummaries([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, langIdMethodKeysDependency]);
+
   const withQueries = summaries.filter((s) => s.queries.length > 0);
   const withoutQueries = summaries.filter((s) => s.queries.length === 0);
   const totalUnscored = summaries.reduce((sum, s) => sum + s.unscored_judged_queries, 0);
@@ -97,9 +147,8 @@ export function MetricsPage() {
           <CardTitle>Метрики качества</CardTitle>
           <CardDescription>
             Оценка качества работы системы по каждой из решаемых задач — у каждой задачи свой
-            раздел ниже. Сейчас доступна оценка качества поиска; в следующих лабораторных здесь
-            появятся и другие разделы (например, качество классификации по языку, реферирования
-            и т. д.).
+            раздел ниже: качество поиска и качество определения языка. В следующих лабораторных
+            здесь появятся и другие разделы (например, качество реферирования).
           </CardDescription>
         </CardHeader>
       </Card>
@@ -235,6 +284,91 @@ export function MetricsPage() {
               <MetricsByQueryChart series={querySeries} />
             </div>
           </>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold tracking-tight">Метрики классификации по языку</h2>
+            <div className="flex flex-wrap gap-2">
+              {selectedId !== null && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refreshLangId(selectedId, langIdMethodKeys, { rerun: true })}
+                  disabled={langIdLoading}
+                  title="Заново классифицирует тестовую выборку каждым из выбранных методов, затем пересчитывает метрики — может занять некоторое время"
+                >
+                  <RotateCw className={langIdLoading ? "size-3.5 animate-spin" : "size-3.5"} />
+                  {langIdLoading ? "Обновление…" : "Обновить"}
+                </Button>
+              )}
+              <Button type="button" variant="outline" size="sm" asChild>
+                <Link to="/help#lang-id">
+                  <HelpCircle className="size-3.5" />
+                  Подробнее о методике
+                </Link>
+              </Button>
+            </div>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Accuracy, Precision/Recall/F1 (macro-усреднение по языкам) для каждого метода
+            определения языка — считаются по тестовой выборке размеченных документов. Разметьте
+            документы и запустите тест на странице «Определение языка».
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4">
+          <span className="text-xs text-muted-foreground">Сравнить методы:</span>
+          {LANG_ID_METHODS.map((method) => (
+            <label key={method} className="flex items-center gap-1.5 text-sm">
+              <Checkbox
+                checked={langIdMethodKeys.includes(method)}
+                onCheckedChange={(checked) => toggleLangIdMethod(method, checked === true)}
+              />
+              <ModelSwatch label={LANG_ID_METHOD_LABELS[method]} color={colorForModel(method)} />
+            </label>
+          ))}
+        </div>
+        {langIdError && <p className="text-sm text-destructive">{langIdError}</p>}
+
+        {selectedId === null && (
+          <p className="text-sm text-muted-foreground">
+            Выберите коллекцию вверху страницы, чтобы увидеть метрики классификации по языку.
+          </p>
+        )}
+
+        {selectedId !== null && langIdSummaries.length === 0 && !langIdLoading && (
+          <p className="text-sm text-muted-foreground">
+            Пока нет ни одного завершённого теста для этой коллекции. Разметьте документы и
+            запустите тест на странице{" "}
+            <Link to="/lang-id" className="text-primary underline-offset-2 hover:underline">
+              «Определение языка»
+            </Link>
+            , либо нажмите «Обновить» здесь.
+          </p>
+        )}
+
+        {langIdSummaries.length > 0 && (
+          <div className="flex flex-col gap-6">
+            <LangIdMethodComparisonTable summaries={langIdSummaries} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <LangIdSummaryBarChart
+                summaries={langIdSummaries}
+                valueOf={(s) => s.accuracy * 100}
+                formatValue={(v) => `${v.toFixed(1)}%`}
+                ariaLabel="Accuracy по методам"
+              />
+              <LangIdSummaryBarChart
+                summaries={langIdSummaries}
+                valueOf={(s) => s.f1 * 100}
+                formatValue={(v) => `${v.toFixed(1)}%`}
+                ariaLabel="F1 (macro) по методам"
+              />
+            </div>
+          </div>
         )}
       </div>
     </div>

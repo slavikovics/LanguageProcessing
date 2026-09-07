@@ -27,6 +27,14 @@ _BATCH_SIZE = 64
 # Batches run concurrently since indexing time here is network-latency bound.
 _MAX_CONCURRENT_REQUESTS = int(os.environ.get("OPENROUTER_EMBEDDING_CONCURRENCY", "10"))
 
+# A single flaky connection among several concurrent requests (or a
+# transient rate limit / upstream hiccup) shouldn't abort an entire
+# multi-minute indexing job — asyncio.gather() in encode_documents cancels
+# every other in-flight batch the instant one raises, so retrying here
+# rather than higher up is what actually gives a blip a chance to clear.
+_MAX_ATTEMPTS = 3
+_RETRY_BACKOFF_SECONDS = 2.0
+
 
 class EmbeddingConfigError(RuntimeError):
     """OPENROUTER_API_KEY isn't set; only raised when embeddings are actually requested."""
@@ -41,15 +49,29 @@ def _api_key() -> str:
     return api_key
 
 
+def _is_retryable(exc: Exception) -> bool:
+    if isinstance(exc, httpx.TransportError):
+        return True
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code == 429 or exc.response.status_code >= 500
+    return False
+
+
 async def _embed_batch(client: httpx.AsyncClient, api_key: str, texts: list[str]) -> list[list[float]]:
-    response = await client.post(
-        _API_URL,
-        headers={"Authorization": f"Bearer {api_key}"},
-        json={"model": MODEL_NAME, "input": texts, "encoding_format": "float"},
-    )
-    response.raise_for_status()
-    data = response.json()["data"]
-    return [item["embedding"] for item in sorted(data, key=lambda item: item["index"])]
+    for attempt in range(_MAX_ATTEMPTS):
+        try:
+            response = await client.post(
+                _API_URL,
+                headers={"Authorization": f"Bearer {api_key}"},
+                json={"model": MODEL_NAME, "input": texts, "encoding_format": "float"},
+            )
+            response.raise_for_status()
+            data = response.json()["data"]
+            return [item["embedding"] for item in sorted(data, key=lambda item: item["index"])]
+        except (httpx.TransportError, httpx.HTTPStatusError) as exc:
+            if attempt == _MAX_ATTEMPTS - 1 or not _is_retryable(exc):
+                raise
+            await asyncio.sleep(_RETRY_BACKOFF_SECONDS * (attempt + 1))
 
 
 async def encode_documents(texts: list[str]) -> list[list[float]]:

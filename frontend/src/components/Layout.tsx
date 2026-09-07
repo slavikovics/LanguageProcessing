@@ -1,4 +1,4 @@
-import { BarChart3, HelpCircle, Library, Search, Waypoints } from "lucide-react";
+import { BarChart3, HelpCircle, Languages, Library, Search, Waypoints } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 
 import { CollectionSwitcher } from "@/components/CollectionSwitcher";
@@ -12,12 +12,13 @@ const NAV_ITEMS = [
   { to: "/collections", label: "Коллекции", icon: Library },
   { to: "/search", label: "Поиск", icon: Search },
   { to: "/metrics", label: "Метрики", icon: BarChart3 },
+  { to: "/lang-id", label: "Язык", icon: Languages },
   { to: "/help", label: "Справка", icon: HelpCircle },
 ];
 
 export function Layout() {
   return (
-    <div className="h-screen overflow-hidden bg-background">
+    <div data-slot="app-shell" className="h-screen overflow-hidden bg-background">
       <header className="pointer-events-none fixed inset-x-0 top-0 z-40 flex justify-center px-4 py-3">
         <div className="pointer-events-auto flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border bg-card/90 p-1.5 pt-2 shadow-lg backdrop-blur-md">
           <nav className="flex shrink-0 items-center gap-1">

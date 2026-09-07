@@ -8,3 +8,4 @@ pydantic-settings==2.6.1
 httpx==0.28.1
 
 -e ./packages/ips_db
+-e ./packages/nlp_core

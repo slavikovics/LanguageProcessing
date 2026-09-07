@@ -145,13 +145,20 @@ async def test_refresh_blocked_while_indexing(session_factory):
 async def test_recrawl_allowed_once_indexing_finished(session_factory):
     collection_id = await _make_collection(session_factory)
     async with session_factory() as session:
-        session.add(CrawlSeed(collection_id=collection_id, url="https://example.com/", max_documents=10, max_depth=1))
+        session.add(
+            CrawlSeed(
+                collection_id=collection_id, url="https://example.com/", max_documents=10, max_depth=1, language="fr"
+            )
+        )
         session.add(IndexJob(collection_id=collection_id, status="completed"))
         await session.commit()
 
     async with session_factory() as session:
         jobs = await CrawlJobService(session).run_collection_crawl(collection_id)
     assert len(jobs) == 1
+    # Each spawned CrawlJob copies its language from the seed that spawned
+    # it, not the collection's — the whole point of per-seed language.
+    assert jobs[0].language == "fr"
 
 
 @pytest.mark.asyncio

@@ -1,0 +1,12 @@
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+pydantic==2.10.3
+
+# spaCy 3.7.x's compiled thinc/blis extensions are built against numpy<2's
+# ABI and crash at import time on numpy 2.x ("numpy.dtype size changed, may
+# indicate binary incompatibility") — torch's CPU wheel has the same
+# constraint on this Python/OS combination, so pin the same way nlp-service does.
+numpy<2
+torch==2.5.1
+
+-e ./packages/nlp_core

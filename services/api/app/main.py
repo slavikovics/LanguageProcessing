@@ -9,6 +9,7 @@ from app.interface.routers import (
     documents,
     health,
     indexing,
+    lang_id,
     metrics,
     search,
     search_models,
@@ -35,3 +36,4 @@ app.include_router(indexing.router)
 app.include_router(search.router)
 app.include_router(search_models.router)
 app.include_router(metrics.router)
+app.include_router(lang_id.router)
