@@ -1,0 +1,236 @@
+@startuml database-erd
+
+' =====================================================================
+'  ER-диаграмма базы данных в нотации Crow's Foot (PlantUML умеет её
+'  рисовать нативно, без внешних библиотек). Показывает всю текущую
+'  схему -- в том числе таблицы под вторую, эмбеддинговую модель поиска
+'  (search_models, document_chunks, document_chunk_embeddings) и таблицы
+'  под определение языка текста (ЛР2, выделены зелёным).
+' =====================================================================
+
+hide methods
+skinparam linetype ortho
+skinparam dpi 200
+skinparam class {
+  BackgroundColor<<new>> #e8f5e9
+  BorderColor<<new>> #2e7d32
+}
+
+legend top left
+  <back:#e8f5e9>  </back> -- добавлено в ЛР2 (определение языка текста)
+endlegend
+
+entity "collections" as collections {
+  * id : integer <<generated>>
+  --
+  name : varchar
+  language : varchar
+}
+
+entity "documents" as documents <<new>> {
+  * id : integer <<generated>>
+  --
+  collection_id : integer <<FK>>
+  title : varchar
+  url : varchar
+  clean_text : text
+  language : varchar
+  confirmed_language : varchar
+  corpus_split : varchar
+}
+
+entity "terms" as terms {
+  * id : integer <<generated>>
+  --
+  lemma : varchar
+  language : varchar
+}
+
+entity "document_terms" as document_terms {
+  * document_id : integer <<FK>>
+  * term_id : integer <<FK>>
+  --
+  tf : integer
+}
+
+entity "term_weights" as term_weights {
+  * document_id : integer <<FK>>
+  * term_id : integer <<FK>>
+  --
+  weight : float
+}
+
+entity "queries" as queries {
+  * id : integer <<generated>>
+  --
+  collection_id : integer <<FK>>
+  text : text
+}
+
+entity "search_models" as search_models {
+  * id : integer <<generated>>
+  --
+  key : varchar
+  kind : varchar
+  dimension : integer
+}
+
+entity "search_runs" as search_runs {
+  * id : integer <<generated>>
+  --
+  query_id : integer <<FK>>
+  model_id : integer <<FK>>
+  executed_at : datetime
+}
+
+entity "search_results" as search_results {
+  * id : integer <<generated>>
+  --
+  search_run_id : integer <<FK>>
+  document_id : integer <<FK>>
+  rank : integer
+  score : float
+}
+
+entity "relevance_judgments" as relevance_judgments {
+  * query_id : integer <<FK>>
+  * document_id : integer <<FK>>
+  --
+  is_relevant : boolean
+}
+
+entity "metric_results" as metric_results {
+  * id : integer <<generated>>
+  --
+  search_run_id : integer <<FK>>
+  metric_name : varchar
+  value : float
+}
+
+entity "crawl_seeds" as crawl_seeds <<new>> {
+  * id : integer <<generated>>
+  --
+  collection_id : integer <<FK>>
+  url : varchar
+  language : varchar
+}
+
+entity "crawl_jobs" as crawl_jobs <<new>> {
+  * id : integer <<generated>>
+  --
+  collection_id : integer <<FK>>
+  status : varchar
+  documents_fetched : integer
+  language : varchar
+}
+
+entity "crawl_urls" as crawl_urls {
+  * id : integer <<generated>>
+  --
+  job_id : integer <<FK>>
+  document_id : integer <<FK>>
+  discovered_from_id : integer <<FK>>
+  url : varchar
+  status : varchar
+}
+
+entity "document_chunks" as document_chunks {
+  * id : integer <<generated>>
+  --
+  document_id : integer <<FK>>
+  chunk_index : integer
+  text : text
+}
+
+entity "document_chunk_embeddings" as document_chunk_embeddings {
+  * chunk_id : integer <<FK>>
+  * search_model_id : integer <<FK>>
+  --
+  embedding : vector
+}
+
+entity "lang_id_profiles" as lang_id_profiles <<new>> {
+  * id : integer <<generated>>
+  --
+  method : varchar
+  language : varchar
+  profile_data : json
+  source_document_count : integer
+  built_at : datetime
+}
+
+entity "lang_id_training_jobs" as lang_id_training_jobs <<new>> {
+  * id : integer <<generated>>
+  --
+  status : varchar
+  epochs_total : integer
+  epochs_completed : integer
+  current_loss : float
+  current_train_accuracy : float
+}
+
+entity "lang_id_runs" as lang_id_runs <<new>> {
+  * id : integer <<generated>>
+  --
+  collection_id : integer <<FK>>
+  method : varchar
+  status : varchar
+  documents_total : integer
+  documents_processed : integer
+}
+
+entity "lang_id_results" as lang_id_results <<new>> {
+  * id : integer <<generated>>
+  --
+  run_id : integer <<FK>>
+  document_id : integer <<FK>>
+  predicted_language : varchar
+  distances : json
+  elapsed_ms : float
+  is_correct : boolean
+}
+
+entity "lang_id_run_metrics" as lang_id_run_metrics <<new>> {
+  * id : integer <<generated>>
+  --
+  run_id : integer <<FK>>
+  metric_name : varchar
+  value : float
+}
+
+collections ||--o{ documents
+collections ||--o{ queries
+collections ||--o{ crawl_jobs
+collections ||--o{ crawl_seeds
+collections ||--o{ lang_id_runs
+
+documents ||--o{ document_terms
+terms     ||--o{ document_terms
+
+documents ||--o{ term_weights
+terms     ||--o{ term_weights
+
+documents ||--o{ document_chunks
+document_chunks ||--o{ document_chunk_embeddings
+search_models   ||--o{ document_chunk_embeddings
+
+queries       ||--o{ search_runs
+search_models ||--o{ search_runs
+search_runs   ||--o{ search_results
+documents     ||--o{ search_results
+
+queries   ||--o{ relevance_judgments
+documents ||--o{ relevance_judgments
+
+search_runs ||--o{ metric_results
+
+crawl_seeds ||--o{ crawl_jobs
+crawl_jobs ||--o{ crawl_urls
+documents  |o--o{ crawl_urls
+crawl_urls |o--o{ crawl_urls
+
+lang_id_runs ||--o{ lang_id_results
+documents    ||--o{ lang_id_results
+lang_id_runs ||--o{ lang_id_run_metrics
+
+@enduml

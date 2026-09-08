@@ -1,0 +1,24 @@
+% =====================================================================
+%  Отчёт по лабораторной работе — главный файл.
+%  Компилировать из reports/lr2:
+%    make lab            (соберёт диаграммы и PDF)
+%  либо вручную:
+%    bash lab/diagrams/build.sh
+%    latexmk -pdf -shell-escape lab/lab_report.tex
+% =====================================================================
+
+\input{preamble}
+\input{lab/lab_preamble}
+\input{lab/lab_vars}
+
+\begin{document}
+
+\input{lab/lab_title}
+
+\input{lab/sections/goal}
+
+\input{lab/sections/body}
+
+\input{lab/sections/conclusion}
+
+\end{document}

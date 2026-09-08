@@ -36,7 +36,3 @@ cd packages/nlp_core && pip install -e ".[dev]" && pytest
 # api
 cd services/api && pip install -r requirements.txt && pytest
 ```
-
-## Дополнительные требования
-
-- добавить возможность создания задачи на автоматический кроулинг в админ-панели
