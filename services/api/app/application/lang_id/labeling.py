@@ -35,7 +35,10 @@ class LangIdLabelingService:
         for document in documents:
             by_language.setdefault(document.confirmed_language, []).append(document.id)
 
-        train_ids, test_ids = split_train_test(by_language, test_ratio=test_ratio)
+        already_split_counts = await self._documents.count_split_by_language(collection_id)
+        train_ids, test_ids = split_train_test(
+            by_language, test_ratio=test_ratio, already_split_counts=already_split_counts
+        )
         await self._documents.bulk_set_corpus_split(train_ids=train_ids, test_ids=test_ids)
         await self._session.commit()
         return {"train_assigned": len(train_ids), "test_assigned": len(test_ids)}

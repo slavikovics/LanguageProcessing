@@ -102,7 +102,7 @@ export function LanguageLabelBrowser({
                       key={lang.code}
                       type="button"
                       size="sm"
-                      variant={doc.confirmed_language === lang.code ? "default" : "outline"}
+                      variant={(doc.confirmed_language ?? doc.language) === lang.code ? "default" : "outline"}
                       disabled={savingId === doc.id}
                       onClick={() => updateLabel(doc, { confirmed_language: lang.code })}
                     >

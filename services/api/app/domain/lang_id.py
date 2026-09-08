@@ -71,21 +71,34 @@ def macro_precision_recall_f1(confusion: dict[str, dict[str, int]]) -> tuple[flo
 
 
 def split_train_test(
-    document_ids_by_language: dict[str, list[int]], *, test_ratio: float, seed: int | None = None
+    document_ids_by_language: dict[str, list[int]],
+    *,
+    test_ratio: float,
+    seed: int | None = None,
+    already_split_counts: dict[str, tuple[int, int]] | None = None,
 ) -> tuple[list[int], list[int]]:
     if not 0 < test_ratio < 1:
         raise LangIdError("test_ratio must be between 0 and 1 (exclusive)")
 
+    already_split_counts = already_split_counts or {}
     rng = random.Random(seed)
     train_ids: list[int] = []
     test_ids: list[int] = []
-    for ids in document_ids_by_language.values():
+    for language, ids in document_ids_by_language.items():
         shuffled = list(ids)
         rng.shuffle(shuffled)
-        if len(shuffled) < 2:
+        existing_train, existing_test = already_split_counts.get(language, (0, 0))
+        combined_total = existing_train + existing_test + len(shuffled)
+        if combined_total < 2:
             train_ids.extend(shuffled)
             continue
-        test_count = max(1, min(round(len(shuffled) * test_ratio), len(shuffled) - 1))
+        # Target the ratio over every confirmed document of this language, not just
+        # the ones in this batch — otherwise labeling one document at a time always
+        # lands in train (each batch of 1 is too small to split) and no language
+        # ever accumulates a test set.
+        target_test_total = max(1, min(round(combined_total * test_ratio), combined_total - 1))
+        needed_test = max(0, target_test_total - existing_test)
+        test_count = min(needed_test, len(shuffled))
         test_ids.extend(shuffled[:test_count])
         train_ids.extend(shuffled[test_count:])
     return train_ids, test_ids

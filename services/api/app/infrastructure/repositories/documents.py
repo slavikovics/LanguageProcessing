@@ -172,6 +172,26 @@ class DocumentRepository:
         )
         return list(result.scalars().all())
 
+    async def count_split_by_language(self, collection_id: int) -> dict[str, tuple[int, int]]:
+        result = await self._session.execute(
+            select(Document.confirmed_language, Document.corpus_split, func.count())
+            .select_from(Document)
+            .where(
+                Document.collection_id == collection_id,
+                Document.confirmed_language.is_not(None),
+                Document.corpus_split.is_not(None),
+            )
+            .group_by(Document.confirmed_language, Document.corpus_split)
+        )
+        counts: dict[str, list[int]] = {}
+        for language, split, count in result.all():
+            train, test = counts.setdefault(language, [0, 0])
+            if split == "train":
+                counts[language][0] = count
+            elif split == "test":
+                counts[language][1] = count
+        return {language: (train, test) for language, (train, test) in counts.items()}
+
     async def bulk_set_corpus_split(self, *, train_ids: list[int], test_ids: list[int]) -> None:
         if train_ids:
             await self._session.execute(
