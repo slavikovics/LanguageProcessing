@@ -35,11 +35,8 @@ export function CollectionsPage() {
     }
   }, [selectedId, page]);
 
-  // Document counts can go stale if they changed elsewhere (a crawl job
-  // finishing in another tab) — always re-check on arrival.
   useEffect(() => {
     void refreshCollections();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -71,7 +68,7 @@ export function CollectionsPage() {
         <CardHeader>
           <CardTitle>Нет выбранной коллекции</CardTitle>
           <CardDescription>
-            Создайте коллекцию через «+» у переключателя вверху страницы, или начните с краулинга —
+            Создайте коллекцию через «+» у переключателя вверху страницы, или начните с кроулинга —
             он предложит создать коллекцию автоматически.
           </CardDescription>
         </CardHeader>

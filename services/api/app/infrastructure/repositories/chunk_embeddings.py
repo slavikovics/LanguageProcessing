@@ -6,15 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class ChunkEmbeddingRepository:
-    """Writes/reads document_chunk_embeddings — the dense-model counterpart
-    to IndexRepository's term_weights, one row per chunk. Vectors arrive
-    already zero-padded to MAX_EMBEDDING_DIM by the caller."""
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
     async def bulk_write(self, rows: list[dict[str, object]]) -> None:
-        """rows: [{chunk_id, search_model_id, embedding}, ...]."""
         if not rows:
             return
         await self._session.execute(insert(DocumentChunkEmbedding), rows)
@@ -22,10 +18,6 @@ class ChunkEmbeddingRepository:
     async def get_first_chunk_vectors(
         self, document_ids: list[int], search_model_id: int
     ) -> dict[int, list[float]]:
-        """Document -> its chunk_index=0 embedding, already computed and
-        stored during search indexing — lets a document-level consumer (e.g.
-        LR2's neural classifier) reuse that vector instead of re-requesting
-        it from the embedding model."""
         if not document_ids:
             return {}
         result = await self._session.execute(
@@ -37,19 +29,11 @@ class ChunkEmbeddingRepository:
                 DocumentChunk.document_id.in_(document_ids),
             )
         )
-        # pgvector deserializes to a numpy float32 array; plain Python floats
-        # are needed so the vector can be JSON-serialized when sent on to
-        # lang-id-service.
         return {document_id: [float(x) for x in embedding] for document_id, embedding in result.all()}
 
     async def nearest_documents(
         self, document_ids: list[int], search_model_id: int, query_vector: list[float]
     ) -> list[tuple[int, float]]:
-        """Every document with at least one chunk vector under this model,
-        ranked by its best-matching chunk's cosine similarity, best first —
-        unlimited, so rank-sensitive metrics stay correct. pgvector's `<=>`
-        returns cosine distance, so we return 1 - distance to match TF-IDF's
-        higher-is-better score scale."""
         if not document_ids:
             return []
         similarity = (1.0 - DocumentChunkEmbedding.embedding.cosine_distance(query_vector)).label(

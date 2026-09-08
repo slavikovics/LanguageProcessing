@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
-  { to: "/crawl", label: "Краулинг", icon: Waypoints },
+  { to: "/crawl", label: "Кроулинг", icon: Waypoints },
   { to: "/collections", label: "Коллекции", icon: Library },
   { to: "/search", label: "Поиск", icon: Search },
   { to: "/metrics", label: "Метрики", icon: BarChart3 },

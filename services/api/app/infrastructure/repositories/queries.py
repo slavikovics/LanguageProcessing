@@ -6,18 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class QueryRepository:
-    """Persists Query/SearchRun/SearchResult — the audit trail relevance
-    judgments and metric results build on."""
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
     async def get_or_create_query(self, *, collection_id: int, text: str) -> Query:
-        """Reuses the existing Query row for this (collection, text) pair:
-        judgments are keyed by query_id, so re-running the same query text
-        must land on the same query for judgments to accumulate into one
-        qrel set — otherwise recall would be trivially 1.0 against a set
-        that never extends past a single run's own results."""
         result = await self._session.execute(
             select(Query).where(Query.collection_id == collection_id, Query.text == text)
         )
@@ -59,7 +52,6 @@ class QueryRepository:
     async def bulk_insert_results(
         self, search_run_id: int, hits: list[tuple[int, int, float]]
     ) -> None:
-        """hits: list of (document_id, rank, score)."""
         if not hits:
             return
         rows = [

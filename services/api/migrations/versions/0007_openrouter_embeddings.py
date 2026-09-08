@@ -1,21 +1,3 @@
-"""Switch dense-embedding model to OpenRouter-hosted Qwen3-Embedding-8B.
-
-Replaces the locally-run intfloat/multilingual-e5-small model with
-Qwen3-Embedding-8B served through OpenRouter's hosted embeddings API (see
-services/nlp-service/app/embeddings.py) — ranked #1 on the MTEB multilingual
-leaderboard, a 32K-token context (vs. e5-small's 512), and no local CPU
-inference or model download. Its native vector is 4096-dim (vs. e5-small's
-384), so `document_chunk_embeddings.embedding` is widened to match the new
-MAX_EMBEDDING_DIM (see ips_db.models) — a different, incompatible embedding
-space from e5-small either way, so existing dense-embedding chunk vectors
-are dropped; collections need reindexing under the new model. TF-IDF search
-and its vectors are untouched.
-
-Revision ID: 0007
-Revises: 0006
-Create Date: 2026-09-06
-
-"""
 from typing import Sequence, Union
 
 import sqlalchemy as sa

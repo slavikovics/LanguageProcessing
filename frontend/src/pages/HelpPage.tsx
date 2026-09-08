@@ -15,11 +15,8 @@ export function HelpPage() {
   const { hash } = useLocation();
 
   useEffect(() => {
-    if (!hash) return;
-    // Scrolls the Radix ScrollArea viewport directly, after a paint — native
-    // scrollIntoView() guesses the wrong ancestor before the viewport has
-    // finished sizing. Instant, not smooth: a smooth scroll can stall if the
-    // tab loses focus right as it starts.
+    if (!hash)
+      return;
     const id = hash.slice(1);
     const raf = requestAnimationFrame(() => {
       const target = document.getElementById(id);
@@ -45,7 +42,7 @@ export function HelpPage() {
           <CardDescription>
             Информационно-поисковая система с двумя независимыми моделями поиска — TF-IDF с
             косинусной мерой и семантические эмбеддинги, — построена вокруг четырёх этапов работы:
-            краулинг источников, управление коллекциями документов, поиск с оценкой релевантности и
+            кроулинг источников, управление коллекциями документов, поиск с оценкой релевантности и
             расчёт метрик качества (<RomipLink />).
           </CardDescription>
         </CardHeader>
@@ -63,7 +60,7 @@ export function HelpPage() {
             steps={[
               {
                 title: "Соберите коллекцию",
-                children: "Создайте коллекцию и запустите краулинг с одного или нескольких стартовых адресов.",
+                children: "Создайте коллекцию и запустите кроулинг с одного или нескольких стартовых адресов.",
               },
               {
                 title: "Приведите документы в порядок",

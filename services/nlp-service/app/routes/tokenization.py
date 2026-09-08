@@ -28,7 +28,5 @@ async def lemmatize(payload: LemmatizeRequest) -> LemmatizeResponse:
 
 @router.post("/lemmatize-batch", response_model=LemmatizeBatchResponse)
 async def lemmatize_batch(payload: LemmatizeBatchRequest) -> LemmatizeBatchResponse:
-    """Runs in a worker thread — CPU-bound spaCy processing would otherwise
-    block this single-process event loop for the whole batch."""
     lemmas = await asyncio.to_thread(tokenization.lemmatize_many, payload.texts)
     return LemmatizeBatchResponse(lemmas=lemmas)

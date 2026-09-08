@@ -53,9 +53,6 @@ export function CrawlSeedForm({
     setSameDomainOnly(editingSeed.same_domain_only);
     setLanguage(editingSeed.language);
     setError(null);
-    // collectionId never changes without also remounting this page, so it's
-    // not a dependency — only switching which seed (or clearing it) matters.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingSeed?.id]);
 
   async function handleSubmit() {

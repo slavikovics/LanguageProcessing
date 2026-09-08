@@ -70,10 +70,7 @@ export function LanguageIdPage() {
           <AdHocClassifyPanel />
         </TabsContent>
 
-        {/* forceMount: an active test run's progress tracking lives in this
-            tab's own state, so switching to another tab and back must not
-            unmount it mid-run (Radix would otherwise drop the tracked
-            run ids the moment the tab goes inactive). */}
+        {}
         <TabsContent value="testing" className="pt-4 data-[state=inactive]:hidden" forceMount>
           <LangIdTestingTab collectionId={selectedId} />
         </TabsContent>

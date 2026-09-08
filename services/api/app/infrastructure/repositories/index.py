@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class IndexRepository:
-    """Writes document_terms/term_weights — the persisted TF-IDF vector of a document."""
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
@@ -32,9 +31,6 @@ class IndexRepository:
     async def load_document_vectors(
         self, document_ids: list[int], term_ids: list[int]
     ) -> dict[int, dict[int, float]]:
-        """document_id -> {term_id: weight}, restricted to the given terms —
-        enough for cosine similarity since stored vectors are already
-        L2-normalized, so only the shared-term dot product is needed."""
         if not document_ids or not term_ids:
             return {}
         result = await self._session.execute(
@@ -48,7 +44,6 @@ class IndexRepository:
         return vectors
 
     async def document_frequency(self, collection_id: int, term_ids: list[int]) -> dict[int, int]:
-        """Number of documents in the collection containing each term — the source of IDF."""
         if not term_ids:
             return {}
         result = await self._session.execute(

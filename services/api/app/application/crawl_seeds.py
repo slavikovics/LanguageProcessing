@@ -16,8 +16,6 @@ class CrawlSeedNotFound(Exception):
 
 
 class CrawlSeedService:
-    """CRUD for the persisted crawl address list a collection is configured
-    with — see CrawlSeed and CrawlJobService.run_collection_crawl."""
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session

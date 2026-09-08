@@ -29,13 +29,11 @@ def test_f1_score_known_value():
 
 
 def test_average_precision_known_value():
-    # relevant hits at ranks 2, 4, 5 -> precisions 1/2, 2/4, 3/5
     expected = (0.5 + 0.5 + 0.6) / 3
     assert math.isclose(metrics.average_precision(RANKED, RELEVANT), expected)
 
 
 def test_r_precision():
-    # |relevant| = 3 -> precision at rank 3
     assert math.isclose(metrics.r_precision(RANKED, RELEVANT), 1 / 3)
 
 

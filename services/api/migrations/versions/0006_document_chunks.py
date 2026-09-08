@@ -1,26 +1,3 @@
-"""Chunked dense embeddings + faster multilingual embedding model.
-
-Replaces the one-vector-per-document `document_embeddings` table with
-`document_chunks` + `document_chunk_embeddings`: a document is split into
-model-context-sized pieces (see api's app.domain.indexing.chunk_text) so a
-long document's tail is represented across several chunk vectors instead of
-being silently discarded by the encoder's truncation. Search then ranks a
-document by its single best-matching chunk (ChunkEmbeddingRepository.
-nearest_documents).
-
-Also swaps the registered dense-embedding model from Alibaba GTE
-Multilingual Base (768-dim, 8192-token context, very slow on CPU for long
-documents) to intfloat/multilingual-e5-small (384-dim, 512-token context,
-tens of times faster) — see services/nlp-service/app/embeddings.py. Old
-768-dim vectors are a different, incompatible embedding space, so they're
-dropped along with the table that held them; collections need reindexing
-under the new model.
-
-Revision ID: 0006
-Revises: 0005
-Create Date: 2026-09-06
-
-"""
 from typing import Sequence, Union
 
 import sqlalchemy as sa

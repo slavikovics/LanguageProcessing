@@ -13,13 +13,6 @@ if TYPE_CHECKING:
 
 
 class CrawlSeed(Base):
-    """A persisted, editable crawl address for a collection; each seed has its
-    own max_documents/max_depth/same_domain_only/language and spawns one
-    CrawlJob. Language is per-seed rather than per-collection so one
-    collection can mix languages — e.g. an en.wikipedia.org seed and an
-    fr.wikipedia.org seed feeding the same collection, each stamping its own
-    documents with the right `Document.language` hint (LR2's ground truth is
-    still the separate, human-confirmed `Document.confirmed_language`)."""
 
     __tablename__ = "crawl_seeds"
 
@@ -28,9 +21,7 @@ class CrawlSeed(Base):
     url: Mapped[str] = mapped_column(String(2000))
     max_documents: Mapped[int] = mapped_column(Integer)
     max_depth: Mapped[int] = mapped_column(Integer)
-    # When true, never follow a link to a different host, subdomains included.
     same_domain_only: Mapped[bool] = mapped_column(Boolean, default=False)
-    # Stamped onto every document this seed's crawl fetches — see CrawlJob.language.
     language: Mapped[str] = mapped_column(String(10), default="en")
     created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
 
@@ -45,15 +36,9 @@ class CrawlJob(Base):
     seed_urls: Mapped[list[str]] = mapped_column(JSON)
     max_documents: Mapped[int] = mapped_column(Integer)
     max_depth: Mapped[int] = mapped_column(Integer)
-    # Copied from the originating CrawlSeed at job-creation time (or from
-    # Collection.language as a fallback for seed-less jobs, e.g. refresh) —
-    # a later edit to the seed's language doesn't retroactively change a
-    # queued/running/finished job's, same as its max_documents/max_depth.
     language: Mapped[str] = mapped_column(String(10), default="en")
-    # Host to stay on (from the seed URL), or null if links may go anywhere.
     allowed_domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="pending")
-    # "crawl" discovers new pages via BFS; "refresh" re-fetches known URLs in place.
     mode: Mapped[str] = mapped_column(String(20), default="crawl")
 
     documents_fetched: Mapped[int] = mapped_column(Integer, default=0)

@@ -1,8 +1,3 @@
-"""Fetches, cleans, and saves one page, and enqueues its outbound links —
-the per-URL unit of work each of CrawlWorker's concurrent fetch lanes runs.
-Persists the outcome (crawl_urls row + crawl_jobs counters) so the api
-service can report live progress from those same tables.
-"""
 
 from __future__ import annotations
 
@@ -42,8 +37,6 @@ class PagePipeline:
     ) -> None:
         try:
             if not await robots.is_allowed(handle.url):
-                # "blocked", not "skipped": this page was never fetched, so it
-                # was never actually a document candidate.
                 await self._finish_url(handle.id, "blocked", error="disallowed by robots.txt")
                 await self._bump_counters(ctx.id, urls_visited=1)
                 return
@@ -52,9 +45,6 @@ class PagePipeline:
             html = await fetch_html(client, handle.url)
             text = extract_main_content(html)
 
-            # The page fetched fine even when we don't keep it as a document
-            # (too short, duplicate) — its links are still real discoveries,
-            # so enqueue them before recording the skip.
             async def _enqueue_discovered_links() -> None:
                 links = extract_links(html, handle.url)
                 await self._frontier.enqueue_links(
@@ -85,7 +75,6 @@ class PagePipeline:
             await self._bump_counters(ctx.id, urls_failed=1)
 
     async def _touch_collection(self, session: AsyncSession, collection_id: int) -> None:
-        """Marks the collection as changed now, so the UI can flag the index as stale."""
         collection = await session.get(Collection, collection_id)
         if collection is not None:
             collection.documents_changed_at = dt.datetime.utcnow()
@@ -94,8 +83,6 @@ class PagePipeline:
         title = extract_title(html, fallback=url)
         async with self._sessionmaker() as session:
             if ctx.mode == "refresh":
-                # Re-fetching a known URL updates the existing row instead of
-                # inserting — a refresh brings documents up to date, not duplicates them.
                 result = await session.execute(
                     select(Document).where(
                         Document.collection_id == ctx.collection_id, Document.url == url

@@ -1,13 +1,3 @@
-"""Nullable document URLs (manually authored documents may have no source),
-staleness tracking on collections (documents_changed_at), and a 'refresh'
-mode for crawl_jobs that re-fetches existing URLs in place instead of
-discovering new ones.
-
-Revision ID: 0003
-Revises: 0002
-Create Date: 2026-09-04
-
-"""
 from typing import Sequence, Union
 
 import sqlalchemy as sa

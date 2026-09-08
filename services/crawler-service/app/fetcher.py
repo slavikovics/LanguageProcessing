@@ -1,6 +1,3 @@
-"""HTTP fetch + link/title extraction. Text cleanup itself lives in
-nlp_core.tokenization.clean_html so the crawler and any future lab share the
-same normalization."""
 
 from __future__ import annotations
 
@@ -19,13 +16,6 @@ _CRAWLABLE_MIME_TYPES = {"text/html", "application/xhtml+xml", "text/plain"}
 
 
 def _is_crawlable_url(url: str) -> bool:
-    """Skips known non-page file types (images, video, archives, office
-    docs, stylesheets/scripts, feeds, ...) by extension before they're ever
-    enqueued — guess_type is stdlib and extension-based, so it costs no
-    request and only rejects a URL when it's confident about the type; an
-    unknown or missing extension (the common case for ordinary pages)
-    passes through. Note text/css and text/javascript are deliberately not
-    in the allow-list — they're "text/*" but never a page to crawl."""
     guessed_type, _ = mimetypes.guess_type(url)
     return guessed_type is None or guessed_type in _CRAWLABLE_MIME_TYPES
 
@@ -53,12 +43,6 @@ def extract_links(html: str, base_url: str) -> list[str]:
             continue
         if not _is_crawlable_url(absolute):
             continue
-        # Query strings are dropped, not just fragments: tracking/session
-        # parameters (utm_*, sessionid, ref, ...) otherwise turn one page
-        # into an endless stream of "different" URLs, which both blows up
-        # the frontier and re-saves the same content as separate documents.
-        # This makes query-string-only page variants (e.g. ?page=2) collide
-        # too — a deliberate trade-off for a bounded, non-duplicating crawl.
         links.append(urlsplit(absolute)._replace(query="", fragment="").geturl())
     return links
 

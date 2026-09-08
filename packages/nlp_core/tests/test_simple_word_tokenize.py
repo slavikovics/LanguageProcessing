@@ -1,8 +1,3 @@
-"""Separate from test_tokenization.py, which importorskip("spacy")'s the
-whole module — simple_word_tokenize deliberately has no spaCy dependency
-(needed for French text, unlike tokenize/lemmatize), so its tests must run
-whether or not spaCy/en_core_web_sm is installed.
-"""
 
 from nlp_core.tokenization import simple_word_tokenize
 

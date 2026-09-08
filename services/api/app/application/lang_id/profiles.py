@@ -11,18 +11,12 @@ _PROFILE_DATA_KEY = {"frequent_words": "top_words", "alphabetic": "frequencies"}
 
 
 async def load_lexical_profiles(profiles: LangIdProfileRepository, method: str) -> dict:
-    """{language: profile_payload} for every language with a built profile
-    under this method — used by LangIdIdentificationService to compare a
-    piece of text against."""
     key = _PROFILE_DATA_KEY[method]
     rows = await profiles.list_by_method(method)
     return {row.language: row.profile_data[key] for row in rows if row.language is not None}
 
 
 class LangIdProfileService:
-    """Builds and stores per-language lexical profiles (frequent-words,
-    alphabetic) from the training split. The neural classifier's single
-    joint profile is built separately, by LangIdTrainingService."""
 
     def __init__(self, session: AsyncSession, *, lang_id_client: LangIdServiceClient | None = None) -> None:
         self._session = session

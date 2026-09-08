@@ -34,7 +34,6 @@ export function NeuralTrainingPanel({
       notifiedRef.current = true;
       onTrained();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job]);
 
   async function handleTrain() {

@@ -7,7 +7,7 @@ class TokenizeRequest(BaseModel):
 
 
 class TokenOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)  # nlp_core.tokenization.Token is a dataclass
+    model_config = ConfigDict(from_attributes=True)
 
     text: str
     lemma: str

@@ -9,14 +9,13 @@ from .base import Base
 
 
 class SearchModel(Base):
-    """Registry of pluggable search algorithms — a new model is just a seeded row."""
 
     __tablename__ = "search_models"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     key: Mapped[str] = mapped_column(String(64), unique=True)
     label: Mapped[str] = mapped_column(String(200))
-    kind: Mapped[str] = mapped_column(String(20))  # "tfidf" | "dense_embedding"
+    kind: Mapped[str] = mapped_column(String(20))
     dimension: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())

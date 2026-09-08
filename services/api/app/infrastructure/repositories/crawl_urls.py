@@ -28,8 +28,6 @@ class CrawlUrlRepository:
         await self._session.flush()
         return entries
 
-    # Excludes "queued"/"fetching" (not resolved yet) and "blocked" (robots.txt
-    # rejected it before it was ever a document candidate).
     _DOCUMENT_CANDIDATE_STATUSES = (
         CrawlUrlStatus.SUCCESS.value,
         CrawlUrlStatus.FAILED.value,

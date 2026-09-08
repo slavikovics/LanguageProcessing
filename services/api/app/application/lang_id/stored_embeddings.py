@@ -13,10 +13,6 @@ async def stored_vectors_for(
     chunk_embeddings: ChunkEmbeddingRepository,
     search_models: SearchModelRepository,
 ) -> list[list[float]]:
-    """Reuses each document's chunk_index=0 embedding, computed once during
-    search indexing, instead of re-requesting it from OpenRouter — indexing
-    the collection is a prerequisite for both neural training and neural
-    testing precisely so this lookup can be instant."""
     active_models = await search_models.list_active()
     dense_model = next((m for m in active_models if m.kind == "dense_embedding"), None)
     if dense_model is None:

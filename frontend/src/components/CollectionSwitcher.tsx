@@ -31,9 +31,6 @@ const STATUS_LABEL: Record<IndexJobStatus, string> = {
   cancelled: "индексация прервана",
 };
 
-/** Single source of "what am I working with right now": picks the active
- * collection, shows its indexing status at a glance, and creates new
- * collections — everything else (Crawl/Search/Metrics) just reads this. */
 export function CollectionSwitcher() {
   const { collections, selectedId, selected, setSelectedId, refreshCollections, latestIndexJob, loading } =
     useCollectionContext();

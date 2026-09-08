@@ -1,8 +1,3 @@
-"""Pure validation for manually created/edited documents — no I/O. Mirrors
-app.domain.crawl_jobs: the same http(s)-URL check the crawler itself uses,
-so a document typed in by hand can't end up with something the search
-pipeline wouldn't otherwise produce.
-"""
 
 from __future__ import annotations
 

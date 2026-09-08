@@ -69,8 +69,6 @@ async def delete_crawl_seed(seed_id: int, db: AsyncSession = Depends(get_db)) ->
     status_code=201,
 )
 async def run_collection_crawl(collection_id: int, db: AsyncSession = Depends(get_db)) -> list[CrawlJobOut]:
-    """Starts a fresh crawl from every configured address, replacing the
-    collection's documents and index — see CrawlJobService.run_collection_crawl."""
     service = CrawlJobService(db)
     try:
         return await service.run_collection_crawl(collection_id)

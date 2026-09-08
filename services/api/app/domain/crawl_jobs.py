@@ -1,6 +1,3 @@
-"""Pure validation/business rules for crawl jobs — no I/O, no framework
-dependency, so it is unit-testable without a database or an HTTP client.
-"""
 
 from __future__ import annotations
 
@@ -61,12 +58,6 @@ def build_crawl_job_config(
 
 
 def build_refresh_job_config(*, collection_id: int, urls: list[str]) -> CrawlJobConfig:
-    """A refresh job re-fetches a fixed, already-known set of URLs in
-    place — unlike a regular crawl it isn't bounded by MAX_SEED_URLS (that
-    cap exists to keep a BFS discovery job's blast radius sane, not to limit
-    how many documents a collection may contain) and never follows links
-    (max_depth=0).
-    """
     if not urls:
         raise InvalidCrawlJobConfig("collection has no documents with a URL to refresh")
     if len(urls) > MAX_DOCUMENTS_LIMIT:

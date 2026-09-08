@@ -58,9 +58,6 @@ async def delete_collection(collection_id: int, db: AsyncSession = Depends(get_d
 
 @router.post("/{collection_id}/refresh", response_model=CrawlJobOut, status_code=201)
 async def refresh_collection(collection_id: int, db: AsyncSession = Depends(get_db)) -> CrawlJobOut:
-    """Re-fetches every document in the collection that has a URL, updating
-    each in place — tracked as an ordinary crawl_job (mode='refresh') so the
-    existing progress UI/WS works unchanged."""
     service = CrawlJobService(db)
     try:
         return await service.create_refresh_job(collection_id)

@@ -1,10 +1,3 @@
-"""Initial schema: collections, documents, terms/weights, search + crawl tracking.
-
-Revision ID: 0001
-Revises:
-Create Date: 2026-09-03
-
-"""
 from typing import Sequence, Union
 
 import sqlalchemy as sa

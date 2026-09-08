@@ -20,19 +20,17 @@ function Stat({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-/** Stats + index/refresh/delete actions for the selected collection, with
- * their own live-progress tracking. Fetches the collection's document
- * count and index status itself via context rather than the page passing
- * them down, since this card is the only consumer of that state. */
-export function CollectionHeaderCard({
-  collection,
-  onDocumentsChanged,
-  onAddDocument,
-}: {
-  collection: Collection;
-  onDocumentsChanged: () => void;
-  onAddDocument: () => void;
-}) {
+export function CollectionHeaderCard(
+  {
+    collection,
+    onDocumentsChanged,
+    onAddDocument,
+  }: {
+    collection: Collection;
+    onDocumentsChanged: () => void;
+    onAddDocument: () => void;
+  }
+) {
   const { latestIndexJob, refreshIndexStatus, refreshCollections, isIndexing } = useCollectionContext();
 
   const [indexError, setIndexError] = useState<string | null>(null);
@@ -47,8 +45,6 @@ export function CollectionHeaderCard({
 
   const [deletingCollection, setDeletingCollection] = useState(false);
 
-  // Picks up an already-running job (e.g. left running from another tab) so
-  // the progress bar shows live state as soon as the page opens.
   useEffect(() => {
     if (latestIndexJob && (latestIndexJob.status === "pending" || latestIndexJob.status === "running")) {
       setActiveJobId(latestIndexJob.id);
@@ -68,7 +64,6 @@ export function CollectionHeaderCard({
       onDocumentsChanged();
       setRefreshJobId(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshProgress]);
 
   async function handleIndex() {

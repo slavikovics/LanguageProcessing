@@ -1,14 +1,3 @@
-"""Per-seed crawl language: each crawl_seed (and the crawl_job it spawns)
-now carries its own `language`, replacing the one-language-per-collection
-assumption — a collection can now mix seeds (e.g. en.wikipedia.org and
-fr.wikipedia.org feeding the same collection), each stamping its own
-documents with the right `Document.language` hint.
-
-Revision ID: 0010
-Revises: 0009
-Create Date: 2026-09-07
-
-"""
 from typing import Sequence, Union
 
 import sqlalchemy as sa

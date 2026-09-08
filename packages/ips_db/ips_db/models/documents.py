@@ -26,13 +26,7 @@ class Document(Base):
     char_count: Mapped[int] = mapped_column(Integer, default=0)
     fetched_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
     published_date: Mapped[dt.datetime | None] = mapped_column(nullable=True)
-    # Human-confirmed ground-truth language for LR2 (language identification)
-    # — distinct from `language` above, which is only the crawl-time value
-    # inherited from the collection and was never actually verified.
     confirmed_language: Mapped[str | None] = mapped_column(String(10), nullable=True)
-    # "train" | "test" | NULL (labeled but not yet assigned to either split).
-    # Lives on the document, not on a separate "train"/"test" Collection, so
-    # an operator can change a document's split without moving it anywhere.
     corpus_split: Mapped[str | None] = mapped_column(String(10), nullable=True)
 
     collection: Mapped["Collection"] = relationship(back_populates="documents")
@@ -71,8 +65,6 @@ class TermWeight(Base):
 
 
 class DocumentChunk(Base):
-    """A document split into context-sized pieces for dense embedding, so a
-    long document isn't silently truncated by the encoder."""
 
     __tablename__ = "document_chunks"
 
@@ -85,7 +77,6 @@ class DocumentChunk(Base):
 
 
 class DocumentChunkEmbedding(Base):
-    """A chunk's dense vector under one registered model, zero-padded to MAX_EMBEDDING_DIM."""
 
     __tablename__ = "document_chunk_embeddings"
 

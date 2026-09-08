@@ -73,8 +73,6 @@ def test_build_crawl_seed_config_rejects_overlong_language():
 
 
 def test_build_crawl_seed_config_each_seed_independent_of_others():
-    # The whole point of per-seed config: two seeds validated separately
-    # keep their own max_documents/max_depth rather than sharing one.
     a = build_crawl_seed_config(
         url="https://a.example.com", max_documents=10, max_depth=0, same_domain_only=False
     )

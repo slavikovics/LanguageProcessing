@@ -7,9 +7,6 @@ from app.infrastructure.repositories.documents import DocumentRepository
 
 
 class LangIdLabelingService:
-    """Confirming a document's true language and assigning it to the
-    train/test split — LR2's ground-truth data entry, separate from the
-    unverified `language` the crawler stamped on it."""
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
@@ -28,10 +25,6 @@ class LangIdLabelingService:
         return updated
 
     async def auto_split(self, collection_id: int, *, test_ratio: float = 0.2) -> dict[str, int]:
-        """Bulk-assigns every confirmed-but-unsplit document in the
-        collection to train/test, stratified per language — the one-click
-        alternative to clicking "Обучение"/"Тест" on each document by hand.
-        Leaves documents someone already split alone."""
         documents = await self._documents.list_confirmed_without_split(collection_id)
         if not documents:
             raise LangIdError(

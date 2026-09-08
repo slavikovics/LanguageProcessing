@@ -10,22 +10,6 @@ from app.infrastructure.repositories.documents import DocumentRepository
 
 
 class EmbeddingSearchBackend:
-    """A dense-embedding backend, parametrized by whichever `search_models`
-    row of kind "dense_embedding" is passed to rank() — a future second
-    embedding model needs no new backend class, only a new registry row
-    (see migrations/versions/0005_search_models.py).
-
-    Ranks a document by its single best-matching chunk (see
-    ChunkEmbeddingRepository.nearest_documents / app.domain.indexing.
-    chunk_text) rather than one whole-document vector, so a long document
-    isn't scored only on however much of it fit in the encoder's truncated
-    input.
-
-    There is no discrete "matched term" concept for a dense vector, but
-    hits still get a matched-terms list — SearchService computes it
-    separately from the indexed TF-IDF vocabulary, independent of which
-    backend produced the ranking.
-    """
 
     def __init__(self, session: AsyncSession, nlp_client: NlpServiceClient) -> None:
         self._documents = DocumentRepository(session)

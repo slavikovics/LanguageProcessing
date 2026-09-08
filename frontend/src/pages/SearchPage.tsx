@@ -77,17 +77,12 @@ export function SearchPage() {
       });
       setResponse(result);
       setSubmittedWords(text.trim().split(/\s+/));
-      // Queries are deduped by collection+text, so this text may already
-      // have prior judgments — hydrate from those instead of starting
-      // blank, otherwise previously marked documents would look unjudged.
       try {
         const existing = await listJudgments(result.query_id);
         setJudgments(
           Object.fromEntries(existing.filter((j) => j.is_relevant).map((j) => [j.document_id, true])),
         );
-      } catch {
-        // Non-critical: results still render, just without pre-filled marks.
-      }
+      } catch {}
     } catch (err) {
       setResponse(null);
       const message = err instanceof Error ? err.message : String(err);
@@ -101,10 +96,6 @@ export function SearchPage() {
     }
   }
 
-  // Only "relevant" is a markable state — everything not explicitly marked
-  // is treated as not relevant, so a separate "not relevant" mark would add
-  // nothing. Clicking again clears the judgment entirely rather than
-  // recording a negative, keeping the qrels set to exactly "confirmed relevant".
   async function handleToggleRelevant(documentId: number) {
     if (!response) return;
     const nextRelevant = !judgments[documentId];

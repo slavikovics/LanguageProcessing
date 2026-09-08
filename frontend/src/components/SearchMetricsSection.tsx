@@ -32,7 +32,6 @@ export function SearchMetricsSection({ collectionId }: { collectionId: number | 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Default to comparing every active model once the registry loads.
   useEffect(() => {
     if (models.length > 0 && selectedModelKeys.length === 0) {
       setSelectedModelKeys(models.map((m) => m.key));
@@ -51,9 +50,6 @@ export function SearchMetricsSection({ collectionId }: { collectionId: number | 
     setLoading(true);
     setError(null);
     try {
-      // "Обновить" reruns every judged query against every selected model
-      // (real searches, slower); toggles/initial load just recompute from
-      // whatever already ran.
       const result = rerun ? await rerunMetricsComparison(id, modelKeys) : await getMetricsComparison(id, modelKeys);
       setSummaries(result.summaries);
     } catch (err) {
@@ -66,9 +62,10 @@ export function SearchMetricsSection({ collectionId }: { collectionId: number | 
 
   const modelKeysDependency = selectedModelKeys.join(",");
   useEffect(() => {
-    if (collectionId !== null) void refresh(collectionId, selectedModelKeys);
-    else setSummaries([]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (collectionId !== null)
+      void refresh(collectionId, selectedModelKeys);
+    else
+      setSummaries([]);
   }, [collectionId, modelKeysDependency]);
 
   const withQueries = summaries.filter((s) => s.queries.length > 0);

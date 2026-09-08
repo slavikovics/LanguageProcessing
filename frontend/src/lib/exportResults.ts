@@ -1,5 +1,3 @@
-/** Client-side "save to file" for LR2's language-ID results — no server
- * endpoint or library needed, just a Blob and a throwaway <a download>. */
 function downloadBlob(filename: string, blob: Blob): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");

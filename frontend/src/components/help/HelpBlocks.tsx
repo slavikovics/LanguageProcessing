@@ -11,17 +11,19 @@ export function Feature({ title, children }: { title: string; children: ReactNod
   );
 }
 
-export function MetricEntry({
-  id,
-  title,
-  formula,
-  children,
-}: {
-  id: string;
-  title: string;
-  formula?: string;
-  children: ReactNode;
-}) {
+export function MetricEntry(
+  {
+    id,
+    title,
+    formula,
+    children,
+  }: {
+    id: string;
+    title: string;
+    formula?: string;
+    children: ReactNode;
+  }
+) {
   return (
     <div
       id={id}
@@ -38,9 +40,6 @@ export function MetricEntry({
   );
 }
 
-/** A vertical, connected step-by-step narrative — for describing a process
- * (something that happens in order) rather than a flat set of independent
- * facts, which is what the plain Feature cards are for. */
 export function ProcessSteps({ steps }: { steps: { title: string; children: ReactNode }[] }) {
   return (
     <ol className="flex flex-col">
@@ -65,10 +64,6 @@ export function ProcessSteps({ steps }: { steps: { title: string; children: Reac
   );
 }
 
-/** The ROMIP'2004 search-track methodology document (tasks/romip_metrics.pdf
- * in the repo, served statically from frontend/public) that every metric on
- * this page is drawn from — opens in a new tab so it doesn't navigate away
- * from the reference material you're currently reading. */
 export function RomipLink() {
   return (
     <a

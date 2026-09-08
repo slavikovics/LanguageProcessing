@@ -13,9 +13,6 @@ router = APIRouter(tags=["nlp"])
 
 @router.post("/embeddings/documents", response_model=EmbedDocumentsResponse)
 async def embed_documents(payload: EmbedDocumentsRequest) -> EmbedDocumentsResponse:
-    """Batch-encode document texts with the dense embedding model — the
-    second search model's counterpart to /index. Awaits OpenRouter's hosted
-    API directly, so no worker thread is needed."""
     vectors = await embeddings.encode_documents(payload.texts)
     return EmbedDocumentsResponse(vectors=vectors)
 

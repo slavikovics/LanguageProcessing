@@ -1,10 +1,3 @@
-"""Index jobs: tracks indexing progress the same way crawl_jobs tracks crawling.
-
-Revision ID: 0002
-Revises: 0001
-Create Date: 2026-09-04
-
-"""
 from typing import Sequence, Union
 
 import sqlalchemy as sa

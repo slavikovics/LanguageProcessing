@@ -12,19 +12,11 @@ from app.infrastructure.repositories.search_models import SearchModelRepository
 
 from .stored_embeddings import stored_vectors_for
 
-# 200 total epochs is enough for a linear classifier to converge on a few
-# hundred 4096-dim vectors; chunked into small steps so the training job's
-# progress bar and loss/accuracy readout visibly move rather than jumping
-# straight from 0% to 100%.
 NEURAL_TOTAL_EPOCHS = 200
 NEURAL_EPOCH_CHUNK = 10
 
 
 class LangIdTrainingService:
-    """Trains the single shared neural classifier — one linear model over
-    every labeled language jointly, unlike the lexical methods' one profile
-    per language. Reuses embeddings already computed during search indexing
-    (see stored_vectors_for) rather than re-requesting them from OpenRouter."""
 
     def __init__(self, session: AsyncSession, *, lang_id_client: LangIdServiceClient | None = None) -> None:
         self._session = session
@@ -99,6 +91,6 @@ class LangIdTrainingService:
             )
             await self._session.commit()
             await self._training_jobs.mark_completed(job_id)
-        except Exception as exc:  # pragma: no cover - top-level safety net
+        except Exception as exc:
             message = str(exc) or type(exc).__name__
             await self._training_jobs.mark_failed(job_id, error_message=f"{type(exc).__name__}: {message}")

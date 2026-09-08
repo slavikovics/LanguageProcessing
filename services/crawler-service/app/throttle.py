@@ -1,4 +1,3 @@
-"""Per-domain request rate limiting."""
 
 from __future__ import annotations
 
@@ -8,9 +7,6 @@ from urllib.parse import urlsplit
 
 
 class DomainThrottle:
-    """Enforces a minimum delay between requests to the same domain, locked
-    per domain so concurrent fetchers queue up instead of racing the same
-    last-fetch timestamp and both firing at once."""
 
     def __init__(self, delay_seconds: float) -> None:
         self._delay = delay_seconds

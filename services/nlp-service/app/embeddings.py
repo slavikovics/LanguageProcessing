@@ -1,8 +1,3 @@
-"""Dense-embedding encoding for the second search model, via OpenRouter's
-hosted embeddings API (Qwen3-Embedding-8B, 4096-dim). Queries get a fixed
-retrieval instruction prefix (_QUERY_INSTRUCTION) since the model's own
-guidance reports this measurably improves retrieval; documents don't need one.
-"""
 
 from __future__ import annotations
 
@@ -21,23 +16,16 @@ _QUERY_INSTRUCTION = (
     "Query: {query}"
 )
 
-# Keeps each request body clear of OpenRouter's request-size limits.
 _BATCH_SIZE = 64
 
-# Batches run concurrently since indexing time here is network-latency bound.
 _MAX_CONCURRENT_REQUESTS = int(os.environ.get("OPENROUTER_EMBEDDING_CONCURRENCY", "10"))
 
-# A single flaky connection among several concurrent requests (or a
-# transient rate limit / upstream hiccup) shouldn't abort an entire
-# multi-minute indexing job — asyncio.gather() in encode_documents cancels
-# every other in-flight batch the instant one raises, so retrying here
-# rather than higher up is what actually gives a blip a chance to clear.
 _MAX_ATTEMPTS = 3
 _RETRY_BACKOFF_SECONDS = 2.0
 
 
 class EmbeddingConfigError(RuntimeError):
-    """OPENROUTER_API_KEY isn't set; only raised when embeddings are actually requested."""
+    pass
 
 
 def _api_key() -> str:
@@ -86,7 +74,6 @@ async def encode_documents(texts: list[str]) -> list[list[float]]:
             return await _embed_batch(client, api_key, batch)
 
     async with httpx.AsyncClient(timeout=120.0) as client:
-        # gather() preserves batch order, keeping vectors aligned with input texts.
         batch_results = await asyncio.gather(*(_bounded(client, batch) for batch in batches))
     return [vector for batch_vectors in batch_results for vector in batch_vectors]
 

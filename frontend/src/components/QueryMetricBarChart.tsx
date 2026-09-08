@@ -42,11 +42,8 @@ export function QueryMetricBarChart({
   height = 380,
 }: {
   series: QuerySeries[];
-  metricKey: keyof QueryMetrics;
-  /** Called with the query's full (untruncated) text when its x-axis label
-   * is activated — the label itself only shows a wrapped, possibly
-   * ellipsized preview (see wrapLabel). */
-  onSelectQuery: (text: string) => void;
+  metricKey: keyof QueryMetrics
+  onSelectQuery: (text: string) => void
   height?: number;
 }) {
   const { ref, width } = useMeasuredWidth<HTMLDivElement>();
@@ -54,9 +51,6 @@ export function QueryMetricBarChart({
   const innerW = Math.max(0, width - padding.left - padding.right);
   const innerH = height - padding.top - padding.bottom;
 
-  // Group by query TEXT, not query_id: different models' runs for "the
-  // same" query have different search_run_ids, so text is the stable key
-  // to line up bars across models.
   const queryTexts: string[] = [];
   const seen = new Set<string>();
   for (const s of series) {
@@ -77,9 +71,6 @@ export function QueryMetricBarChart({
   const toY = (value: number) => padding.top + (1 - value) * innerH;
 
   return (
-    // minHeight is unconditional so the container never collapses to 0
-    // during the one-frame gap before ResizeObserver reports the real
-    // width on tab switch — that gap used to cause a page reflow/scroll jump.
     <div ref={ref} className="w-full" style={{ minHeight: height }}>
       {width > 0 && (
         <svg width={width} height={height} role="img" aria-label="Метрика по запросам">
@@ -156,7 +147,7 @@ export function QueryMetricBarChart({
                   aria-label={`Показать полный текст запроса: ${text}`}
                   className="cursor-pointer outline-none"
                 >
-                  {/* Widens the click/tap target past the label's own text bounds. */}
+                  {}
                   <rect
                     x={groupX - 4}
                     y={padding.top + innerH}

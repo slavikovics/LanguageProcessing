@@ -12,10 +12,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { colorForModel } from "@/lib/modelColors";
 
-/** Toolbar mirroring LanguageIdPage's testing-tab export/print controls,
- * scoped to one ad-hoc classification's own outcomes (source is the URL or
- * pasted-text snippet that produced them). */
-function ExportToolbar({ source, outcomes }: { source: string; outcomes: IdentificationOutcome[] }) {
+function ExportToolbar(
+  { source, outcomes }: { source: string; outcomes: IdentificationOutcome[] }
+) {
   function handleExportCsv() {
     const rows = outcomes.map((o) => ({
       source,

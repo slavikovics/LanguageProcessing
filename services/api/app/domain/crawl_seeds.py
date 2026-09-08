@@ -1,8 +1,3 @@
-"""Pure validation for a single persisted crawl seed — mirrors
-app.domain.crawl_jobs' rules (same limits) but each seed is validated and
-stored independently, since seeds no longer share one job-wide
-max_documents/max_depth.
-"""
 
 from __future__ import annotations
 

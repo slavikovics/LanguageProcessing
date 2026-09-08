@@ -1,22 +1,3 @@
-"""LR2: language identification (frequent-words/alphabetic/neural methods).
-
-Adds `confirmed_language`/`corpus_split` to `documents` — crawled documents
-carry only the collection-inherited `language`, never a verified ground
-truth, so identification needs a human-confirmed field plus a train/test
-split flag independent of which collection a document was crawled into.
-
-Adds four new tables: `lang_id_profiles` (one trained profile per method+
-language, NULL language for the single joint neural classifier),
-`lang_id_training_jobs` (live progress for neural training, mirrors
-IndexJob), `lang_id_runs` (one method's identification pass over a
-collection's test split, mirrors IndexJob), and `lang_id_results`
-(per-document outcome under one run).
-
-Revision ID: 0008
-Revises: 0007
-Create Date: 2026-09-07
-
-"""
 from typing import Sequence, Union
 
 import sqlalchemy as sa

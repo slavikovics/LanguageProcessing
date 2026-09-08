@@ -29,9 +29,6 @@ export function LangIdMetricsSection({ collectionId }: { collectionId: number | 
     setLoading(true);
     setError(null);
     try {
-      // "Обновить" runs a fresh classification pass for every selected
-      // method (slower); toggles/initial load just read each method's
-      // latest already-completed run.
       const result = rerun ? await rerunLangIdComparison(id, methods) : await compareLangIdMethods(id, methods);
       setSummaries(result.summaries);
     } catch (err) {
@@ -44,9 +41,10 @@ export function LangIdMetricsSection({ collectionId }: { collectionId: number | 
 
   const methodKeysDependency = methodKeys.join(",");
   useEffect(() => {
-    if (collectionId !== null) void refresh(collectionId, methodKeys);
-    else setSummaries([]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (collectionId !== null)
+      void refresh(collectionId, methodKeys);
+    else
+      setSummaries([]);
   }, [collectionId, methodKeysDependency]);
 
   return (

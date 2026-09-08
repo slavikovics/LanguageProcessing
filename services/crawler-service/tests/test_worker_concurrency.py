@@ -30,10 +30,6 @@ class _AllowAllRobots:
 async def test_drain_frontier_runs_lanes_concurrently_without_overshooting_budget(
     sessionmaker_, monkeypatch
 ):
-    """Several fetch lanes race to claim URLs and each independently sees
-    "room for one more" against a stale documents_fetched count — the
-    in_flight reservation in _drain_frontier must stop that from adding up
-    to more than max_documents saved documents."""
     async with sessionmaker_() as session:
         collection = Collection(name="c", language="en")
         session.add(collection)
@@ -76,6 +72,4 @@ async def test_drain_frontier_runs_lanes_concurrently_without_overshooting_budge
         remaining_queued = await session.execute(
             select(CrawlUrl).where(CrawlUrl.job_id == job_id, CrawlUrl.status == "queued")
         )
-        # The frontier had 10 URLs but the budget was 3 — draining must stop
-        # once the budget is met, leaving the rest untouched.
         assert len(remaining_queued.scalars().all()) > 0

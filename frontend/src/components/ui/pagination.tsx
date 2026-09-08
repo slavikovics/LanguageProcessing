@@ -16,17 +16,17 @@ function getPageNumbers(current: number, total: number): (number | "ellipsis")[]
   return pages;
 }
 
-/** Standard numbered pagination: first/prev, page numbers with ellipsis gaps, next/last. */
-export function Pagination({
-  page,
-  totalPages,
-  onPageChange,
-}: {
-  /** Zero-indexed current page. */
-  page: number;
-  totalPages: number;
-  onPageChange: (page: number) => void;
-}) {
+export function Pagination(
+  {
+    page,
+    totalPages,
+    onPageChange,
+  }: {
+    page: number
+    totalPages: number;
+    onPageChange: (page: number) => void;
+  }
+) {
   const current = page + 1;
   const items = getPageNumbers(current, totalPages);
   const isFirst = page === 0;

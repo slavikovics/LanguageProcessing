@@ -8,8 +8,6 @@ export const LANG_ID_METHOD_LABELS: Record<LangIdMethod, string> = {
   neural: "Нейросетевой",
 };
 
-// Variant 25: French/English — hardcoded rather than a generic per-project
-// language config, since this module's whole assignment is these two.
 export const LANG_ID_LANGUAGES: readonly { code: string; label: string }[] = [
   { code: "fr", label: "Французский" },
   { code: "en", label: "Английский" },

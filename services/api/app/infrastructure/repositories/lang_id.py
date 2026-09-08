@@ -67,9 +67,6 @@ class LangIdProfileRepository:
 
 
 class LangIdTrainingJobRepository:
-    """Tracks the neural classifier's live training progress — same shape as
-    IndexJobRepository, but scoped globally (one joint classifier) rather
-    than per collection."""
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
@@ -135,8 +132,6 @@ class LangIdTrainingJobRepository:
 
 
 class LangIdRunRepository:
-    """Tracks one method's identification pass over a collection's test
-    split — same progress-tracking shape as IndexJobRepository."""
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
@@ -199,8 +194,6 @@ class LangIdResultRepository:
         self._session = session
 
     async def bulk_write(self, rows: list[dict[str, object]]) -> None:
-        """rows: [{run_id, document_id, predicted_language, distances,
-        elapsed_ms, is_correct}, ...]."""
         if not rows:
             return
         await self._session.execute(insert(LangIdResult), rows)
@@ -216,8 +209,6 @@ class LangIdResultRepository:
 
 
 class LangIdRunMetricRepository:
-    """Persists a run's aggregate accuracy/precision/recall/F1 — same
-    replace-on-write shape as `MetricResultRepository` for search."""
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session

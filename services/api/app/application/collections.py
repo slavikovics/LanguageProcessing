@@ -15,10 +15,7 @@ class CollectionNotFound(Exception):
 
 
 class CollectionBusy(Exception):
-    """Raised when deleting a collection would pull the rug out from under
-    a background job still writing rows for its documents (an in-flight
-    index job reading document_terms, or a crawl job about to insert new
-    documents/touch the collection)."""
+    pass
 
 
 class CollectionService:

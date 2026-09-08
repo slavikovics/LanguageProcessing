@@ -5,9 +5,6 @@ export interface LossPoint {
   loss: number;
 }
 
-/** Bespoke inline-SVG line chart for the neural method's live training loss
- * — same hand-rolled-SVG-plus-useMeasuredWidth convention as the Metrics
- * page's charts, just a polyline instead of bars since there's one series. */
 export function LossCurveChart({ points, height = 160 }: { points: LossPoint[]; height?: number }) {
   const { ref, width } = useMeasuredWidth<HTMLDivElement>();
   const padding = { top: 12, right: 12, bottom: 20, left: 34 };

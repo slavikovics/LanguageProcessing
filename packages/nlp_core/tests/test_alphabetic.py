@@ -2,10 +2,6 @@ import math
 
 from nlp_core import alphabetic
 
-# Longer, non-pangram-like corpora: a short single sentence's letter
-# distribution is too easily skewed by chance to reliably discriminate
-# languages, so tests use the same repeated-paragraph size as
-# test_frequent_words.py.
 EN_CORPUS = [
     "The quick brown fox jumps over the lazy dog. The dog barks at the fox. "
     "It is a sunny day and the weather is nice. The dog and the fox are friends."

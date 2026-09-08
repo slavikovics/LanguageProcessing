@@ -18,10 +18,6 @@ from .profiles import load_lexical_profiles
 
 
 class LangIdIdentificationService:
-    """Ad-hoc classification (by document/URL/pasted text) against whatever
-    profiles already exist. Silently skips a method that doesn't have enough
-    profiles yet rather than failing the whole call. Used both directly by
-    the "Ручная проверка" UI and, per-document, by LangIdTestRunService."""
 
     def __init__(
         self,
@@ -84,8 +80,6 @@ class LangIdIdentificationService:
     async def identify_url(
         self, url: str, methods: list[str] | None = None
     ) -> list[IdentificationOutcome]:
-        """Fetches and extracts the page but doesn't persist a Document row
-        — a scratch check, not a corpus addition."""
         headers = {"User-Agent": get_settings().crawler_user_agent}
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True, headers=headers) as client:
             response = await client.get(url)

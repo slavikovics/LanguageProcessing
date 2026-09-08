@@ -1,24 +1,3 @@
-"""LR2's neural language-identification method: a single nn.Linear(D, C) +
-softmax classifier trained on already-computed document embeddings (see
-services/api's LanguageIdentificationService, which fetches embeddings from
-nlp-service before calling this service — this module never touches
-OpenRouter or any embedding model itself, keeping this service stateless
-like nlp-service).
-
-Deliberately linear (no hidden layer): a few hundred documents per language
-can't statistically support the extra parameters a hidden layer would add
-without overfitting. This is architecturally a real neural network (a real
-training loop, a real loss curve for the report) while being mathematically
-equivalent to L2-regularized multinomial logistic regression — the right
-model for this data regime.
-
-Training is chunked/resumable (train_step) rather than one long call: each
-call runs a handful more epochs from a given weight state and returns the
-updated state. That's what lets api's background task report live progress
-(epoch N/total, current loss/accuracy) without this service needing to be
-stateful or expose a streaming endpoint — every call here is a pure function
-of its inputs.
-"""
 
 from __future__ import annotations
 
@@ -34,9 +13,6 @@ class LinearSoftmaxClassifier(nn.Module):
         self.linear = nn.Linear(input_dim, num_classes)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Raw logits. train_step feeds these to nn.CrossEntropyLoss
-        (which expects logits, not probabilities); predict() below applies
-        softmax itself to get the actual probability output."""
         return self.linear(x)
 
 
@@ -63,11 +39,6 @@ def train_step(
     learning_rate: float = 0.01,
     weight_decay: float = 1e-3,
 ) -> dict:
-    """Runs `epochs` more steps of gradient descent, continuing from
-    (weights, bias, classes) if given, or initializing fresh otherwise.
-    Class order is fixed on the first call (sorted language keys) and must
-    be passed back unchanged on every later chunk of the same training run.
-    """
     if classes is None:
         classes = sorted(vectors_by_language.keys())
     if len(classes) < 2:
@@ -109,7 +80,6 @@ def train_step(
 def _predict_proba(
     weights: list[list[float]], bias: list[float], classes: list[str], vector: list[float]
 ) -> dict[str, float]:
-    """One forward pass -> {language: probability}. No GPU needed."""
     model = LinearSoftmaxClassifier(len(vector), len(classes))
     with torch.no_grad():
         model.linear.weight.copy_(torch.tensor(weights, dtype=torch.float32))
@@ -122,10 +92,6 @@ def _predict_proba(
 def identify(
     weights: list[list[float]], bias: list[float], classes: list[str], vector: list[float]
 ) -> dict:
-    """Same {distances, predicted_language, elapsed_ms} shape as the
-    frequent-words/alphabetic endpoints: distance = 1 - probability, so
-    "lower is closer" is the one argmin rule shared by every method (see
-    api's app.domain.lang_id)."""
     started = time.perf_counter()
     probabilities = _predict_proba(weights, bias, classes, vector)
     elapsed_ms = (time.perf_counter() - started) * 1000

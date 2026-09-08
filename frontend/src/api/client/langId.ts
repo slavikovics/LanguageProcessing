@@ -28,7 +28,7 @@ export function getLabelProgress(collectionId: number): Promise<LabelProgress> {
 
 export function setLanguageLabel(
   documentId: number,
-  input: { confirmed_language: string | null; corpus_split: "train" | "test" | null },
+  input: { confirmed_language: string | null; corpus_split: "train" | "test" | null }
 ): Promise<DocumentSummary> {
   return request<DocumentSummary>(`/documents/${documentId}/language-label`, {
     method: "PUT",
@@ -36,9 +36,6 @@ export function setLanguageLabel(
   });
 }
 
-/** Stratified per-language bulk train/test split for every confirmed
- * document that doesn't have one yet (see LanguageIdentificationService.auto_split) —
- * the one-click alternative to labeling each document's split by hand. */
 export function autoSplitTrainTest(collectionId: number, testRatio = 0.2): Promise<AutoSplitResult> {
   return request<AutoSplitResult>(
     `/collections/${collectionId}/lang-id/auto-split?test_ratio=${testRatio}`,
@@ -131,22 +128,13 @@ export function getLangIdRunSummary(runId: number): Promise<LangIdRunSummary> {
   return request<LangIdRunSummary>(`/lang-id/runs/${runId}/summary`);
 }
 
-export function compareLangIdMethods(
-  collectionId: number,
-  methods: LangIdMethod[],
-): Promise<LangIdCompareResponse> {
+export function compareLangIdMethods(collectionId: number, methods: LangIdMethod[]): Promise<LangIdCompareResponse> {
   return request<LangIdCompareResponse>(
     `/lang-id/compare?collection_id=${collectionId}&methods=${methods.map(encodeURIComponent).join(",")}`,
   );
 }
 
-/** Like compareLangIdMethods, but runs fresh classification passes for
- * every method first (real test-collection runs, slower) instead of
- * reading each method's latest already-completed run. */
-export function rerunLangIdComparison(
-  collectionId: number,
-  methods: LangIdMethod[],
-): Promise<LangIdCompareResponse> {
+export function rerunLangIdComparison(collectionId: number, methods: LangIdMethod[]): Promise<LangIdCompareResponse> {
   return request<LangIdCompareResponse>("/lang-id/rerun", {
     method: "POST",
     body: JSON.stringify({ collection_id: collectionId, methods }),

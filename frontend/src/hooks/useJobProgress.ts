@@ -8,8 +8,6 @@ interface UseJobProgressOptions<T> {
   isTerminal: (data: T) => boolean;
 }
 
-/** Subscribes over WebSocket for job progress; falls back to REST polling
- * of the equivalent GET endpoint if the socket can't connect or drops. */
 export function useJobProgress<T>(jobId: number | null, options: UseJobProgressOptions<T>) {
   const [progress, setProgress] = useState<T | null>(null);
   const [connection, setConnection] = useState<"websocket" | "polling" | "idle">("idle");
@@ -37,9 +35,7 @@ export function useJobProgress<T>(jobId: number | null, options: UseJobProgressO
             clearInterval(pollTimer);
             pollTimer = null;
           }
-        } catch {
-          // transient network error - next tick will retry
-        }
+        } catch {}
       };
       void poll();
       pollTimer = setInterval(poll, POLL_INTERVAL_MS);
@@ -54,9 +50,7 @@ export function useJobProgress<T>(jobId: number | null, options: UseJobProgressO
         const data = JSON.parse(event.data) as T | { error: string };
         if (data && typeof data === "object" && "error" in data) return;
         setProgress(data as T);
-      } catch {
-        // ignore malformed frame
-      }
+      } catch {}
     };
     socket.onerror = () => {
       socket.close();
@@ -70,7 +64,6 @@ export function useJobProgress<T>(jobId: number | null, options: UseJobProgressO
       socket.close();
       if (pollTimer !== null) clearInterval(pollTimer);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId]);
 
   return { progress, connection };

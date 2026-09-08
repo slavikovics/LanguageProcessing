@@ -1,8 +1,3 @@
-"""Thin async HTTP client for lang-id-service — the only place `api` knows
-that service exists. Keeps every language-ID formula (frequent-words,
-alphabetic, the PyTorch neural classifier) in lang-id-service; `api` only
-ever sees JSON in and out, exactly like NlpServiceClient/nlp-service.
-"""
 
 from __future__ import annotations
 

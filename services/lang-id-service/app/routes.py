@@ -47,9 +47,6 @@ async def alphabetic_identify(payload: AlphabeticIdentifyRequest) -> IdentifyRes
 
 @router.post("/neural/train-step", response_model=NeuralTrainStepResponse)
 async def neural_train_step(payload: NeuralTrainStepRequest) -> NeuralTrainStepResponse:
-    """Runs a small, resumable chunk of gradient-descent epochs — see
-    app.neural.train_step for why training is chunked instead of one long
-    call: it's what lets api's background task report live progress."""
     result = neural.train_step(
         payload.vectors_by_language,
         weights=payload.weights,

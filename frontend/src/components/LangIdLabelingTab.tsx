@@ -28,9 +28,6 @@ export function LangIdLabelingTab({ collectionId }: { collectionId: number }) {
   const [autoSplitting, setAutoSplitting] = useState(false);
   const [autoSplitError, setAutoSplitError] = useState<string | null>(null);
   const [autoSplitMessage, setAutoSplitMessage] = useState<string | null>(null);
-  // Bumped after an auto-split to force LanguageLabelBrowser to remount and
-  // refetch — it otherwise only reloads on its own paging/filter changes,
-  // so it wouldn't notice documents this action just split behind its back.
   const [labelBrowserKey, setLabelBrowserKey] = useState(0);
 
   async function handleAutoSplit() {

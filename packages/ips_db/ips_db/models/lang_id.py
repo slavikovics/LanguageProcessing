@@ -9,18 +9,11 @@ from .base import Base
 
 
 class LangIdProfile(Base):
-    """One trained profile per (method, language) for LR2's language
-    identification. `language` is NULL only for "neural", whose single
-    nn.Linear(4096,2) classifier is trained jointly across every labeled
-    language rather than one independent profile per language like the
-    lexical methods. `profile_data` holds whatever shape that method needs:
-    frequent_words -> ranked word list, alphabetic -> char-frequency dict,
-    neural -> {weights, bias, classes, loss_curve}."""
 
     __tablename__ = "lang_id_profiles"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    method: Mapped[str] = mapped_column(String(20))  # "frequent_words" | "alphabetic" | "neural"
+    method: Mapped[str] = mapped_column(String(20))
     language: Mapped[str | None] = mapped_column(String(10), nullable=True)
     profile_data: Mapped[dict] = mapped_column(JSON)
     source_document_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -33,9 +26,6 @@ class LangIdProfile(Base):
 
 
 class LangIdTrainingJob(Base):
-    """Tracks one neural-classifier training run so the frontend can show a
-    live progress bar with the current loss/accuracy, the same way IndexJob
-    tracks indexing progress."""
 
     __tablename__ = "lang_id_training_jobs"
 
@@ -54,8 +44,6 @@ class LangIdTrainingJob(Base):
 
 
 class LangIdRun(Base):
-    """One method's identification pass over one collection's test-split
-    documents — mirrors IndexJob's progress-tracking shape."""
 
     __tablename__ = "lang_id_runs"
 
@@ -74,12 +62,6 @@ class LangIdRun(Base):
 
 
 class LangIdResult(Base):
-    """One document's identification outcome under one run — the per-document
-    row both the results table and the run's aggregate accuracy/speed stats
-    are built from. `distances` holds every candidate language's distance
-    (lower = closer, all three methods normalized to this convention — see
-    app.domain.lang_id), so `predicted_language = min(distances, key=get)`
-    is the one argmin rule shared by every method."""
 
     __tablename__ = "lang_id_results"
 
@@ -89,7 +71,6 @@ class LangIdResult(Base):
     predicted_language: Mapped[str] = mapped_column(String(10))
     distances: Mapped[dict] = mapped_column(JSON)
     elapsed_ms: Mapped[float] = mapped_column(Float)
-    # NULL only if the document's confirmed_language was cleared after the run.
     is_correct: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
     __table_args__ = (
@@ -98,9 +79,6 @@ class LangIdResult(Base):
 
 
 class LangIdRunMetric(Base):
-    """Aggregate accuracy/precision/recall/F1 for one lang-id run, persisted
-    the same way `MetricResult` caches search metrics — computed from
-    `LangIdResult` rows whenever a run's summary is (re)requested."""
 
     __tablename__ = "lang_id_run_metrics"
 

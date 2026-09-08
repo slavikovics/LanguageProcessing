@@ -18,10 +18,6 @@ from app.infrastructure.repositories.search_models import SearchModelRepository
 
 
 class MetricsService:
-    """Scores one search run against its query's relevance judgments, or
-    rolls up every judged query in a collection into MAP + mean
-    R-precision/P@5/P@10/etc + an averaged curve, scoped to one search model
-    at a time so summaries can be compared across models (see compare())."""
 
     def __init__(self, session: AsyncSession, nlp_client: NlpServiceClient | None = None) -> None:
         self._session = session
@@ -92,12 +88,10 @@ class MetricsService:
                 continue
             relevant_ids = await self._judgments.relevant_document_ids(query.id)
             if not relevant_ids:
-                # Queries with no relevant documents are excluded (0/0 is undefined).
                 unscored_judged_queries += 1
                 continue
             run = await self._queries.latest_search_run_for_query(query.id, model_id=model_row.id)
             if run is None:
-                # Not searched with this model yet — no row, not a misleading zero.
                 continue
 
             query_metrics = await self.evaluate_run(run.id)
@@ -146,14 +140,6 @@ class MetricsService:
     async def rerun_all_and_compare(
         self, collection_id: int, models: list[str]
     ) -> list[CollectionMetricsSummary]:
-        """Re-executes every judged query against every requested model
-        before comparing, so numbers reflect the current index/model rather
-        than a possibly stale search_run.
-
-        Imports SearchService locally: it's the only place metrics needs the
-        search feature, and a top-level import would pull the search backend
-        stack into every metrics-only test.
-        """
         from app.application.search import SearchService
 
         queries = await self._queries.list_queries_by_collection(collection_id)
@@ -167,8 +153,6 @@ class MetricsService:
                         collection_id=collection_id, text=query.text, top_k=DEFAULT_TOP_K, model=model_key
                     )
                 except SearchError:
-                    # e.g. the dense-embedding model isn't configured — leave
-                    # that model's existing runs alone rather than failing the rerun.
                     continue
 
         return await self.compare(collection_id, models)

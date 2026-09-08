@@ -46,7 +46,6 @@ export function CrawlPage() {
     try {
       const jobs = await listCrawlJobs(selectedId);
       const latest = new Map<string, CrawlJob>();
-      // Jobs come back newest-first, so the first job seen per seed URL is its latest run.
       for (const job of jobs) {
         const seedUrl = job.seed_urls[0];
         if (seedUrl !== undefined && !latest.has(seedUrl)) {
@@ -54,9 +53,7 @@ export function CrawlPage() {
         }
       }
       setLatestJobBySeedUrl(latest);
-    } catch {
-      // best-effort: seed rows just fall back to showing no last-run status
-    }
+    } catch {}
   }, [selectedId]);
 
   useEffect(() => {
@@ -64,7 +61,6 @@ export function CrawlPage() {
     void refreshSeedJobs();
     setRunError(null);
     setEditingSeedId(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
   async function removeSeed(seed: CrawlSeed) {
@@ -94,7 +90,7 @@ export function CrawlPage() {
       selected &&
       selected.document_count > 0 &&
       !window.confirm(
-        `Коллекция «${selected.name}» уже содержит ${selected.document_count} документов. Запуск краулинга удалит их вместе с построенным индексом и начнёт сбор заново. Продолжить?`,
+        `Коллекция «${selected.name}» уже содержит ${selected.document_count} документов. Запуск кроулинга удалит их вместе с построенным индексом и начнёт сбор заново. Продолжить?`,
       )
     ) {
       return;
@@ -117,8 +113,6 @@ export function CrawlPage() {
     }
   }
 
-  // Only ever shows a task for a base URL that's still configured as a seed
-  // — deleting a seed drops its last run from view too, in seed-list order.
   const visibleJobs = seeds
     .map((seed) => latestJobBySeedUrl.get(seed.url))
     .filter((job): job is CrawlJob => job !== undefined);
@@ -130,9 +124,9 @@ export function CrawlPage() {
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-lg font-semibold tracking-tight">
           <Waypoints className="size-5 text-muted-foreground" />
-          Запуск краулинга
+          Запуск кроулинга
         </div>
-        <Button asChild variant="ghost" size="icon" aria-label="Справка о краулинге" className="text-muted-foreground">
+        <Button asChild variant="ghost" size="icon" aria-label="Справка о кроулинге" className="text-muted-foreground">
           <Link to="/help#crawling">
             <HelpCircle className="size-4" />
           </Link>
@@ -172,7 +166,7 @@ export function CrawlPage() {
           className="w-full overflow-hidden transition-all duration-300 hover:scale-[1.015] hover:shadow-lg hover:shadow-primary/30 active:scale-[0.98]"
         >
           <Play className="size-4" />
-          {running ? "Запуск…" : "Запустить краулинг"}
+          {running ? "Запуск…" : "Запустить кроулинг"}
         </Button>
       </div>
 

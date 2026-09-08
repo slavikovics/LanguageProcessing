@@ -90,9 +90,6 @@ export function DocumentFormDialog({
       <DialogContent
         className="max-w-2xl"
         onOpenAutoFocus={(event) => {
-          // Radix focuses the first tabbable field (the title input) on
-          // open, which selects its whole value — collapse the caret to
-          // the end instead of leaving the title highlighted.
           event.preventDefault();
           const el = titleInputRef.current;
           if (el) {

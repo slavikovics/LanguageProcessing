@@ -12,9 +12,6 @@ from app.infrastructure.repositories.terms import TermRepository
 
 
 class TfidfSearchBackend:
-    """TF-IDF/cosine backend behind the same rank() contract as
-    EmbeddingSearchBackend. Query and document vectors are both
-    L2-normalized, so cosine similarity reduces to a plain dot product."""
 
     def __init__(self, session: AsyncSession, nlp_client: NlpServiceClient) -> None:
         self._documents = DocumentRepository(session)

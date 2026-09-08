@@ -13,21 +13,15 @@ const STORAGE_KEY = "ips-selected-search-model";
 const DEFAULT_MODEL_KEY = "tfidf";
 
 interface SearchModelContextValue {
-  /** Every active registered search model — populates the Search page's
-   * model picker and the Metrics page's comparison checklist. */
-  models: SearchModel[];
-  loading: boolean;
-  /** The model the Search page currently searches with. */
-  selectedModelKey: string;
-  setSelectedModelKey: (key: string) => void;
-  /** Re-fetches the model list. */
-  refreshModels: () => Promise<void>;
+  models: SearchModel[]
+  loading: boolean
+  selectedModelKey: string
+  setSelectedModelKey: (key: string) => void
+  refreshModels: () => Promise<void>
 }
 
 const SearchModelContext = createContext<SearchModelContextValue | null>(null);
 
-/** Mirrors CollectionContext's pattern for the search model the Search page
- * uses; new models show up automatically once the backend registers them. */
 export function SearchModelProvider({ children }: { children: ReactNode }) {
   const [models, setModels] = useState<SearchModel[]>([]);
   const [loading, setLoading] = useState(true);

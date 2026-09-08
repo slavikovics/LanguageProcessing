@@ -21,7 +21,6 @@ class CollectionRepository:
         return await self._session.get(Collection, collection_id)
 
     async def delete(self, collection: Collection) -> None:
-        """Relies on ON DELETE CASCADE to clear everything the collection owns."""
         await self._session.delete(collection)
 
     async def list(self) -> list[Collection]:
@@ -38,13 +37,6 @@ class CollectionRepository:
         return [(collection, count) for collection, count in result.all()]
 
     async def touch_documents_changed(self, collection_id: int) -> None:
-        """Marks the collection's document set as changed now, so the UI can
-        flag a stale index against the latest IndexJob's finished_at.
-
-        Uses fetch-then-mutate rather than a bare Core UPDATE so an already
-        -loaded Collection in this session's identity map picks up the new
-        value immediately instead of staying stale.
-        """
         collection = await self._session.get(Collection, collection_id)
         if collection is not None:
             collection.documents_changed_at = dt.datetime.utcnow()

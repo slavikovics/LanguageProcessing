@@ -16,9 +16,6 @@ _TERMINAL_STATUSES = {IndexJobStatus.COMPLETED.value, IndexJobStatus.FAILED.valu
 
 
 async def _run_index_job(job_id: int) -> None:
-    """Runs in the background after the response is sent, with its own DB
-    session — the request-scoped session from Depends(get_db) is already
-    closed by then."""
     async with SessionLocal() as session:
         await IndexingService(session).run_job(job_id)
 
@@ -67,8 +64,6 @@ async def cancel_index_job(job_id: int, db: AsyncSession = Depends(get_db)) -> I
 
 @router.websocket("/index-jobs/ws/{job_id}")
 async def index_job_progress_ws(websocket: WebSocket, job_id: int) -> None:
-    """Polls index_jobs and pushes diffs; the frontend falls back to plain
-    GET /index-jobs/{id} polling if this connection drops."""
     await websocket.accept()
     settings = get_settings()
     last_payload: str | None = None

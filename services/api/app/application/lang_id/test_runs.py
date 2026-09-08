@@ -20,9 +20,6 @@ from .stored_embeddings import stored_vectors_for
 
 
 class LangIdTestRunService:
-    """Runs one method's classifier over a collection's whole test split and
-    scores the result — the batch counterpart to LangIdIdentificationService's
-    one-off classification."""
 
     def __init__(self, session: AsyncSession, *, lang_id_client: LangIdServiceClient | None = None) -> None:
         self._session = session
@@ -53,9 +50,6 @@ class LangIdTestRunService:
     async def _identify_for_run(
         self, method: str, documents: list[Document]
     ) -> dict[int, IdentificationOutcome]:
-        """The lexical methods classify one document at a time (cheap,
-        in-process math in lang-id-service); neural instead batches every
-        document's already-stored embedding into one request."""
         if method != "neural":
             outcomes: dict[int, IdentificationOutcome] = {}
             for document in documents:
@@ -116,7 +110,7 @@ class LangIdTestRunService:
             await self._results.bulk_write(rows)
             await self._session.commit()
             await self._runs.mark_completed(run_id)
-        except Exception as exc:  # pragma: no cover - top-level safety net
+        except Exception as exc:
             message = str(exc) or type(exc).__name__
             await self._runs.mark_failed(run_id, error_message=f"{type(exc).__name__}: {message}")
 
@@ -152,7 +146,6 @@ class LangIdTestRunService:
         return summary
 
     async def compare(self, collection_id: int, methods: list[str]) -> list[LangIdRunSummary]:
-        """Latest completed run per requested method for this collection."""
         runs = await self._runs.list_by_collection(collection_id)
         summaries: list[LangIdRunSummary] = []
         for method in methods:
@@ -163,9 +156,6 @@ class LangIdTestRunService:
         return summaries
 
     async def rerun_and_compare(self, collection_id: int, methods: list[str]) -> list[LangIdRunSummary]:
-        """Starts fresh runs for every requested method and waits for them
-        to finish, so numbers reflect the current profiles/classifier rather
-        than a possibly stale run."""
         runs = await self.start_run(collection_id, methods)
         for run in runs:
             await self.run_job(run.id)

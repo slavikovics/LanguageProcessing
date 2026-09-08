@@ -17,9 +17,6 @@ def test_cosine_similarity_zero_vector_is_zero_not_nan():
 
 
 def test_rank_documents_orders_by_similarity_descending():
-    # Single-term vectors are collinear regardless of magnitude (cosine only
-    # measures angle), so this needs a second dimension for d1 vs d2 to
-    # actually differ in *direction*, not just scale.
     query = {"cat": 1.0}
     docs = {
         "d1": {"cat": 0.1, "dog": 0.9},

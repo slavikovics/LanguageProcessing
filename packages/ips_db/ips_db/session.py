@@ -1,5 +1,3 @@
-"""Tiny helper so every service builds its async engine/sessionmaker the same
-way instead of repeating the SQLAlchemy boilerplate."""
 
 from __future__ import annotations
 

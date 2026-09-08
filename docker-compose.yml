@@ -74,9 +74,6 @@ services:
       - ./packages/ips_db:/app/packages/ips_db
       - ./packages/nlp_core:/app/packages/nlp_core
     healthcheck:
-      # api's entrypoint runs `alembic upgrade head` before uvicorn starts, so
-      # "healthy" also means migrations are applied — crawler-service depends
-      # on that, not just on postgres, to avoid racing the schema.
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
       interval: 5s
       timeout: 5s

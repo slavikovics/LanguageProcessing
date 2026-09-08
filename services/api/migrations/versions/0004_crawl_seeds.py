@@ -1,12 +1,3 @@
-"""Crawl seeds: persisted, per-collection crawl addresses with independent
-max_documents/max_depth/same_domain_only each, plus the crawl_jobs column
-that carries same_domain_only through to a running job.
-
-Revision ID: 0004
-Revises: 0003
-Create Date: 2026-09-04
-
-"""
 from typing import Sequence, Union
 
 import sqlalchemy as sa

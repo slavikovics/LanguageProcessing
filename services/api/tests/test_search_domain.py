@@ -39,5 +39,5 @@ def test_build_snippet_falls_back_to_start_when_no_match():
 def test_build_snippet_truncates_long_text():
     text = "word " * 200
     snippet = build_snippet(text, [], max_chars=50)
-    assert len(snippet) <= 52  # + possible ellipsis
+    assert len(snippet) <= 52
     assert snippet.endswith("…")

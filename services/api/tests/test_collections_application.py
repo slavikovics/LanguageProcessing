@@ -18,11 +18,8 @@ async def session_factory(tmp_path):
     db_path = tmp_path / "test.db"
     engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}")
 
-    # SQLite ignores ON DELETE CASCADE unless foreign_keys is turned on per
-    # connection — Postgres (production) enforces it unconditionally, so
-    # this only matters for making the test's cascade assertions meaningful.
     @event.listens_for(engine.sync_engine, "connect")
-    def _enable_fk(dbapi_connection, connection_record):  # noqa: ARG001
+    def _enable_fk(dbapi_connection, connection_record):
         dbapi_connection.execute("PRAGMA foreign_keys=ON")
 
     async with engine.begin() as conn:
@@ -156,8 +153,6 @@ async def test_recrawl_allowed_once_indexing_finished(session_factory):
     async with session_factory() as session:
         jobs = await CrawlJobService(session).run_collection_crawl(collection_id)
     assert len(jobs) == 1
-    # Each spawned CrawlJob copies its language from the seed that spawned
-    # it, not the collection's — the whole point of per-seed language.
     assert jobs[0].language == "fr"
 
 
@@ -229,10 +224,6 @@ async def test_cancel_index_job_already_terminal_is_rejected(session_factory):
 
 @pytest.mark.asyncio
 async def test_cancel_index_job_while_pending_prevents_it_from_ever_running(session_factory):
-    """A job cancelled before the background task even started must stay
-    cancelled — mark_running must not silently resurrect it back to
-    "running" once the task does get around to it (see IndexJobRepository.
-    mark_running's conditional UPDATE)."""
     collection_id = await _make_collection(session_factory)
     async with session_factory() as session:
         document = Document(
@@ -249,8 +240,6 @@ async def test_cancel_index_job_while_pending_prevents_it_from_ever_running(sess
         await IndexingService(session).cancel_job(job_id)
 
     async with session_factory() as session:
-        # The background task now gets around to running the (already
-        # cancelled) job — it must notice immediately and do nothing.
         await IndexingService(session).run_job(job_id)
 
     async with session_factory() as session:

@@ -12,12 +12,6 @@ _DUPLICATE_URL_MESSAGE = "a document with this URL already exists in this collec
 
 
 class DocumentService:
-    """Manual CRUD for documents — the same rows the crawler writes, just
-    entered by hand. A create/update/delete leaves the collection's index
-    stale until the user reindexes (same as after a crawl); this service
-    does not trigger indexing itself, only marks the collection as changed
-    (Collection.documents_changed_at) so the UI can flag that staleness.
-    """
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session

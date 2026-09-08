@@ -1,4 +1,3 @@
-"""URL claiming and enqueueing for one crawl job's frontier."""
 
 from __future__ import annotations
 
@@ -24,12 +23,6 @@ class Frontier:
         self._links_per_page_cap = links_per_page_cap
 
     async def claim_next(self, job_id: int) -> CrawlUrlHandle | None:
-        """Claims the shallowest queued URL, with no depth ceiling: max_depth
-        is a starting preference (BFS naturally exhausts shallower URLs
-        first), not a hard stop — a job keeps widening past it rather than
-        finishing short of max_documents. The job still terminates: the link
-        graph is finite and enqueue_links dedupes, so retracing it can't loop
-        forever."""
         async with self._sessionmaker() as session:
             result = await session.execute(
                 select(CrawlUrl)
@@ -45,8 +38,6 @@ class Frontier:
             if crawl_url is None:
                 return None
             crawl_url.status = "fetching"
-            # urls_queued tracks the current backlog, not a lifetime total, so
-            # it must shrink here to match enqueue_links growing it.
             await session.execute(
                 update(CrawlJob)
                 .where(CrawlJob.id == job_id)
@@ -89,13 +80,6 @@ class Frontier:
                 for url in new_urls
             )
             try:
-                # The CrawlJob update below is a Core execute() call, which
-                # triggers a session-wide autoflush of the pending CrawlUrl
-                # inserts above BEFORE it runs — so a sibling lane's race
-                # (uq_crawl_url_job_url) can raise IntegrityError right here,
-                # not just at the final commit. Both statements must be
-                # inside the same try/except for the rollback to actually
-                # catch it.
                 await session.execute(
                     update(CrawlJob)
                     .where(CrawlJob.id == job_id)
@@ -103,7 +87,4 @@ class Frontier:
                 )
                 await session.commit()
             except IntegrityError:
-                # A sibling fetch lane discovered and inserted the same link
-                # between our SELECT and this COMMIT (uq_crawl_url_job_url) —
-                # it's queued either way, so drop this batch instead of failing.
                 await session.rollback()

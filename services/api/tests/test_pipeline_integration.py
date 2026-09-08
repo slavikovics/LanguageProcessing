@@ -1,10 +1,3 @@
-"""End-to-end check of indexing -> search -> judgments -> metrics wired
-together against a real (file-based, throwaway) SQLite database. The only
-thing stubbed out is the network hop to nlp-service: `_InProcessNlpClient`
-runs the exact same nlp_core functions nlp-service would, in-process, so
-this test also verifies that api's HTTP payload shapes match what nlp_core
-actually returns.
-"""
 
 from __future__ import annotations
 
@@ -23,10 +16,6 @@ from app.application.search import SearchService
 from app.infrastructure.nlp_client import NlpServiceClient
 
 _WORD_RE = re.compile(r"[a-z]+")
-# A handful of stopwords used only by the fixture documents/queries below —
-# just enough for "cats"/"cat" not to swamp scoring, without pulling in
-# spaCy (nlp-service's real /lemmatize does the actual lemmatization+stopword
-# removal; this test only needs *a* stable, deterministic stand-in for it).
 _STOPWORDS = {"are", "to", "the", "and"}
 _IRREGULAR = {"cats": "cat", "dogs": "dog", "animals": "animal", "galaxies": "galaxy"}
 
@@ -37,12 +26,8 @@ def _fake_lemmatize(text: str) -> list[str]:
 
 
 class _InProcessNlpClient(NlpServiceClient):
-    """Same contract as the real HTTP client, computed locally via nlp_core's
-    formulas (weighting/metrics — no spaCy needed) instead of an HTTP round
-    trip, so this test stays fast and offline while still exercising the
-    real TF-IDF/cosine/metrics implementation end to end."""
 
-    def __init__(self) -> None:  # no base_url/timeout needed
+    def __init__(self) -> None:
         pass
 
     async def lemmatize(self, text: str) -> list[str]:
@@ -87,9 +72,6 @@ class _InProcessNlpClient(NlpServiceClient):
         }
 
     async def embed_documents(self, texts: list[str]) -> list[list[float]]:
-        """Deterministic 8-dim stand-in for the real dense encoder: a bag-
-        of-words hash into fixed buckets, L2-normalized like the real
-        sentence-transformers call (normalize_embeddings=True)."""
         vectors = []
         for text in texts:
             bucket = [0.0] * 8
@@ -115,23 +97,13 @@ async def session_factory(tmp_path):
     db_path = tmp_path / "test.db"
     engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}")
 
-    # SQLite ignores ON DELETE CASCADE unless foreign_keys is turned on per
-    # connection — Postgres (production) enforces it unconditionally. Without
-    # this, a reindex's document_chunks delete doesn't cascade to
-    # document_chunk_embeddings, and SQLite's rowid reuse on the now-empty
-    # document_chunks table can collide with those orphaned rows on the next
-    # insert (see test_editing_document_text_is_stale_until_reindexed, which
-    # reindexes twice).
     @event.listens_for(engine.sync_engine, "connect")
-    def _enable_fk(dbapi_connection, connection_record):  # noqa: ARG001
+    def _enable_fk(dbapi_connection, connection_record):
         dbapi_connection.execute("PRAGMA foreign_keys=ON")
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     factory = async_sessionmaker(engine, expire_on_commit=False)
-    # Production seeds search_models via migration 0005; these throwaway
-    # SQLite databases are built from Base.metadata directly (no alembic),
-    # so the same two rows are seeded here instead.
     async with factory() as session:
         session.add_all(
             [
@@ -178,9 +150,6 @@ async def test_full_pipeline_index_search_judge_metrics(session_factory, collect
 
     async with session_factory() as session:
         summary = await IndexingService(session, nlp).reindex_collection_now(collection_id)
-    # documents_processed/documents_total count units across every active
-    # model's pass (see IndexingService._run) — 3 docs x 2 active models
-    # (tfidf + gte-multilingual-base, both seeded active in session_factory).
     assert summary.documents_indexed == 6
     assert summary.terms_indexed > 0
 
@@ -191,7 +160,6 @@ async def test_full_pipeline_index_search_judge_metrics(session_factory, collect
     assert response.hits, "expected at least one ranked document"
     assert response.hits[0].title == "Cats"
     assert "cat" in response.hits[0].matched_terms
-    # Astronomy doc shares no vocabulary with the query.
     assert all(hit.title != "Astronomy" for hit in response.hits)
 
     cats_doc_id = response.hits[0].document_id
@@ -226,15 +194,6 @@ async def test_full_pipeline_index_search_judge_metrics(session_factory, collect
 
 @pytest.mark.asyncio
 async def test_metrics_are_scoped_per_model(session_factory, collection_with_documents):
-    """MetricsService.collection_summary/compare must key off search_runs.
-    model_id, not just "the latest run for this query" — two models'
-    results for the same query must be evaluated and reported
-    independently. The embedding model's search_run/search_results are
-    inserted directly via the repositories here (bypassing
-    EmbeddingSearchBackend, which issues a pgvector-specific `<=>` SQL
-    operator that plain SQLite — used by this test's throwaway DB — has no
-    equivalent for; that backend's real behavior is exercised against the
-    actual Postgres+pgvector stack instead, not this offline suite)."""
     collection_id = collection_with_documents
     nlp = _InProcessNlpClient()
 
@@ -254,14 +213,9 @@ async def test_metrics_are_scoped_per_model(session_factory, collection_with_doc
 
         embedding_model = await SearchModelRepository(session).get_by_key("gte-multilingual-base")
         queries = QueryRepository(session)
-        # Same (collection, text) pools onto the same Query row (query-level
-        # pooling stays model-agnostic) — reuse it rather than creating a
-        # second Query, exactly like a real search under this model would.
         query_row = await queries.get_or_create_query(collection_id=collection_id, text=tfidf_response.query_text)
         assert query_row.id == tfidf_response.query_id
         embedding_run = await queries.create_search_run(query_id=query_row.id, model_id=embedding_model.id)
-        # A different ranking from tfidf's, to prove each summary reads its
-        # own model's run rather than "whatever the latest run is."
         await queries.bulk_insert_results(embedding_run.id, [(cats_doc_id, 1, 0.9)])
 
         await RelevanceJudgmentRepository(session).set_judgment(
@@ -284,8 +238,6 @@ async def test_metrics_are_scoped_per_model(session_factory, collection_with_doc
     assert embedding_summary.model == "gte-multilingual-base"
     assert len(embedding_summary.queries) == 1
     assert embedding_summary.queries[0].search_run_id == embedding_run_id
-    # Both models scored the same one relevant document at rank 1 in their
-    # own ranking, so both should show a perfect AP for this query.
     assert embedding_summary.queries[0].average_precision == pytest.approx(1.0)
 
     async with session_factory() as session:
@@ -295,11 +247,6 @@ async def test_metrics_are_scoped_per_model(session_factory, collection_with_doc
 
 @pytest.mark.asyncio
 async def test_rerun_all_and_compare_only_reruns_judged_queries(session_factory, collection_with_documents):
-    """The metrics page's "Обновить" button reruns every judged query
-    against every requested model, creating fresh search_runs, before
-    comparing — so a reindex/model swap is reflected instead of stale
-    scores. Unjudged queries must be left alone: they never feed the
-    summary regardless, so rerunning them would just waste API calls."""
     collection_id = collection_with_documents
     nlp = _InProcessNlpClient()
 
@@ -346,9 +293,7 @@ async def test_rerun_all_and_compare_only_reruns_judged_queries(session_factory,
             unjudged_response.query_id, model_id=tfidf_model.id
         )
 
-    # The judged query got a brand-new search_run out of the rerun...
     assert fresh_judged_run.id != judged_response.search_run_id
-    # ...but the unjudged one was never touched.
     assert unchanged_unjudged_run.id == original_unjudged_run.id
 
     assert len(compared) == 1
@@ -359,8 +304,6 @@ async def test_rerun_all_and_compare_only_reruns_judged_queries(session_factory,
 
 @pytest.mark.asyncio
 async def test_index_job_reports_progress_across_multiple_chunks(session_factory):
-    """CHUNK_SIZE is 5 — 12 documents should take 3 chunks, and the job
-    should end up fully processed regardless of the chunk boundaries."""
     async with session_factory() as session:
         collection = Collection(name="many-docs", language="en")
         session.add(collection)
@@ -388,8 +331,6 @@ async def test_index_job_reports_progress_across_multiple_chunks(session_factory
 
     assert finished is not None
     assert finished.status == "completed"
-    # 12 docs x 2 active models (tfidf + gte-multilingual-base) — see the
-    # comment in test_full_pipeline_index_search_judge_metrics above.
     assert finished.documents_total == 24
     assert finished.documents_processed == 24
     assert finished.terms_indexed and finished.terms_indexed > 0
@@ -397,10 +338,6 @@ async def test_index_job_reports_progress_across_multiple_chunks(session_factory
 
 @pytest.mark.asyncio
 async def test_deleting_indexed_document_does_not_break_search(session_factory, collection_with_documents):
-    """Deleting a document cascades to its document_terms/term_weights (FK
-    ondelete=CASCADE) and search recomputes document_frequency/N live at
-    query time, so the deleted document simply stops being a candidate —
-    it must not crash or leave a dangling reference in results."""
     collection_id = collection_with_documents
     nlp = _InProcessNlpClient()
 
@@ -430,11 +367,6 @@ async def test_deleting_indexed_document_does_not_break_search(session_factory, 
 
 @pytest.mark.asyncio
 async def test_editing_document_text_is_stale_until_reindexed(session_factory, collection_with_documents):
-    """Editing clean_text does not touch document_terms/term_weights — the
-    stored vector still reflects the pre-edit text until the collection is
-    explicitly reindexed. This documents the current (manual-reindex)
-    behavior rather than silently drifting.
-    """
     collection_id = collection_with_documents
     nlp = _InProcessNlpClient()
 
@@ -451,7 +383,6 @@ async def test_editing_document_text_is_stale_until_reindexed(session_factory, c
         before = await SearchService(session, nlp).search(
             collection_id=collection_id, text="galaxies universe", top_k=10
         )
-    # "Dogs" doesn't mention galaxies/universe before the edit.
     assert dogs_id not in {h.document_id for h in before.hits}
 
     async with session_factory() as session:
@@ -471,8 +402,6 @@ async def test_editing_document_text_is_stale_until_reindexed(session_factory, c
         stale = await SearchService(session, nlp).search(
             collection_id=collection_id, text="galaxies universe", top_k=10
         )
-    # Stored vector still reflects the OLD text — the edit hasn't been
-    # reindexed yet, so it must not appear despite the new text matching.
     assert dogs_id not in {h.document_id for h in stale.hits}
 
     async with session_factory() as session:

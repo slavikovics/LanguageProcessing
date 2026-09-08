@@ -27,10 +27,7 @@ export function MetricsByQueryChart({ series }: { series: QuerySeries[] }) {
           </TabsTrigger>
         ))}
       </TabsList>
-      {/* relative + forceMount + absolute-when-inactive keeps every tab's
-          chart laid out instead of display:none, which reports width 0 to
-          ResizeObserver until the tab is visible again — without this, bars
-          visibly popped in late on every switch. */}
+      {}
       <div className="relative">
         {RANKING_METRICS.map((m) => (
           <TabsContent

@@ -6,8 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class SearchModelRepository:
-    """Reads the search_models registry seeded by migrations — adding a new
-    model is a new seeded row, never a schema change."""
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session

@@ -22,10 +22,6 @@ from app.infrastructure.repositories.terms import TermRepository
 
 
 class SearchService:
-    """Dispatches to the search model named by `model` (default "tfidf"),
-    then persists the run identically regardless of which backend produced
-    it. A model of an already-supported kind needs no new backend, only a
-    new search_models registry row."""
 
     def __init__(self, session: AsyncSession, nlp_client: NlpServiceClient | None = None) -> None:
         self._session = session
@@ -44,9 +40,6 @@ class SearchService:
     async def _matched_terms_for(
         self, *, collection: Collection, text: str, document_ids: list[int]
     ) -> dict[int, list[str]]:
-        """Which of the query's lemmas each document contains, from the
-        indexed TF-IDF vocabulary — independent of which backend actually
-        ranked it, so this works for dense-embedding hits too."""
         if not document_ids:
             return {}
         query_lemmas = await self._nlp.lemmatize(text)
@@ -107,9 +100,6 @@ class SearchService:
             collection_id=config.collection_id, text=config.text
         )
         search_run = await self._queries.create_search_run(query_id=query_row.id, model_id=model_row.id)
-        # Persist the *full* ranking, not just the top_k slice shown to the
-        # user: rank-sensitive metrics (AP, R-precision, the curve) need the
-        # whole ranking, or a relevant doc just past top_k reads as "never found".
         await self._queries.bulk_insert_results(
             search_run.id,
             [(doc_id, rank, score) for rank, (doc_id, score) in enumerate(ranked, start=1)],

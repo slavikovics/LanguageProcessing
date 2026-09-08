@@ -54,7 +54,6 @@ async def _run_lang_id_run(run_id: int) -> None:
         await LangIdTestRunService(session).run_job(run_id)
 
 
-# -- labeling ----------------------------------------------------------
 
 
 @router.get("/collections/{collection_id}/lang-id/unlabeled-documents", response_model=list[DocumentOut])
@@ -96,7 +95,6 @@ async def set_language_label(
         _raise_for_lang_id_error(exc)
 
 
-# -- profiles ------------------------------------------------------------
 
 
 @router.get("/lang-id/profiles", response_model=list[LangIdProfileOut])
@@ -127,7 +125,6 @@ async def build_alphabetic_profile(
         _raise_for_lang_id_error(exc)
 
 
-# -- neural training, with live progress ---------------------------------
 
 
 @router.post("/lang-id/neural/train", response_model=LangIdTrainingJobOut, status_code=201)
@@ -160,8 +157,6 @@ async def get_latest_neural_training_job(db: AsyncSession = Depends(get_db)) -> 
 
 @router.websocket("/lang-id/neural/train/ws/{job_id}")
 async def neural_training_progress_ws(websocket: WebSocket, job_id: int) -> None:
-    """Same polling-and-push shape as /index-jobs/ws/{job_id} — the frontend
-    falls back to plain GET polling if this connection drops."""
     await websocket.accept()
     settings = get_settings()
     last_payload: str | None = None
@@ -187,7 +182,6 @@ async def neural_training_progress_ws(websocket: WebSocket, job_id: int) -> None
         pass
 
 
-# -- identification --------------------------------------------------------
 
 
 @router.post("/lang-id/identify", response_model=IdentifyResponseOut)
@@ -209,7 +203,7 @@ async def identify_url(payload: IdentifyUrlRequest, db: AsyncSession = Depends(g
         outcomes = await service.identify_url(payload.url, payload.methods)
     except LangIdError as exc:
         _raise_for_lang_id_error(exc)
-    except Exception as exc:  # noqa: BLE001 - surfaces fetch/parsing failures to the UI
+    except Exception as exc:
         raise HTTPException(status_code=422, detail=f"could not fetch/classify URL: {exc}") from exc
     return IdentifyResponseOut(results=[IdentificationOutcomeOut(**vars(o)) for o in outcomes])
 
@@ -229,7 +223,6 @@ async def identify_text(
     return IdentifyResponseOut(results=[IdentificationOutcomeOut(**vars(o)) for o in outcomes])
 
 
-# -- test-collection runs ----------------------------------------------
 
 
 @router.post("/lang-id/runs", response_model=list[LangIdRunOut], status_code=201)
@@ -315,9 +308,6 @@ async def compare(
 
 @router.post("/lang-id/rerun", response_model=LangIdCompareResponseOut)
 async def rerun(payload: LangIdRunCreate, db: AsyncSession = Depends(get_db)) -> LangIdCompareResponseOut:
-    """Like GET /lang-id/compare, but runs fresh classification passes for
-    every requested method first — the classification-quality analogue of
-    POST /collections/{id}/metrics/rerun."""
     service = LangIdTestRunService(db)
     try:
         summaries = await service.rerun_and_compare(payload.collection_id, payload.methods)

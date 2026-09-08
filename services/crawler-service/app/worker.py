@@ -1,11 +1,3 @@
-"""BFS crawl worker: claims pending crawl_jobs one at a time, fetches pages
-shallowest-first, and keeps crawl_jobs/crawl_urls updated so the api service
-can report live progress by reading those same tables.
-
-max_depth is a traversal preference, not a hard stop: a job keeps widening
-past it rather than finishing short of max_documents (see Frontier.claim_next).
-max_documents (or a genuinely exhausted, finite link graph) is what ends it.
-"""
 
 from __future__ import annotations
 
@@ -40,8 +32,6 @@ class CrawlWorker:
             headers={"User-Agent": self._settings.crawler_user_agent}
         ) as client:
             robots = RobotsCache(self._settings.crawler_user_agent, client)
-            # Several crawl_jobs run concurrently instead of one at a time —
-            # jobs on different domains don't wait on each other.
             running: dict[int, asyncio.Task[None]] = {}
             while True:
                 running = {jid: task for jid, task in running.items() if not task.done()}
@@ -51,7 +41,6 @@ class CrawlWorker:
                     try:
                         job_ids = await self._next_pending_job_ids(slots, exclude=set(running))
                     except Exception as exc:
-                        # Transient DB hiccups shouldn't kill the whole worker process.
                         print(f"crawler-service: poll failed, will retry: {exc!r}", flush=True)
                 for job_id in job_ids:
                     running[job_id] = asyncio.create_task(self._run_job(job_id, client, robots))
@@ -110,27 +99,12 @@ class CrawlWorker:
             _, status = await self._current_progress(job_id)
             if status not in _TERMINAL_STATUSES:
                 await self._mark_job_status(job_id, "completed")
-        except Exception as exc:  # pragma: no cover - top-level safety net
+        except Exception as exc:
             await self._mark_job_status(job_id, "failed", error=str(exc)[:1000])
 
     async def _drain_frontier(
         self, ctx: JobContext, client: httpx.AsyncClient, robots: RobotsCache
     ) -> None:
-        """Runs several fetch lanes concurrently against one job's URL
-        frontier, since a network-bound fetch used to fully block claiming
-        and processing the next URL. Frontier.claim_next uses SELECT ... FOR
-        UPDATE SKIP LOCKED, so lanes never double-claim.
-
-        A lane finding the frontier empty can't just stop: a sibling lane may
-        still be mid-fetch and about to enqueue more links, so "queue empty"
-        alone doesn't mean "job done" — only "queue empty AND no lane in
-        flight" does.
-
-        `in_flight` also doubles as a budget reservation: a lane reserves a
-        slot *before* claiming a URL, not after saving a document, so several
-        lanes checking documents_fetched at once can't all see room for "one
-        more" and collectively overshoot max_documents.
-        """
         in_flight = 0
         lock = asyncio.Lock()
 

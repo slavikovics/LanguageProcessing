@@ -8,7 +8,6 @@ router = APIRouter(tags=["nlp"])
 
 @router.post("/metrics/evaluate", response_model=MetricsEvaluateResponse)
 async def evaluate_metrics(payload: MetricsEvaluateRequest) -> MetricsEvaluateResponse:
-    """Computes rank-quality metrics for one ranked list against its qrels."""
     relevant = set(payload.relevant_ids)
     n = len(payload.ranked_ids)
     precision_at_5 = metrics.precision_at_k(payload.ranked_ids, relevant, 5)

@@ -1,22 +1,3 @@
-"""Pluggable search models: registry table + dense-vector storage.
-
-Adds `search_models` (a small registry of pluggable search algorithms —
-schema never changes again when a new model is added, only a new seeded
-row via a future migration), `document_embeddings` (pgvector storage for
-dense models, fixed-width column shared by any number of models via
-zero-padding — see ips_db.models.MAX_EMBEDDING_DIM), and a `model_id`
-column on `search_runs` so existing/new runs are tagged with the model
-that produced them. Existing rows are backfilled to the "tfidf" model.
-
-No ANN index (ivfflat/hnsw) is created — collection sizes here are course-
-project scale, so an exact brute-force `ORDER BY embedding <=> :qvec` is
-adequate. Add one later if a collection ever grows large enough to need it.
-
-Revision ID: 0005
-Revises: 0004
-Create Date: 2026-09-05
-
-"""
 from typing import Sequence, Union
 
 import sqlalchemy as sa
@@ -108,4 +89,3 @@ def downgrade() -> None:
     op.drop_column("search_runs", "model_id")
     op.drop_table("document_embeddings")
     op.drop_table("search_models")
-    # The `vector` extension is left installed — harmless to keep.

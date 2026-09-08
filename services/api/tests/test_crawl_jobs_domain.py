@@ -68,8 +68,6 @@ def test_build_refresh_job_config_happy_path_forces_depth_zero():
 
 
 def test_build_refresh_job_config_allows_more_than_max_seed_urls():
-    # Unlike a discovery crawl, a refresh isn't bounded by MAX_SEED_URLS —
-    # it re-fetches whatever the collection already contains.
     urls = [f"https://example.com/{i}" for i in range(40)]
     config = build_refresh_job_config(collection_id=1, urls=urls)
     assert len(config.seed_urls) == 40

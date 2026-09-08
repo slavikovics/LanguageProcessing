@@ -99,8 +99,6 @@ async def test_create_document_without_url_is_allowed(session_factory, collectio
         )
     assert created.url is None
 
-    # A second url-less document in the same collection must not collide —
-    # NULL is not equal to NULL for the (collection_id, url) unique index.
     async with session_factory() as session:
         second = await DocumentService(session).create_document(
             collection_id, title="Another note", url="", clean_text="Another manually authored note."

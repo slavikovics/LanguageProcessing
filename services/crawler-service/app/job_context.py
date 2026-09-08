@@ -11,6 +11,4 @@ class JobContext:
     max_documents: int
     max_depth: int
     mode: str
-    # Exact host (netloc) this job's discovered links must stay on — including
-    # rejecting subdomains — or None when links may go anywhere.
     allowed_domain: str | None = None

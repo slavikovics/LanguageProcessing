@@ -1,12 +1,3 @@
-"""Pure language-ID rules — no I/O. Mirrors app.domain.indexing: validation
-errors and result shapes live here, orchestration lives in application/.
-
-Contract shared by all three methods: every identify call returns a
-`distances` mapping where LOWER means closer, so `min(distances, key=get)`
-is the one argmin rule that works for frequent-words, alphabetic, and
-neural alike — lang-id-service's neural endpoint converts its softmax
-probability to `1 - probability` before responding so this holds for it too.
-"""
 
 from __future__ import annotations
 
@@ -34,15 +25,10 @@ class LangIdRunSummary:
     method: str
     documents_evaluated: int
     accuracy: float
-    # Macro-averaged over every language seen as either actual or predicted
-    # (sklearn's default for average="macro"): the mean of each language's
-    # own precision/recall/F1, so a rare language counts as much as a common
-    # one rather than being drowned out by document volume.
     precision: float
     recall: float
     f1: float
     mean_elapsed_ms: float
-    # {actual_language: {predicted_language: count}}
     confusion: dict[str, dict[str, int]]
 
 
@@ -55,8 +41,6 @@ def build_confusion_matrix(actual_predicted_pairs: list[tuple[str, str]]) -> dic
 
 
 def macro_precision_recall_f1(confusion: dict[str, dict[str, int]]) -> tuple[float, float, float]:
-    """Per-language precision/recall/F1 from a confusion matrix, then
-    averaged unweighted across languages (macro-average)."""
     languages: set[str] = set(confusion.keys())
     for row in confusion.values():
         languages.update(row.keys())
@@ -89,12 +73,6 @@ def macro_precision_recall_f1(confusion: dict[str, dict[str, int]]) -> tuple[flo
 def split_train_test(
     document_ids_by_language: dict[str, list[int]], *, test_ratio: float, seed: int | None = None
 ) -> tuple[list[int], list[int]]:
-    """Stratified per-language train/test split: shuffles each language's
-    document ids independently and assigns `test_ratio` of them to test, the
-    rest to train — stratifying keeps every language represented on both
-    sides regardless of how lopsided the labeled counts are. A language
-    with only one confirmed document goes entirely to train (a profile
-    needs at least one; a lone document can't usefully test one anyway)."""
     if not 0 < test_ratio < 1:
         raise LangIdError("test_ratio must be between 0 and 1 (exclusive)")
 

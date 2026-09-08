@@ -37,11 +37,6 @@ export function LangIdTestingTab({ collectionId }: { collectionId: number }) {
   const { progress: neuralRun } = useLangIdRunProgress(runIds.neural);
   const runsInProgress = { frequent_words: freqWordsRun, alphabetic: alphabeticRun, neural: neuralRun };
 
-  // Loads each method's latest completed run for the selected collection —
-  // used both right after a fresh test finishes and to restore results when
-  // this page is revisited (results live only in this component's state, so
-  // navigating away and back would otherwise leave the testing tab empty
-  // even though the runs are already persisted server-side).
   const loadLatestResults = useCallback(async () => {
     const compared = await compareLangIdMethods(collectionId, [...LANG_ID_METHODS]);
     setSummaries(compared.summaries);
@@ -69,8 +64,8 @@ export function LangIdTestingTab({ collectionId }: { collectionId: number }) {
     const runs = [freqWordsRun, alphabeticRun, neuralRun].filter((r) => r !== null);
     if (runs.length === 0) return;
     const allTerminal = runs.every((r) => r.status === "completed" || r.status === "failed");
-    if (allTerminal) void finishTesting();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (allTerminal)
+      void finishTesting();
   }, [freqWordsRun, alphabeticRun, neuralRun, testing]);
 
   async function handleRunTest() {

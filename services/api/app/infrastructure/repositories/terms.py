@@ -4,10 +4,6 @@ from ips_db import Term
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# asyncpg caps a single query at 32767 bind parameters. A big multi-language
-# collection's corpus vocabulary can itself exceed that count, so a single
-# `Term.lemma.in_(lemmas)` query needs to be split into chunks comfortably
-# under the limit (leaving headroom for the `language` parameter too).
 _IN_CLAUSE_CHUNK_SIZE = 10_000
 
 
@@ -20,8 +16,6 @@ class TermRepository:
         self._session = session
 
     async def get_existing(self, lemmas: set[str], language: str) -> dict[str, int]:
-        """Lemma -> term_id for the subset of lemmas already indexed; unknown
-        terms are simply absent."""
         if not lemmas:
             return {}
         term_ids: dict[str, int] = {}
@@ -33,7 +27,6 @@ class TermRepository:
         return term_ids
 
     async def get_or_create_many(self, lemmas: set[str], language: str) -> dict[str, int]:
-        """Lemma -> term_id for every lemma, creating rows for unseen ones."""
         if not lemmas:
             return {}
         term_ids = await self.get_existing(lemmas, language)

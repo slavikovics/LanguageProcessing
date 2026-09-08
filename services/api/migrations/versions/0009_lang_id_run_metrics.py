@@ -1,14 +1,3 @@
-"""LR2: persist aggregate accuracy/precision/recall/F1 per lang-id run.
-
-Adds `lang_id_run_metrics`, mirroring `metric_results` for search — one
-(run_id, metric_name, value) row per macro-averaged classification metric,
-replaced each time a run's summary is (re)computed.
-
-Revision ID: 0009
-Revises: 0008
-Create Date: 2026-09-07
-
-"""
 from typing import Sequence, Union
 
 import sqlalchemy as sa

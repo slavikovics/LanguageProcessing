@@ -7,7 +7,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from ips_db import Base
-from ips_db import models as ips_db_models  # noqa: F401 - registers models on Base.metadata
+from ips_db import models as ips_db_models
 
 from app.core.config import get_settings
 

@@ -1,7 +1,3 @@
-"""Thin async HTTP client for nlp-service — the only place `api` knows that
-service exists. Keeps every NLP formula (tokenization, TF/IDF, cosine) in
-`nlp_core`/`nlp-service`; `api` only ever sees JSON in and out.
-"""
 
 from __future__ import annotations
 
@@ -13,10 +9,6 @@ from app.core.config import get_settings
 
 
 class NlpServiceClient:
-    # Batch-encoding documents with a CPU transformer model (see
-    # nlp-service's app/embeddings.py) is meaningfully slower than every
-    # other call this client makes — it runs inside a background IndexJob,
-    # not an interactive request, so a much longer timeout is fine here.
     EMBEDDING_TIMEOUT = 300.0
 
     def __init__(self, base_url: str | None = None, *, timeout: float = 60.0) -> None:
@@ -40,7 +32,6 @@ class NlpServiceClient:
         return body["lemmas"]
 
     async def index(self, document_term_lists: list[list[str]]) -> dict[str, Any]:
-        """Returns {idf, term_frequencies, vectors} — see nlp-service's /index."""
         return await self._post("/index", {"document_term_lists": document_term_lists})
 
     async def idf_from_frequency(
@@ -61,12 +52,6 @@ class NlpServiceClient:
         return body["vector"]
 
     async def evaluate_metrics(self, ranked_ids: list[int], relevant_ids: list[int]) -> dict[str, Any]:
-        """The full ROMIP'2004 search-track metric set for one ranked list
-        against its qrels: Precision(5)/Recall(5)/F1(5), Precision(10)/
-        Recall(10)/F1(10), Average Precision, R-Precision, 11-point curve.
-        Whole-list Precision/Recall/F1 are skipped — they degenerate for a
-        system that always ranks the entire collection (Recall is trivially
-        1.0, Precision collapses to relevant_count/collection_size)."""
         return await self._post(
             "/metrics/evaluate", {"ranked_ids": ranked_ids, "relevant_ids": relevant_ids}
         )

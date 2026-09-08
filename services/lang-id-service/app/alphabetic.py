@@ -1,5 +1,3 @@
-"""Thin FastAPI-facing wrapper over nlp_core.alphabetic — see
-frequent_words.py for why timing/argmin live at this layer."""
 
 from __future__ import annotations
 

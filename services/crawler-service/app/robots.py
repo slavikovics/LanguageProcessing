@@ -1,5 +1,3 @@
-"""robots.txt gate: one parser per origin, fetched (not blocking-read) and
-cached for the lifetime of the worker process."""
 
 from __future__ import annotations
 
@@ -29,12 +27,10 @@ class RobotsCache:
         try:
             response = await self._client.get(robots_url, timeout=5.0)
             if response.status_code >= 400:
-                parser.parse([])  # no robots.txt found -> treat as allow-all
+                parser.parse([])
             else:
                 parser.parse(response.text.splitlines())
         except httpx.HTTPError:
-            # Small curated seed lists, not a hostile mass crawl: fail open
-            # rather than stalling the whole job on one flaky robots.txt.
             parser.parse([])
         return parser
 

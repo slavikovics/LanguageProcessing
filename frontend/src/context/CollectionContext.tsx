@@ -13,29 +13,19 @@ import { useIndexJobProgress } from "../hooks/useIndexJobProgress";
 const STORAGE_KEY = "ips-selected-collection-id";
 
 interface CollectionContextValue {
-  /** Every collection, used to populate the switcher. */
-  collections: Collection[];
-  /** True only while the initial list is loading. */
-  loading: boolean;
-  selectedId: number | null;
-  /** The full Collection object for `selectedId`, or null. */
-  selected: Collection | null;
-  setSelectedId: (id: number | null) => void;
-  /** Re-fetches the collection list (call after creating/crawling into one). */
-  refreshCollections: () => Promise<void>;
-  /** Most recent indexing job for the selected collection, if any. */
-  latestIndexJob: IndexJob | null;
-  /** Re-fetches latestIndexJob (call after starting/finishing an index job). */
-  refreshIndexStatus: () => Promise<void>;
-  /** Live "is the selected collection currently being indexed" — shared so
-   * any page can disable actions the backend would reject anyway. */
-  isIndexing: boolean;
+  collections: Collection[]
+  loading: boolean
+  selectedId: number | null
+  selected: Collection | null
+  setSelectedId: (id: number | null) => void
+  refreshCollections: () => Promise<void>
+  latestIndexJob: IndexJob | null
+  refreshIndexStatus: () => Promise<void>
+  isIndexing: boolean
 }
 
 const CollectionContext = createContext<CollectionContextValue | null>(null);
 
-/** Single source of truth for "the collection you're currently working
- * with", so every page shares one switcher. */
 export function CollectionProvider({ children }: { children: ReactNode }) {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,8 +77,6 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
     void refreshIndexStatus();
   }, [refreshIndexStatus]);
 
-  // Picks up a running job as soon as latestIndexJob reflects it, then
-  // subscribes to its live progress.
   useEffect(() => {
     if (latestIndexJob && (latestIndexJob.status === "pending" || latestIndexJob.status === "running")) {
       setActiveIndexJobId(latestIndexJob.id);
@@ -100,7 +88,6 @@ export function CollectionProvider({ children }: { children: ReactNode }) {
       setActiveIndexJobId(null);
       void refreshIndexStatus();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveIndexJob]);
 
   const displayedIndexJob = liveIndexJob ?? latestIndexJob;

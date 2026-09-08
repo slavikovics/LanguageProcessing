@@ -1,7 +1,3 @@
-"""Thin FastAPI-facing wrapper over nlp_core.frequent_words — adds the
-elapsed-time measurement and argmin-over-distances decision that make this
-endpoint's response directly comparable to the alphabetic/neural ones.
-"""
 
 from __future__ import annotations
 

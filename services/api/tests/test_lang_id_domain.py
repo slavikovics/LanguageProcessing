@@ -23,8 +23,6 @@ def test_macro_precision_recall_f1_perfect_classifier():
 
 
 def test_macro_precision_recall_f1_averages_per_language():
-    # en: 1 correct, 1 misclassified as ru -> precision 1/1=1.0 (no false ru->en), recall 1/2=0.5
-    # ru: 2 correct, 0 misclassified, but 1 en misclassified as ru -> precision 2/3, recall 2/2=1.0
     confusion = {"en": {"en": 1, "ru": 1}, "ru": {"ru": 2}}
     precision, recall, f1 = macro_precision_recall_f1(confusion)
     assert precision == (1.0 + 2 / 3) / 2
@@ -56,8 +54,8 @@ def test_split_train_test_is_stratified_and_covers_every_document():
     assert set(train_ids) & set(test_ids) == set()
     en_test = [i for i in test_ids if i < 100]
     fr_test = [i for i in test_ids if i >= 100]
-    assert len(en_test) == 2  # round(10 * 0.2)
-    assert len(fr_test) == 1  # round(5 * 0.2), clamped to at least 1
+    assert len(en_test) == 2
+    assert len(fr_test) == 1
 
 
 def test_split_train_test_single_document_language_goes_entirely_to_train():

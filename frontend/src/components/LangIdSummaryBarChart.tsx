@@ -3,22 +3,21 @@ import { LANG_ID_METHOD_LABELS, type LangIdRunSummary } from "../api/types";
 import { useMeasuredWidth } from "@/hooks/useMeasuredWidth";
 import { colorForModel } from "@/lib/modelColors";
 
-/** One bar per method — simpler than the Metrics page's QueryMetricBarChart
- * (no per-query grouping needed here), reused for both the accuracy and
- * the speed comparison via `valueOf`/`formatValue`. */
-export function LangIdSummaryBarChart({
-  summaries,
-  valueOf,
-  formatValue,
-  ariaLabel,
-  height = 220,
-}: {
-  summaries: LangIdRunSummary[];
-  valueOf: (summary: LangIdRunSummary) => number;
-  formatValue: (value: number) => string;
-  ariaLabel: string;
-  height?: number;
-}) {
+export function LangIdSummaryBarChart(
+  {
+    summaries,
+    valueOf,
+    formatValue,
+    ariaLabel,
+    height = 220,
+  }: {
+    summaries: LangIdRunSummary[];
+    valueOf: (summary: LangIdRunSummary) => number;
+    formatValue: (value: number) => string;
+    ariaLabel: string;
+    height?: number;
+  }
+) {
   const { ref, width } = useMeasuredWidth<HTMLDivElement>();
   const padding = { top: 24, right: 16, bottom: 28, left: 8 };
   const innerW = Math.max(0, width - padding.left - padding.right);

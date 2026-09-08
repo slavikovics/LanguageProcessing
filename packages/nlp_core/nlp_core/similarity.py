@@ -1,5 +1,3 @@
-"""Vector comparison — the cosine measure r(D,Q) = (D,Q) / (||D||*||Q||)
-from the methodology's vector search model."""
 
 from __future__ import annotations
 
@@ -19,10 +17,6 @@ def euclidean_norm(vector: Mapping[Term, float]) -> float:
 
 
 def cosine_similarity(a: Mapping[Term, float], b: Mapping[Term, float]) -> float:
-    """r(D,Q). Returns 0.0 (rather than raising on a division by zero) when
-    either vector has no weight at all, so an empty query/document simply
-    ranks last instead of crashing the search.
-    """
     norm_a = euclidean_norm(a)
     norm_b = euclidean_norm(b)
     if norm_a == 0 or norm_b == 0:
@@ -31,9 +25,6 @@ def cosine_similarity(a: Mapping[Term, float], b: Mapping[Term, float]) -> float
 
 
 def manhattan_distance(a: Mapping[Term, float], b: Mapping[Term, float]) -> float:
-    """L1 distance over the union of keys (0.0 for a key missing from either
-    side) — used by LR2's alphabetic language-ID method to compare two
-    character-frequency distributions."""
     keys = a.keys() | b.keys()
     return sum(abs(a.get(term, 0.0) - b.get(term, 0.0)) for term in keys)
 
@@ -42,7 +33,6 @@ def rank_documents(
     query_vector: Mapping[Term, float],
     document_vectors: Mapping[Hashable, Mapping[Term, float]],
 ) -> list[tuple[Hashable, float]]:
-    """Rank document ids by cosine similarity to the query, descending."""
     scored = [
         (doc_id, cosine_similarity(query_vector, vector))
         for doc_id, vector in document_vectors.items()

@@ -13,10 +13,8 @@ export function LanguageLabelBrowser({
   collectionId,
   onLabeled,
 }: {
-  collectionId: number;
-  /** Called after a label/split change is saved, so the parent can refresh
-   * its label-progress stats. */
-  onLabeled: () => void;
+  collectionId: number
+  onLabeled: () => void
 }) {
   const [showAll, setShowAll] = useState(false);
   const [documents, setDocuments] = useState<DocumentSummary[]>([]);

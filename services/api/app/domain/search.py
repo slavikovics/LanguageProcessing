@@ -1,8 +1,3 @@
-"""Pure search rules: query validation and the snippet-building heuristic.
-Scoring itself lives in nlp_core (cosine) via nlp-service; this module only
-holds logic that has no business being an HTTP call — validating a query and
-picking which slice of a document's text to show in the results list.
-"""
 
 from __future__ import annotations
 
@@ -40,11 +35,6 @@ def build_search_query_config(
 def build_snippet(
     text: str, focus_words: Sequence[str], *, max_chars: int = SNIPPET_MAX_CHARS
 ) -> str:
-    """A window of `text` centered on the first occurrence of any of
-    `focus_words` (case-insensitive substring match on the raw query words —
-    not the lemmas, so inflected surface forms still anchor the snippet).
-    Falls back to the start of the document when nothing matches literally.
-    """
     lowered = text.lower()
     position: int | None = None
     for word in focus_words:

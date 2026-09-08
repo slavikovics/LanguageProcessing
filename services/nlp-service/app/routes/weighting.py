@@ -44,8 +44,6 @@ async def compute_similarity(payload: SimilarityRequest) -> SimilarityResponse:
 
 @router.post("/index", response_model=IndexResponse)
 async def index_documents(payload: IndexRequest) -> IndexResponse:
-    """Full-corpus indexing: given one lemma list per document, computes the
-    collection's IDF plus each document's term frequencies and TF-IDF vector."""
     total_documents = len(payload.document_term_lists)
     document_frequency = weighting.document_frequencies(payload.document_term_lists)
     idf = weighting.inverse_document_frequency(document_frequency, total_documents)
@@ -56,7 +54,5 @@ async def index_documents(payload: IndexRequest) -> IndexResponse:
 
 @router.post("/idf-from-frequency", response_model=IdfFromFrequencyResponse)
 async def idf_from_frequency(payload: IdfFromFrequencyRequest) -> IdfFromFrequencyResponse:
-    """Recomputes IDF from already-known document frequencies, used at search
-    time instead of resending every document's term list."""
     idf = weighting.inverse_document_frequency(payload.document_frequency, payload.total_documents)
     return IdfFromFrequencyResponse(idf=idf)

@@ -58,7 +58,6 @@ async def test_save_document_refresh_mode_updates_existing_row_in_place(sessionm
         col = await session.get(Collection, collection_id)
         assert col.documents_changed_at is not None
 
-    # Only one row for that URL — updated in place, not duplicated.
     async with sessionmaker_() as session:
         from sqlalchemy import func, select
 

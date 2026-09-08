@@ -26,9 +26,6 @@ export function CrawlJobProgressCard({ jobId }: { jobId: number }) {
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
 
-  // The document count shown in the header switcher is fetched once on
-  // load; without this the "Индексировать" button on Collections stays
-  // disabled (0 documents) until a manual page reload.
   useEffect(() => {
     if (progress?.job.status === "completed") {
       void refreshCollections();

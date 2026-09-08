@@ -22,8 +22,6 @@ def test_pad_to_max_dim_rejects_oversized_vector():
 
 
 def test_pad_to_max_dim_preserves_cosine_similarity():
-    """The whole point of zero-padding: cosine similarity between two
-    padded vectors must equal the similarity of the originals."""
 
     def cosine(a: list[float], b: list[float]) -> float:
         dot = sum(x * y for x, y in zip(a, b))

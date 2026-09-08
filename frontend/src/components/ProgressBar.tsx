@@ -2,11 +2,8 @@ import { Progress } from "@/components/ui/progress";
 
 interface ProgressBarProps {
   value: number;
-  max: number;
-  /** Force a full bar once the job has stopped processing (completed, failed,
-   * or cancelled) — skipped/failed URLs still count as "done", so the crawl
-   * finishing with fewer documents than the quota shouldn't look stuck partway. */
-  complete?: boolean;
+  max: number
+  complete?: boolean
 }
 
 export function ProgressBar({ value, max, complete = false }: ProgressBarProps) {
