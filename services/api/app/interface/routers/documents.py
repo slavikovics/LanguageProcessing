@@ -15,10 +15,11 @@ async def list_documents(
     collection_id: int,
     limit: int = 50,
     offset: int = 0,
+    search: str | None = None,
     db: AsyncSession = Depends(get_db),
 ) -> list[DocumentOut]:
     repo = DocumentRepository(db)
-    return await repo.list_by_collection(collection_id, limit=limit, offset=offset)
+    return await repo.list_by_collection(collection_id, limit=limit, offset=offset, search=search)
 
 
 @router.post("/collections/{collection_id}/documents", response_model=DocumentDetailOut, status_code=201)

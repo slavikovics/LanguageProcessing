@@ -62,3 +62,25 @@ class LangIdRunStatus(str, Enum):
     @property
     def is_terminal(self) -> bool:
         return self in {LangIdRunStatus.COMPLETED, LangIdRunStatus.FAILED}
+
+
+class SummarizationMethod(str, Enum):
+    ALGORITHMIC = "algorithmic"
+    TEXTRANK = "textrank"
+    EMBEDDINGS = "embeddings"
+
+
+class SummarizationRunStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+    @property
+    def is_terminal(self) -> bool:
+        return self in {
+            SummarizationRunStatus.COMPLETED,
+            SummarizationRunStatus.FAILED,
+            SummarizationRunStatus.CANCELLED,
+        }

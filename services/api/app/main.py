@@ -13,6 +13,8 @@ from app.interface.routers import (
     metrics,
     search,
     search_models,
+    summarization,
+    translation,
 )
 
 settings = get_settings()
@@ -37,3 +39,5 @@ app.include_router(search.router)
 app.include_router(search_models.router)
 app.include_router(metrics.router)
 app.include_router(lang_id.router)
+app.include_router(summarization.router)
+app.include_router(translation.router)

@@ -33,3 +33,11 @@ class LemmatizeBatchRequest(BaseModel):
 
 class LemmatizeBatchResponse(BaseModel):
     lemmas: list[list[str]]
+
+
+class SplitSentencesRequest(BaseModel):
+    text: str
+
+
+class SplitSentencesResponse(BaseModel):
+    sentences: list[str]

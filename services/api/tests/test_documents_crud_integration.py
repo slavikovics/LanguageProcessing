@@ -53,6 +53,27 @@ async def test_create_update_delete_document(session_factory, collection_id):
 
 
 @pytest.mark.asyncio
+async def test_list_by_collection_filters_by_title_search(session_factory, collection_id):
+    from app.infrastructure.repositories.documents import DocumentRepository
+
+    async with session_factory() as session:
+        service = DocumentService(session)
+        await service.create_document(
+            collection_id, title="Laser basics", url="https://example.com/1", clean_text="..."
+        )
+        await service.create_document(
+            collection_id, title="Blue laser", url="https://example.com/2", clean_text="..."
+        )
+        await service.create_document(
+            collection_id, title="Unrelated topic", url="https://example.com/3", clean_text="..."
+        )
+
+    async with session_factory() as session:
+        results = await DocumentRepository(session).list_by_collection(collection_id, search="laser")
+    assert {doc.title for doc in results} == {"Laser basics", "Blue laser"}
+
+
+@pytest.mark.asyncio
 async def test_create_document_rejects_duplicate_url_in_collection(session_factory, collection_id):
     async with session_factory() as session:
         await DocumentService(session).create_document(

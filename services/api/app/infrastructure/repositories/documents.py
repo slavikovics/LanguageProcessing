@@ -5,18 +5,27 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
+def _escape_like(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 class DocumentRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def list_by_collection(self, collection_id: int, *, limit: int = 50, offset: int = 0) -> list[Document]:
-        result = await self._session.execute(
-            select(Document)
-            .where(Document.collection_id == collection_id)
-            .order_by(Document.id)
-            .limit(limit)
-            .offset(offset)
-        )
+    async def list_by_collection(
+        self,
+        collection_id: int,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        search: str | None = None,
+    ) -> list[Document]:
+        stmt = select(Document).where(Document.collection_id == collection_id)
+        if search:
+            stmt = stmt.where(Document.title.ilike(f"%{_escape_like(search)}%", escape="\\"))
+        stmt = stmt.order_by(Document.id).limit(limit).offset(offset)
+        result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
     async def get(self, document_id: int) -> Document | None:

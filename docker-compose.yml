@@ -33,6 +33,7 @@ services:
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPENROUTER_EMBEDDING_MODEL: ${OPENROUTER_EMBEDDING_MODEL:-qwen/qwen3-embedding-8b}
       OPENROUTER_EMBEDDING_CONCURRENCY: ${OPENROUTER_EMBEDDING_CONCURRENCY:-10}
+      OPENROUTER_CHAT_MODEL: ${OPENROUTER_CHAT_MODEL:-qwen/qwen-2.5-7b-instruct}
       PYTHONUNBUFFERED: "1"
     ports:
       - "8001:8001"
@@ -51,6 +52,18 @@ services:
     volumes:
       - ./packages/nlp_core:/app/packages/nlp_core
 
+  summarization-service:
+    build:
+      context: .
+      dockerfile: services/summarization-service/Dockerfile
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: "1"
+    ports:
+      - "8003:8003"
+    volumes:
+      - ./packages/nlp_core:/app/packages/nlp_core
+
   api:
     build:
       context: .
@@ -60,6 +73,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://ips_user:ips_password@postgres:5432/ips}
       NLP_SERVICE_URL: ${NLP_SERVICE_URL:-http://nlp-service:8001}
       LANG_ID_SERVICE_URL: ${LANG_ID_SERVICE_URL:-http://lang-id-service:8002}
+      SUMMARIZATION_SERVICE_URL: ${SUMMARIZATION_SERVICE_URL:-http://summarization-service:8003}
       PYTHONUNBUFFERED: "1"
     ports:
       - "8000:8000"
@@ -69,6 +83,8 @@ services:
       nlp-service:
         condition: service_started
       lang-id-service:
+        condition: service_started
+      summarization-service:
         condition: service_started
     volumes:
       - ./packages/ips_db:/app/packages/ips_db

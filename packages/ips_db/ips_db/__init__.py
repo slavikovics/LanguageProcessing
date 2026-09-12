@@ -23,6 +23,12 @@ from .models import (
     SearchRun,
     Term,
     TermWeight,
+    DocumentSummary,
+    DocumentSummaryPolish,
+    SummarizationRun,
+    TranslationDictionaryEntry,
+    TranslationRun,
+    TranslationRunWord,
 )
 
 __all__ = [
@@ -50,4 +56,10 @@ __all__ = [
     "LangIdRun",
     "LangIdResult",
     "LangIdRunMetric",
+    "SummarizationRun",
+    "DocumentSummary",
+    "DocumentSummaryPolish",
+    "TranslationDictionaryEntry",
+    "TranslationRun",
+    "TranslationRunWord",
 ]

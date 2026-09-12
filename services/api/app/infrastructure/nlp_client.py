@@ -67,3 +67,23 @@ class NlpServiceClient:
             "/embeddings/query", {"text": text}, timeout=self.EMBEDDING_TIMEOUT
         )
         return body["vector"]
+
+    async def split_sentences(self, text: str) -> list[str]:
+        body = await self._post("/sentences", {"text": text})
+        return body["sentences"]
+
+    async def polish(self, text: str, *, language: str | None = None) -> dict[str, Any]:
+        return await self._post(
+            "/llm/polish", {"text": text, "language": language}, timeout=self.EMBEDDING_TIMEOUT
+        )
+
+    async def translate(self, text: str, dictionary: dict[str, str]) -> dict[str, Any]:
+        return await self._post("/translate", {"text": text, "dictionary": dictionary})
+
+    async def build_word_list(self, text: str, dictionary: dict[str, str]) -> list[dict[str, Any]]:
+        body = await self._post("/translate/word-list", {"text": text, "dictionary": dictionary})
+        return body["words"]
+
+    async def parse_sentence(self, text: str) -> list[dict[str, Any]]:
+        body = await self._post("/syntax/parse", {"text": text})
+        return body["tokens"]

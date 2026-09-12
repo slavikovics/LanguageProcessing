@@ -3,11 +3,15 @@ import { request } from "./http";
 
 export function listDocuments(
   collectionId: number,
-  { limit = 50, offset = 0 }: { limit?: number; offset?: number } = {},
+  {
+    limit = 50,
+    offset = 0,
+    search,
+  }: { limit?: number; offset?: number; search?: string } = {},
 ): Promise<DocumentSummary[]> {
-  return request<DocumentSummary[]>(
-    `/collections/${collectionId}/documents?limit=${limit}&offset=${offset}`,
-  );
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  if (search) params.set("search", search);
+  return request<DocumentSummary[]>(`/collections/${collectionId}/documents?${params.toString()}`);
 }
 
 export interface DocumentInput {

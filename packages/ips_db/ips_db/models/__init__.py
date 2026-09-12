@@ -6,6 +6,8 @@ from .documents import Document, DocumentChunk, DocumentChunkEmbedding, Document
 from .indexing import IndexJob
 from .lang_id import LangIdProfile, LangIdResult, LangIdRun, LangIdRunMetric, LangIdTrainingJob
 from .search import MetricResult, Query, RelevanceJudgment, SearchModel, SearchResult, SearchRun
+from .summarization import DocumentSummary, DocumentSummaryPolish, SummarizationRun
+from .translation import TranslationDictionaryEntry, TranslationRun, TranslationRunWord
 
 __all__ = [
     "Base",
@@ -32,4 +34,10 @@ __all__ = [
     "LangIdRun",
     "LangIdResult",
     "LangIdRunMetric",
+    "SummarizationRun",
+    "DocumentSummary",
+    "DocumentSummaryPolish",
+    "TranslationDictionaryEntry",
+    "TranslationRun",
+    "TranslationRunWord",
 ]

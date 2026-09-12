@@ -8,6 +8,8 @@ from app.schemas.tokenization import (
     LemmatizeBatchResponse,
     LemmatizeRequest,
     LemmatizeResponse,
+    SplitSentencesRequest,
+    SplitSentencesResponse,
     TokenizeRequest,
     TokenizeResponse,
 )
@@ -30,3 +32,9 @@ async def lemmatize(payload: LemmatizeRequest) -> LemmatizeResponse:
 async def lemmatize_batch(payload: LemmatizeBatchRequest) -> LemmatizeBatchResponse:
     lemmas = await asyncio.to_thread(tokenization.lemmatize_many, payload.texts)
     return LemmatizeBatchResponse(lemmas=lemmas)
+
+
+@router.post("/sentences", response_model=SplitSentencesResponse)
+async def split_sentences(payload: SplitSentencesRequest) -> SplitSentencesResponse:
+    sentences = await asyncio.to_thread(tokenization.split_sentences, payload.text)
+    return SplitSentencesResponse(sentences=sentences)

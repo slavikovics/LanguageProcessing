@@ -109,3 +109,10 @@ def test_tokenize_endpoint():
     words = [t["text"] for t in response.json()["tokens"]]
     assert "cats" in words
     assert "the" not in words
+
+
+@pytest.mark.skipif(not _model_available(), reason="en_core_web_sm model not installed")
+def test_sentences_endpoint():
+    response = client.post("/sentences", json={"text": "Cats run. Dogs bark!"})
+    assert response.status_code == 200
+    assert response.json()["sentences"] == ["Cats run.", "Dogs bark!"]

@@ -1,4 +1,13 @@
-import { BarChart3, HelpCircle, Languages, Library, Search, Waypoints } from "lucide-react";
+import {
+  ArrowLeftRight,
+  BarChart3,
+  FileText,
+  HelpCircle,
+  Languages,
+  Library,
+  Search,
+  Waypoints,
+} from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 
 import { CollectionSwitcher } from "@/components/CollectionSwitcher";
@@ -13,6 +22,8 @@ const NAV_ITEMS = [
   { to: "/search", label: "Поиск", icon: Search },
   { to: "/metrics", label: "Метрики", icon: BarChart3 },
   { to: "/lang-id", label: "Язык", icon: Languages },
+  { to: "/summarization", label: "Реферирование", icon: FileText },
+  { to: "/translation", label: "Перевод", icon: ArrowLeftRight },
   { to: "/help", label: "Справка", icon: HelpCircle },
 ];
 

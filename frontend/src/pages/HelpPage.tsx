@@ -9,6 +9,8 @@ import { LangIdHelp } from "@/components/help/LangIdHelp";
 import { MetricsHelp } from "@/components/help/MetricsHelp";
 import { SearchingHelp } from "@/components/help/SearchingHelp";
 import { SearchModelsHelp } from "@/components/help/SearchModelsHelp";
+import { SummarizationHelp } from "@/components/help/SummarizationHelp";
+import { TranslationHelp } from "@/components/help/TranslationHelp";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function HelpPage() {
@@ -87,6 +89,8 @@ export function HelpPage() {
       <SearchModelsHelp />
       <MetricsHelp />
       <LangIdHelp />
+      <SummarizationHelp />
+      <TranslationHelp />
     </div>
   );
 }

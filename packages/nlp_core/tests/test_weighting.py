@@ -50,3 +50,26 @@ def test_normalized_tfidf_vector_handles_all_zero_weights():
 def test_binary_query_vector_deduplicates_terms():
     vector = weighting.binary_query_vector(["cat", "dog", "cat"])
     assert vector == {"cat": 1.0, "dog": 1.0}
+
+
+def test_modified_term_weight_matches_lr3_formula():
+    weight = weighting.modified_term_weight(tf=3, tf_max=4, document_frequency=2, total_documents=8)
+    assert math.isclose(weight, 0.5 * (1 + 3 / 4) * math.log(8 / 2))
+
+
+def test_modified_term_weight_rejects_non_positive_tf_max():
+    try:
+        weighting.modified_term_weight(tf=1, tf_max=0, document_frequency=1, total_documents=1)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("expected ValueError for tf_max<=0")
+
+
+def test_modified_term_weight_rejects_non_positive_document_frequency_or_total():
+    try:
+        weighting.modified_term_weight(tf=1, tf_max=1, document_frequency=0, total_documents=1)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("expected ValueError for document_frequency<=0")
