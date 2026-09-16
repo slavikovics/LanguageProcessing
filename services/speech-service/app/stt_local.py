@@ -6,19 +6,9 @@ import threading
 
 _MODEL_SIZE = os.environ.get("WHISPER_MODEL_SIZE", "small")
 _STREAM_MODEL_SIZE = os.environ.get("WHISPER_STREAM_MODEL_SIZE", "base")
-"""Live/streaming chunks (services/api's /speech/stt/stream gateway) use a
-smaller, faster model than the default batch /stt endpoint: benchmarked
-against this container, "small" takes ~1.4x real-time to transcribe a clip
-(chunks would fall progressively further behind during continuous speech),
-while "base" comfortably runs at ~0.3-0.5x real-time — the accuracy/latency
-trade-off is worth it specifically for the live path, where a later full-
-accuracy pass isn't part of the design. The batch endpoint keeps "small" as
-its default, unchanged."""
+# Stream path uses the faster "base" model so chunks don't fall behind real-time.
 _CPU_THREADS = int(os.environ.get("WHISPER_CPU_THREADS", "2"))
-"""Caps ctranslate2's intra-op thread pool so one transcription can't claim
-every core in the container — left unset, faster-whisper defaults to using
-all visible CPUs, which starves the rest of the container's cpus= budget
-(see docker-compose.yml) and can push it into throttling/OOM under load."""
+# Caps thread pool so one transcription can't claim every core in the container.
 
 _model = None
 _stream_model = None
@@ -57,15 +47,7 @@ def _get_stream_model():
 
 
 def warmup() -> None:
-    """Eagerly loads both Whisper models (called once from main.py's startup
-    hook, off the event loop thread) so the first real request doesn't pay
-    the model-load cost itself. This matters most for the stream model: the
-    live-transcription gateway (services/api's /speech/stt/stream) gives
-    each chunk a fixed ~20s ceiling before reporting an error, and a cold
-    faster-whisper load can easily take longer than that — which used to
-    surface to the user as a spurious "connection lost" on the very first
-    utterance spoken after this container (re)started, since it looked
-    identical to a genuinely failed chunk from the gateway's side."""
+    # Preloads models so a cold load doesn't blow the stream gateway's ~20s chunk timeout.
     _get_stream_model()
     _get_model()
 
@@ -90,17 +72,7 @@ def transcribe(
         text = " ".join(segment.text.strip() for segment in segments).strip()
         return text, info.language
     except Exception:
-        # The live-streaming path (/speech/stt/stream) restarts MediaRecorder
-        # every ~3.5s to get independently-decodable chunks, but a chunk that
-        # gets cut short by a manual stop (or is otherwise too brief for the
-        # browser's encoder to finalize a valid container) can come back as
-        # an empty/truncated file that av/faster-whisper can't open at all
-        # (av.error.FFmpegError, e.g. "End of file") — surfacing that as a
-        # 500 for every such chunk would make ordinary short utterances look
-        # broken. Treat it the same as vad_filter already treats silence: no
-        # speech found in this chunk, not a request failure. The batch /stt
-        # endpoint (use_stream_model=False) still raises: a genuinely
-        # undecodable *complete* recording is worth surfacing to the user.
+        # Stream chunks can be truncated by MediaRecorder restarts; treat as silence, not an error.
         if use_stream_model:
             return "", language_hint
         raise

@@ -11,13 +11,6 @@ export interface PagedTableColumn<T> {
   className?: string;
 }
 
-/**
- * One table + pagination footer, shared by the translation module's three
- * paged lists (word frequency, sentences, dictionary) so they look and
- * behave the same way. Rows passed in are already the current page's rows —
- * the caller decides whether that page came from the server (dictionary) or
- * from slicing an already-fetched array client-side (words, sentences).
- */
 export function PagedTable<T>({
   columns,
   rows,

@@ -71,8 +71,6 @@ class SummarizationMethod(str, Enum):
 
 
 class SpeechBackend(str, Enum):
-    """Local faster-whisper/Piper is the only supported speech backend."""
-
     LOCAL = "local"
 
 

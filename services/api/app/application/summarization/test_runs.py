@@ -94,8 +94,6 @@ class SummarizationTestRunService:
                         elapsed_ms=outcome.elapsed_ms,
                     )
                 except Exception:
-                    # A single unsummarizable document (not indexed, empty text, ...)
-                    # should not abort the whole comparison run.
                     pass
                 await self._runs.update_progress(run_id, documents_processed=processed)
 

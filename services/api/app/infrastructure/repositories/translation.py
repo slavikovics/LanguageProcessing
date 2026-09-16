@@ -11,12 +11,7 @@ class TranslationDictionaryRepository:
         self._session = session
 
     async def as_lookup(self, *, source_lang: str, target_lang: str) -> dict[str, str]:
-        """Builds the `{"lemma|POS": target}` map nlp_core.translation.translate()
-        expects. Every entry also seeds a `"lemma|*"` fallback (first entry
-        for that lemma wins, in id order) — even though every entry now
-        carries a real POS tag rather than the `ANY_POS` sentinel, a word
-        used with a different POS than the dictionary happened to tag it
-        with should still resolve instead of going untranslated."""
+        # Format expected by nlp_core.translation.translate(); ANY_POS entry is first-in-order fallback.
         result = await self._session.execute(
             select(
                 TranslationDictionaryEntry.source_lemma,

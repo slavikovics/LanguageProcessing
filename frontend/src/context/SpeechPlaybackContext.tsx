@@ -5,22 +5,7 @@ import { useSpeechSettings } from "./SpeechSettingsContext";
 
 type Status = "idle" | "requesting" | "playing";
 
-/**
- * A single shared TTS player instead of one per SpeakButton: only one
- * document/snippet can sensibly be read aloud at a time (same mental model
- * as any audio player), and a single player is what lets the "stop_speaking"
- * voice command and the global speech-mode dispatcher stop whatever is
- * currently playing regardless of which SpeakButton started it.
- *
- * Playback goes through a shared Web Audio API AudioContext rather than a
- * plain <audio> element: Chrome blocks audio.play() with a NotAllowedError
- * unless it's called from inside a real user gesture, but a *voice command*
- * (e.g. "read this" heard by global speech mode) fires from an async
- * SpeechRecognition callback, which doesn't count as one. An AudioContext
- * only needs to be resumed *once* from a real click (see primeAudioContext,
- * called when global speech mode is toggled on) and then stays usable
- * indefinitely — unlike audio.play(), which re-checks activation every call.
- */
+// Web Audio, not <audio>: a once-primed AudioContext bypasses Chrome's per-call gesture check.
 interface SpeechPlaybackContextValue {
   status: Status;
   activeText: string | null;
@@ -54,9 +39,6 @@ export function SpeechPlaybackProvider({ children }: { children: ReactNode }) {
   const nextChunkRef = useRef<Promise<Blob> | null>(null);
   const stoppedRef = useRef(true);
 
-  // Settings can change mid-playback; refs keep the in-flight chunk queue
-  // using whatever was selected when speak() was called, not a stale
-  // closure, without re-running this whole effect-free class of logic.
   const settingsRef = useRef({ voice, rate, volume });
   settingsRef.current = { voice, rate, volume };
 
@@ -74,9 +56,6 @@ export function SpeechPlaybackProvider({ children }: { children: ReactNode }) {
     return ctx;
   }
 
-  /** Call from inside a real click handler (e.g. the global speech-mode
-   * toggle) to unlock playback for voice-triggered speak() calls later,
-   * whenever they happen. A no-op if already running. */
   function primeAudioContext() {
     const ctx = getAudioContext();
     if (ctx && ctx.state === "suspended") void ctx.resume();
@@ -90,9 +69,7 @@ export function SpeechPlaybackProvider({ children }: { children: ReactNode }) {
       sourceRef.current.onended = null;
       try {
         sourceRef.current.stop();
-      } catch {
-        // already stopped/never started
-      }
+      } catch {}
       sourceRef.current.disconnect();
       sourceRef.current = null;
     }
@@ -118,9 +95,7 @@ export function SpeechPlaybackProvider({ children }: { children: ReactNode }) {
     if (ctx.state === "suspended") {
       try {
         await ctx.resume();
-      } catch {
-        // fall through — decodeAudioData/start below will surface the real error
-      }
+      } catch {}
     }
 
     let audioBuffer: AudioBuffer;
@@ -158,9 +133,7 @@ export function SpeechPlaybackProvider({ children }: { children: ReactNode }) {
       controller && nextIndex < chunksRef.current.length
         ? fetchChunk(chunksRef.current[nextIndex], controller.signal)
         : null;
-    // Attach a no-op catch immediately: if stop() aborts the controller
-    // before advance() ever consumes this promise, it would otherwise
-    // surface as an unhandled promise rejection.
+    // Avoids an unhandled rejection if stop() aborts before advance() consumes this promise.
     prefetch?.catch(() => {});
     nextChunkRef.current = prefetch;
   }

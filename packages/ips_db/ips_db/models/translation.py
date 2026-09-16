@@ -9,18 +9,10 @@ from .base import Base
 
 
 ANY_POS = "*"
-"""Sentinel `pos` value meaning "matches any part of speech". A real NULL
-can't be used for this: Postgres treats every NULL as distinct for the
-purposes of a UNIQUE constraint, so two NULL-pos rows for the same lemma
-would silently bypass duplicate detection."""
+# Sentinel instead of NULL pos: Postgres treats NULLs as distinct in UNIQUE constraints.
 
 
 class TranslationDictionaryEntry(Base):
-    """One (source_lemma, POS) -> target_text mapping used by the direct
-    (word-for-word) translation system. `pos` is `ANY_POS` for an entry that
-    covers a lemma regardless of part of speech (checked as a fallback after
-    a POS-specific entry)."""
-
     __tablename__ = "translation_dictionary_entries"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -41,9 +33,6 @@ class TranslationDictionaryEntry(Base):
 
 
 class TranslationRun(Base):
-    """One machine-translation pass over a text (either a document from a
-    collection or pasted free text)."""
-
     __tablename__ = "translation_runs"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -64,8 +53,6 @@ class TranslationRun(Base):
 
 
 class TranslationRunWord(Base):
-    """A row of the frequency-ordered word list (tab 1) for a translation run."""
-
     __tablename__ = "translation_run_words"
 
     id: Mapped[int] = mapped_column(primary_key=True)

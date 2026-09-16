@@ -108,11 +108,6 @@ export function SearchPage() {
     await performSearch(text);
   }
 
-  // Cross-page bridge for voice commands (navigate_search/clear_query):
-  // dispatchSpeechCommandAction navigates here with ?voiceQuery=<text>
-  // (possibly empty, for "clear search") whether the command was heard by
-  // this page's own mic button or by global speech mode elsewhere in the
-  // app. The param is stripped right after so a refresh doesn't re-run it.
   useEffect(() => {
     const voiceQuery = searchParams.get("voiceQuery");
     if (voiceQuery === null) return;

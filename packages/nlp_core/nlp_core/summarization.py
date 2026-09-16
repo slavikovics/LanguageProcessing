@@ -65,14 +65,12 @@ def split_sentences_with_positions(text: str) -> list[SentenceSpan]:
 
 
 def sentence_document_position_weight(doc_start: int, document_length: int) -> float:
-    """Posd(Si) = 1 - BD(Si)/|D|"""
     if document_length <= 0:
         return 1.0
     return 1 - (doc_start / document_length)
 
 
 def sentence_paragraph_position_weight(paragraph_start: int, paragraph_length: int) -> float:
-    """Posp(Si) = 1 - BP(Si)/|P|"""
     if paragraph_length <= 0:
         return 1.0
     return 1 - (paragraph_start / paragraph_length)
@@ -81,7 +79,6 @@ def sentence_paragraph_position_weight(paragraph_start: int, paragraph_length: i
 def modified_tfidf_sentence_score(
     sentence_terms: Iterable[str], term_weights: Mapping[str, float]
 ) -> float:
-    """Score(Si) = sum over t in Si of tf(t,Si) * w(t,D)"""
     counts = term_frequencies(sentence_terms)
     return sum(count * term_weights.get(term, 0.0) for term, count in counts.items())
 
@@ -89,7 +86,6 @@ def modified_tfidf_sentence_score(
 def rank_sentences_algorithm(
     text: str, term_weights: Mapping[str, float]
 ) -> list[SentenceScore]:
-    """LR3 methodology: sentence weight = Posd(Si) * Posp(Si) * Score(Si)."""
     spans = split_sentences_with_positions(text)
     document_length = len(text)
     scores: list[SentenceScore] = []
@@ -184,10 +180,6 @@ def rank_sentences_by_query_similarity(
     sentence_embeddings: Sequence[Sequence[float]],
     query_embedding: Sequence[float],
 ) -> list[SentenceScore]:
-    """Query-oriented variant of the embeddings method: score(Si) =
-    cosine(embedding(Si), embedding(query)) — same embedding space as
-    `rank_sentences_by_embedding_centrality`, but ranked toward relevance to a
-    user query instead of toward the whole document's centroid."""
     if len(sentences) != len(sentence_embeddings):
         raise ValueError("sentences and sentence_embeddings must be the same length")
     return [
@@ -208,17 +200,12 @@ def select_summary_sentences(
 def extract_keywords_from_weights(
     term_weights: Mapping[str, float], top_n: int | None = None
 ) -> list[str]:
-    """Terms ranked by weight, descending. `top_n=None` (default) returns the
-    full vocabulary — every term with a weight — unfiltered."""
     ranked = sorted(term_weights.items(), key=lambda pair: pair[1], reverse=True)
     return [term for term, _ in ranked[:top_n]]
 
 
 @dataclass(frozen=True)
 class KeywordGroup:
-    """A root keyword with the key phrases (noun groups) it appears in, e.g.
-    laser -> [red laser, blue laser]."""
-
     term: str
     children: list[str]
 
@@ -227,8 +214,6 @@ _PHRASE_POS = {"NOUN", "PROPN", "ADJ"}
 
 
 def _extract_candidate_phrases(text: str) -> list[list[str]]:
-    """Lemmatized runs of consecutive adjective/noun tokens (length >= 2) — a
-    parser-free approximation of noun phrases, used as key-phrase candidates."""
     doc = get_pipeline()(text)
     phrases: list[list[str]] = []
     current: list[str] = []
@@ -251,9 +236,6 @@ def extract_keyword_hierarchy(
     top_n: int | None = None,
     max_children: int = 5,
 ) -> list[KeywordGroup]:
-    """Hierarchical keyword reference: top single-word terms as roots, each with
-    the key phrases containing it as children (e.g. laser -> [red laser, blue
-    laser]). A root with no matching phrase is returned as a leaf (children=[])."""
     roots = extract_keywords_from_weights(term_weights, top_n)
     if not roots:
         return []

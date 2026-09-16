@@ -1,11 +1,3 @@
-/**
- * Human-readable labels for speech_commands.action — the action set is a
- * small fixed enum interpreted by dispatchSpeechCommandAction (lib/
- * commandDispatch.ts), not user-extensible, so a static map here is enough;
- * no need for a "description" column in the database. Used by the Settings
- * "Команды" tab and the assistant FAB's commands-discovery popover so users
- * see what a command actually does instead of a raw action key.
- */
 export interface SpeechActionInfo {
   label: string;
   hint: string;

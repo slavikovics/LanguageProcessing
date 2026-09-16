@@ -38,11 +38,6 @@ def get_parser_pipeline():
 
 
 def parse_sentence(text: str) -> list[SyntaxToken]:
-    """Dependency parse tree of a single sentence — tab 2 of the lab. Unlike
-    `tokenization.tokenize()` (which drops the parser for speed on the
-    indexing path), this uses the full pipeline including the dependency
-    parser, and keeps every token — punctuation included — since the tree
-    has to represent the whole sentence, not just its content words."""
     doc = get_parser_pipeline()(text)
     return [
         SyntaxToken(

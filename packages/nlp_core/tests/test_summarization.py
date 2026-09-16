@@ -141,12 +141,10 @@ def test_extract_keyword_hierarchy_nests_phrases_under_their_root_and_avoids_dup
     groups = summarization.extract_keyword_hierarchy(_HIERARCHY_WEIGHTS, _HIERARCHY_TEXT, top_n=2)
     all_children = [child for group in groups for child in group.children]
 
-    # every child phrase actually contains the root term it was nested under
     for group in groups:
         for child in group.children:
             assert group.term in child.split(" ")
 
-    # no phrase is assigned to more than one root
     assert len(all_children) == len(set(all_children))
 
 

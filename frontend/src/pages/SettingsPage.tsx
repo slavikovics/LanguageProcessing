@@ -158,13 +158,6 @@ function TtsSettingsTab() {
 function SttSettingsTab() {
   const { sttLanguage, activationPhrase, update } = useSpeechSettings();
   const [transcript, setTranscript] = useState("");
-  // The phrase field doesn't save on every keystroke (unlike sttLanguage's
-  // Select, where a single click is already an unambiguous, instant commit)
-  // — an explicit "Применить" makes it clear exactly when the change takes
-  // effect, rather than leaving it ambiguous whether a half-typed phrase is
-  // already live. It IS applied immediately on click: ambient mode
-  // (SpeechModeContext) reads activationPhrase reactively, no mic restart
-  // needed.
   const [phraseDraft, setPhraseDraft] = useState(activationPhrase);
   const [justApplied, setJustApplied] = useState(false);
   const isDirty = phraseDraft.trim() !== activationPhrase;
@@ -269,10 +262,6 @@ function CommandsTab() {
     setLoading(true);
     try {
       setCommands(await listSpeechCommands());
-      // Ambient mode matches commands entirely client-side against a
-      // snapshot fetched once when the mic starts listening (see
-      // SpeechModeContext) — without this, an edit made here wouldn't take
-      // effect until the mic was toggled off and back on.
       refreshCommands();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

@@ -9,10 +9,7 @@ from app.stt_local import warmup
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Fire-and-forget: runs the (blocking) model load in a worker thread
-    # instead of awaiting it here, so the container reports ready and starts
-    # accepting requests immediately rather than waiting out the load first.
-    # See stt_local.warmup for why this matters for the live-stream gateway.
+    # Fire-and-forget: don't block startup on model load; see stt_local.warmup.
     asyncio.create_task(asyncio.to_thread(warmup))
     yield
 

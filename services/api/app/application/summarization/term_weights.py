@@ -10,7 +10,6 @@ from app.infrastructure.repositories.summarization import DocumentTermStatsRepos
 async def compute_modified_term_weights(
     session: AsyncSession, *, document_id: int, collection_id: int
 ) -> dict[str, float]:
-    """w(t,D) per LR3's modified TF-IDF formula, scoped to the document's collection."""
     term_stats = DocumentTermStatsRepository(session)
     documents = DocumentRepository(session)
 

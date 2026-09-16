@@ -1,8 +1,4 @@
-/** Mirrors match_command in services/api/app/domain/speech.py so global
- * speech mode can react to commands client-side (no network round-trip per
- * utterance) using the exact same "normalize, then substring-contains"
- * rule the backend already applies after a recording is transcribed. */
-
+// Mirrors match_command in services/api/app/domain/speech.py for client-side matching.
 const PUNCT_RE = /[^\p{L}\p{N}_\s]/gu;
 const WHITESPACE_RE = /\s+/g;
 

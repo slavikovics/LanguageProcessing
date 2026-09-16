@@ -1,6 +1,3 @@
-/** Minimal shape of the (non-standardized, Chrome/Edge-only) Web Speech API
- * SpeechRecognition interface — not in TypeScript's DOM lib, so declared
- * locally rather than pulling in a whole @types package for a few fields. */
 interface LiveRecognitionResult {
   isFinal: boolean;
   0: { transcript: string };
@@ -34,16 +31,6 @@ function getConstructor(): LiveRecognitionConstructor | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
-/**
- * Best-effort *live* caption while recording, using the browser's built-in
- * Web Speech API purely as a "words appear as you speak" preview — the
- * authoritative transcript and command matching still come from the local
- * faster-whisper backend (see SpeechHelp's "Почему не Web Speech API": that
- * choice still stands, this is only a cosmetic layer on top of it, updating
- * far more often than the ~3.5s server chunk cadence). Returns null where
- * the API isn't available (e.g. Firefox); callers must treat that as "no
- * live preview" and keep working exactly as before.
- */
 export function startLiveTranscription(
   language: string,
   onUpdate: (text: string) => void,
@@ -71,18 +58,13 @@ export function startLiveTranscription(
     const combined = `${finalText} ${interim}`.trim();
     if (combined) onUpdate(combined);
   };
-  recognition.onerror = () => {
-    // Best-effort only — the backend transcription is authoritative, so a
-    // live-preview hiccup (no-speech, permission race, etc.) isn't surfaced.
-  };
+  recognition.onerror = () => {};
   recognition.onend = () => {
     if (!stopped) {
       try {
         recognition.start();
       } catch {
-        // Some browsers throw when restarting too quickly after onend;
-        // the preview just stops updating until the next click, which is
-        // harmless since it's cosmetic.
+        // Some browsers throw when restarting too soon after onend; preview just stops updating.
       }
     }
   };
@@ -101,9 +83,7 @@ export function startLiveTranscription(
       recognition.onend = null;
       try {
         recognition.stop();
-      } catch {
-        // already stopped
-      }
+      } catch {}
     },
   };
 }

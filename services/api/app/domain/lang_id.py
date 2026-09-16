@@ -92,10 +92,6 @@ def split_train_test(
         if combined_total < 2:
             train_ids.extend(shuffled)
             continue
-        # Target the ratio over every confirmed document of this language, not just
-        # the ones in this batch — otherwise labeling one document at a time always
-        # lands in train (each batch of 1 is too small to split) and no language
-        # ever accumulates a test set.
         target_test_total = max(1, min(round(combined_total * test_ratio), combined_total - 1))
         needed_test = max(0, target_test_total - existing_test)
         test_count = min(needed_test, len(shuffled))

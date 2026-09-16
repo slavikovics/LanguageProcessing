@@ -9,10 +9,6 @@ from .base import Base
 
 
 class SpeechCommand(Base):
-    """One entry in the LR9 'list of operations the system can react to' —
-    a phrase matched (case-insensitively, substring) against an STT
-    transcript, and the action it should trigger in the frontend."""
-
     __tablename__ = "speech_commands"
 
     id: Mapped[int] = mapped_column(primary_key=True)

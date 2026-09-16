@@ -1,10 +1,7 @@
 from pydantic import BaseModel, Field
 
 MAX_TTS_TEXT_LENGTH = 5000
-"""Piper synthesizes the whole string in one call, so an unbounded text
-length turns into unbounded CPU/memory for the local backend — this caps it
-to a size the container's resource limits (see docker-compose.yml) can
-comfortably absorb. Mirrored in the api service's SynthesizeSpeechRequest."""
+# Bounds Piper's per-call cost; mirrors api service's SynthesizeSpeechRequest limit.
 
 
 class SynthesizeRequest(BaseModel):

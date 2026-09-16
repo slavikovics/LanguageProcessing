@@ -5,12 +5,6 @@ import { Button } from "@/components/ui/button";
 import { useSpeechPlayback } from "@/context/SpeechPlaybackContext";
 import { cn } from "@/lib/utils";
 
-/**
- * Reusable play/stop control for TTS playback, backed by the shared
- * SpeechPlaybackContext player. Used anywhere a snippet of text can be read
- * aloud (document forms, settings preview, summarization results,
- * translation output) so the play/stop animation stays consistent app-wide.
- */
 export function SpeakButton({
   text,
   className,

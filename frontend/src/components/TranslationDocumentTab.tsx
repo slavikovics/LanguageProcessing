@@ -27,8 +27,7 @@ export function TranslationDocumentTab({
   const [error, setError] = useState<string | null>(null);
 
   const canTranslate = selectedDocument !== null || pastedText.trim().length > 0;
-  // Makes the "read this" voice command work here (LR9) — source registers
-  // before the translation, matching the left-to-right column order below.
+  // Registers source before translation, matching left-to-right column order.
   useReadableText(run?.source_text ?? "");
   useReadableText(run?.translated_text ?? "");
 

@@ -1,7 +1,3 @@
-/** spaCy universal POS tags and dependency labels — both kept as raw spaCy
- * values (not translated), matching the original corpus-manager tooling
- * this was ported from. Only the colour maps are look-up tables here. */
-
 export const POS_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   NOUN: { bg: "#3b82f620", text: "#3b82f6", border: "#3b82f6" },
   PROPN: { bg: "#3b82f620", text: "#3b82f6", border: "#3b82f6" },

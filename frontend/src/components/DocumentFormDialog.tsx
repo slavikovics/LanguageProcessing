@@ -34,9 +34,7 @@ export function DocumentFormDialog({
   const titleInputRef = useRef<HTMLInputElement>(null);
   const { setActiveDocumentText } = useSpeechMode();
 
-  // An open document dialog takes priority over any page's own readable
-  // blocks for the "read this" voice command (LR9) — see
-  // SpeechModeContext's getActiveDocumentText.
+  // Open dialog text overrides page readable blocks for the "read this" voice command.
   useEffect(() => {
     if (mode === "closed") {
       setActiveDocumentText(null);

@@ -14,12 +14,8 @@ class SpeechServiceError(RuntimeError):
         self.detail = detail
 
 
+# Generous 150s ceiling: exceeds faster-whisper's worst-case decode time so errors surface from speech-service, not timeout.
 _STT_TIMEOUT_SECONDS = 150.0
-"""Generous ceiling for the batch /stt call against speech-service — well
-above faster-whisper's worst-case decode+transcribe time for a full-length
-recording, so a slow transcription surfaces as speech-service's own (more
-specific) error/response rather than our request timing out first and
-masking it with a generic ReadTimeout."""
 
 
 class SpeechServiceClient:
@@ -30,10 +26,6 @@ class SpeechServiceClient:
     async def open_synthesis_stream(
         self, text: str, *, backend: str, voice: str | None, rate: float
     ) -> AsyncIterator[bytes]:
-        """Opens the /tts call against speech-service and validates the
-        response status before returning — so a backend/model error surfaces
-        as a clean HTTPException instead of a broken stream after a 200 has
-        already been committed to the browser."""
         client = httpx.AsyncClient(base_url=self._base_url, timeout=self._timeout)
         request = client.build_request(
             "POST",

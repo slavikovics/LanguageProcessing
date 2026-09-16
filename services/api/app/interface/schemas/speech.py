@@ -6,10 +6,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.enums import SpeechBackend
 
+# Must match speech-service's MAX_TTS_TEXT_LENGTH so oversized text is rejected before the network call.
 MAX_TTS_TEXT_LENGTH = 5000
-"""Matches speech-service's MAX_TTS_TEXT_LENGTH (app/schemas.py) so an
-oversized request is rejected here, before the text is even sent over the
-wire to speech-service."""
 
 
 class SynthesizeSpeechRequest(BaseModel):

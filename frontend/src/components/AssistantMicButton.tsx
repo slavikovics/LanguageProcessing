@@ -6,20 +6,12 @@ import { Button } from "@/components/ui/button";
 import { useSpeechMode } from "@/context/SpeechModeContext";
 import { cn } from "@/lib/utils";
 
-/**
- * Single, always-reachable voice-assistant entry point (Siri/Google
- * Assistant style: one floating mic, bottom-right, everywhere in the app) —
- * replaces the old mic toggle that used to live inline in the top nav pill.
- */
 export function AssistantMicButton() {
   const { isListening, isSupported, notice, partialTranscript, commandFlashToken, toggle, getVolume } =
     useSpeechMode();
   const volumeRingRef = useRef<HTMLSpanElement>(null);
 
-  // Drives the volume ring directly via style writes on every animation
-  // frame instead of React state — mic loudness changes far faster than any
-  // reasonable re-render budget, and this keeps the rest of the component
-  // (and its parents) from re-rendering 60 times a second while listening.
+  // Volume ring is driven via direct style writes, not state, to avoid 60fps re-renders.
   useEffect(() => {
     if (!isListening) return;
     let rafId = 0;
@@ -57,9 +49,7 @@ export function AssistantMicButton() {
         <div className="relative">
           {isListening && (
             <>
-              {/* Sound-wave ripple: "voice mode is on", independent of volume. */}
               <SoundWaveRing active={isListening} />
-              {/* Volume ring: scales/brightens with live mic loudness (see the rAF loop above). */}
               <span
                 ref={volumeRingRef}
                 className="pointer-events-none absolute inset-0 rounded-full bg-primary/60 blur-sm transition-none"

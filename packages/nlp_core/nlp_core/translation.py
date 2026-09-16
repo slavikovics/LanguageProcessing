@@ -44,13 +44,6 @@ class TranslationResult:
 
 
 def translate(text: str, lookup: DictionaryLookup) -> TranslationResult:
-    """Word-for-word (direct/pословный) translation: every alphabetic token is
-    looked up by (lemma, POS) — falling back to (lemma, any POS) — in the
-    supplied dictionary and swapped in place; punctuation and whitespace are
-    preserved exactly via spaCy's `whitespace_` so the output reads as normal
-    text rather than a token list. Tokens without a dictionary entry are left
-    untranslated (the direct-translation systems described in the assignment
-    do not fall back to any other translation model)."""
     doc = get_pipeline()(text)
 
     rendered_parts: list[str] = []
@@ -100,9 +93,6 @@ def translate(text: str, lookup: DictionaryLookup) -> TranslationResult:
 
 
 def build_word_list(text: str, lookup: DictionaryLookup) -> list[TranslatedWord]:
-    """Frequency-ordered word list with grammatical info and translations —
-    tab 1 of the lab: reuses the same tokenize() as the LR1 frequency list,
-    grouped by (lemma, POS) and sorted by descending frequency."""
     counts: Counter[tuple[str, str]] = Counter()
     surface_by_key: dict[tuple[str, str], str] = {}
     for tok in tokenize(text):

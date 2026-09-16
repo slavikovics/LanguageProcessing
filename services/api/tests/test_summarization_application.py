@@ -122,7 +122,6 @@ async def test_compute_modified_term_weights_matches_formula(session_factory):
             session, document_id=doc_a_id, collection_id=collection_id
         )
     assert set(weights) == {"laser", "device"}
-    # tf_max = 3 (laser); df(laser) = 1, df(device) = 1; |DB| = 2 documents
     assert math.isclose(weights["laser"], 0.5 * (1 + 3 / 3) * math.log(2 / 1))
     assert math.isclose(weights["device"], 0.5 * (1 + 1 / 3) * math.log(2 / 1))
 

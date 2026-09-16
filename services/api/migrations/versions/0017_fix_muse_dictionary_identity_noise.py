@@ -13,35 +13,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 CHUNK_SIZE = 5000
 
-# Migration 0015 bulk-inserted MUSE's raw induced en->fr dictionary keyed by
-# whatever surface word it happened to appear as (source_lemma stored the raw
-# frequency-list token, not a computed lemma — "did", "went", "goes" each got
-# their own disconnected row instead of pooling under "do"/"go"), and picked
-# whatever MUSE candidate came first even when that candidate was just the
-# English word mapped to itself. MUSE's automatically-induced dictionaries are
-# seeded from identical-string pairs and are especially noisy for
-# high-frequency function words ("her her", "will will", "did did", ...) —
-# nearly half of the bulk-inserted rows ended up with target_text equal to the
-# source word, concentrated in exactly the closed-class categories (pronouns,
-# determiners, auxiliaries, prepositions...) that dominate word counts in real
-# text, which is what made direct translations look like they left "too many
-# words the same".
-#
-# en_fr_muse.tsv has been regenerated: entries are now pooled by the actual
-# spaCy-computed lemma (so "did"/"goes"/"went" contribute their MUSE
-# candidates to one "do" entry instead of three disconnected ones), preferring
-# a genuine (non-self) translation whenever any inflected form of the lemma
-# has one anywhere in MUSE's data. Closed-class words where no inflected form
-# has a real translation are dropped entirely (left untranslated by the
-# direct-translation system) instead of keeping a fabricated self-translation.
-# Open-class words with no non-self candidate anywhere in MUSE are still
-# stored as identical — many of those are genuine EN/FR cognates and
-# loanwords (e.g. "virus", "style").
-#
-# Because the old rows were keyed by surface form and the new ones by lemma,
-# there's no reliable per-row correspondence to update in place, so this
-# migration replaces the whole non-curated slice: every row migration 0015
-# bulk-inserted is removed and the regenerated file is inserted fresh.
+# 0015's rows were keyed by surface form, not lemma, causing identity-translation noise; replaces the whole non-curated slice with a lemma-pooled, re-filtered dictionary.
 DICTIONARY_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "app", "domain", "dictionaries", "en_fr_muse.tsv"
 )
@@ -108,8 +80,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # The pre-fix per-surface-word data isn't recoverable from what's on disk
-    # now; downgrading just clears the regenerated rows back to empty, same as
-    # 0015's own downgrade() does for its bulk import.
     conn = op.get_bind()
     _delete_non_curated(conn)

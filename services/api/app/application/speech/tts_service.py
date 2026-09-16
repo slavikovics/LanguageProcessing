@@ -6,9 +6,6 @@ from app.infrastructure.speech_client import SpeechServiceClient
 
 
 class SpeechSynthesisService:
-    """No DB access — synthesis is a pure passthrough to speech-service, not
-    persisted (see the plan's DB-persistence decision for /speech/tts)."""
-
     def __init__(self, *, client: SpeechServiceClient | None = None) -> None:
         self._client = client or SpeechServiceClient()
 

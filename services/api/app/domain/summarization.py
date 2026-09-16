@@ -31,11 +31,6 @@ class SummaryOutcome:
 
     @property
     def compression_ratio(self) -> float:
-        """Character length of the extracted summary relative to the source
-        document. Sentence-count ratio would be identical across methods
-        whenever they target the same sentence_count, so it can't distinguish
-        methods — character length varies with which (shorter/longer)
-        sentences each method actually picked."""
         if self.document_chars <= 0:
             return 0.0
         return len(self.summary_text) / self.document_chars

@@ -16,9 +16,6 @@ class SummarizeDocumentRequest(BaseModel):
     sentence_count: int = 10
     keyword_count: int = 15
     query: str | None = None
-    """Query for the query-oriented variant of the embeddings method — sentences
-    are ranked by similarity to this query instead of to the document centroid.
-    Ignored by the algorithmic/textrank methods."""
 
 
 class SummaryOutcomeOut(BaseModel):

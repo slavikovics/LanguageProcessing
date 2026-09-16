@@ -7,11 +7,6 @@ interface SpeechSettings {
   rate: number;
   volume: number;
   sttLanguage: string;
-  /** Wake phrase gating the always-on ambient listening mode
-   * (SpeechModeContext) — empty means no gating (every utterance heard
-   * while listening is checked against active commands, today's default
-   * behavior). Push-to-talk (VoiceInputButton) never requires this: pressing
-   * the button is already an explicit activation. */
   activationPhrase: string;
 }
 

@@ -14,9 +14,6 @@ function inlineMarkdownToHtml(text: string): string {
     .replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, "<em>$1</em>");
 }
 
-/** Minimal, dependency-free Markdown → HTML for the print view (no JS
- * libraries run inside the printed tab): headings, paragraphs, bullet
- * lists, bold/italic — enough for the LLM's paraphrased output. */
 export function markdownToPrintHtml(markdown: string): string {
   const parts: string[] = [];
   let listBuffer: string[] = [];
@@ -64,10 +61,6 @@ export function markdownToPrintHtml(markdown: string): string {
   return parts.join("");
 }
 
-/** Opens a new tab containing only the given content — no app chrome — and
- * triggers the browser print dialog on it once it has loaded. Served from a
- * Blob URL (rather than document.write into an about:blank window) so the
- * tab has a real, inspectable URL and its own document lifecycle. */
 export function openPrintView(title: string, bodyHtml: string): void {
   const html = `<!doctype html>
 <html lang="ru">

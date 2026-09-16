@@ -18,8 +18,6 @@ from app.infrastructure.summarization_client import SummarizationServiceClient
 from .term_weights import compute_modified_term_weights
 
 DEFAULT_KEYWORD_COUNT = 15
-"""Default cap on the number of keyword-hierarchy roots, used when the caller
-doesn't request a specific count."""
 
 
 class DocumentSummarizationService:

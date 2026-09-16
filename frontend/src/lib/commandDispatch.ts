@@ -1,11 +1,5 @@
 import type { NavigateFunction } from "react-router-dom";
 
-/**
- * What each speech_commands.action actually does, in one place — used both
- * by a page's own push-to-talk VoiceInputButton and by the global
- * always-listening speech mode, so a command behaves identically regardless
- * of which one heard it.
- */
 export interface CommandDispatchDeps {
   navigate: NavigateFunction;
   speak: (text: string) => void;
@@ -13,9 +7,6 @@ export interface CommandDispatchDeps {
   getActiveDocumentText: () => string | null;
 }
 
-/** Plain "go to that tab" actions, one per Layout.tsx nav item — a lookup
- * table rather than one switch case each since they're all the same shape
- * (navigate, no args). */
 const NAVIGATE_TARGETS: Record<string, string> = {
   navigate_to_crawl: "/crawl",
   navigate_to_collections: "/collections",
@@ -43,17 +34,9 @@ export function dispatchSpeechCommandAction(
       deps.navigate(`/search?voiceQuery=${encodeURIComponent(transcript)}`);
       break;
     case "clear_query":
-      // Encoded empty voiceQuery (rather than a bare "/search") so
-      // SearchPage's handler still runs and clears its query box even if
-      // the user is already on that page.
       deps.navigate("/search?voiceQuery=");
       break;
     case "read_document": {
-      // Prefers an explicitly open document dialog (see
-      // SpeechModeContext's activeDocumentTextRef); otherwise falls back to
-      // the first still-mounted readable block registered via
-      // useReadableText (e.g. a summary or a translation result) — "the
-      // first block with playback available on the page," per LR9's ask.
       const text = deps.getActiveDocumentText();
       if (text) deps.speak(text);
       break;

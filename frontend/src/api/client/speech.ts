@@ -27,15 +27,7 @@ export async function synthesizeSpeech(
   return new Blob([fixWavHeaderSize(buffer)], { type: "audio/wav" });
 }
 
-/**
- * The backend streams WAV audio without knowing the final size upfront (so
- * stopping mid-generation can cancel the upstream request), so it writes a
- * placeholder 0xFFFFFFFF RIFF/data size. Browsers don't tolerate that
- * mismatch for playback (a WAV whose header claims ~4GB but whose actual
- * byte length is a few hundred KB can hang the audio decoder) — by the time
- * we're here the full buffer is already in memory, so patch the header with
- * the real size before handing it to <audio>.
- */
+// Backend writes a placeholder 0xFFFFFFFF size; browsers can hang decoding that.
 function fixWavHeaderSize(buffer: ArrayBuffer): ArrayBuffer {
   const view = new DataView(buffer);
   const totalSize = buffer.byteLength;

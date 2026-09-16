@@ -53,7 +53,6 @@ def binary_query_vector(query_terms: Iterable[Term]) -> dict[Term, float]:
 def modified_term_weight(
     tf: float, tf_max: float, document_frequency: int, total_documents: int
 ) -> float:
-    """w(t,D) = 0.5 * (1 + tf(t,D)/tf_max(D)) * log(|DB| / df(t)) — LR3 methodology formula."""
     if tf_max <= 0:
         raise ValueError("tf_max must be positive")
     if document_frequency <= 0 or total_documents <= 0:

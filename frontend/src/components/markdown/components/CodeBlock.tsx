@@ -26,8 +26,7 @@ export function CodeBlock({
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      // Clipboard access can be blocked by the browser — the button is a
-      // convenience, so failing silently beats throwing into the render tree.
+      // Clipboard access can be blocked by browser permissions; fail silently.
     }
   }
 

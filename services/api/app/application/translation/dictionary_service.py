@@ -13,10 +13,6 @@ _DUPLICATE_ENTRY_MESSAGE = (
 
 
 class TranslationDictionaryService:
-    """The 'утилита автоматического пополнения/корректировки словаря' the
-    assignment asks for — CRUD over translation_dictionary_entries with
-    duplicate-key handling on top of the plain repository."""
-
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
         self._entries = TranslationDictionaryRepository(session)

@@ -32,9 +32,6 @@ _WHITESPACE_RE = re.compile(r"\s+")
 
 
 def _normalize(text: str) -> str:
-    """Lowercase, punctuation -> space (not deleted, so "stop-reading" still
-    matches "stop reading" instead of colliding into "stopreading"), then
-    collapse repeated whitespace."""
     despaced = _PUNCT_RE.sub(" ", text)
     return _WHITESPACE_RE.sub(" ", despaced).lower().strip()
 
@@ -42,8 +39,6 @@ def _normalize(text: str) -> str:
 def match_command(
     transcript: str, commands: list[SpeechCommandDef]
 ) -> SpeechCommandDef | None:
-    """First active command whose phrase appears (normalized, case/punct
-    insensitive) in the transcript — the LR9 'automatic reaction' trigger."""
     normalized = _normalize(transcript)
     if not normalized:
         return None

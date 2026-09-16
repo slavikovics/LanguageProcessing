@@ -13,13 +13,6 @@ const PAGE_SIZE = 30;
 const SEARCH_DEBOUNCE_MS = 250;
 const LOAD_MORE_THRESHOLD_PX = 48;
 
-/**
- * Server-searched document picker: fetches title-matching documents a page
- * at a time and loads the next page as the list is scrolled, so it stays
- * fast and lets you reach any document whether the collection has 20 or
- * 20 000 of them. `value` of `null` means "no document" — pass `null` to
- * `onChange` (via the clear button) to go back to that state.
- */
 export function DocumentCombobox({
   collectionId,
   value,

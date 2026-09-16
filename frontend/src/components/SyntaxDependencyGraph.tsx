@@ -48,9 +48,6 @@ function TokenNode({ data }: NodeProps) {
 
 const nodeTypes = { token: TokenNode };
 
-/** Dependency parse tree — tab 2 of the lab. Root at the top, each token's
- * head above it, laid out level-by-level (BFS depth from the sentence
- * root) since spaCy dependency trees aren't necessarily linear left → right. */
 export function SyntaxDependencyGraph({
   tokens,
   className = "h-[420px]",

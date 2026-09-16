@@ -3,8 +3,7 @@ from __future__ import annotations
 import struct
 
 _STREAMING_SIZE_SENTINEL = 0xFFFFFFFF
-"""RIFF/data chunk sizes when the total length isn't known upfront (streamed
-generation) — players read until EOF for the data chunk regardless."""
+# Sentinel size for streamed WAV (unknown length); players read until EOF.
 
 
 def build_wav_header(

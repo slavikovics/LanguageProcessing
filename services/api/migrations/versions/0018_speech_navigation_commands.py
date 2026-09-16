@@ -16,10 +16,7 @@ speech_commands_table = sa.table(
     sa.column("is_active", sa.Boolean),
 )
 
-# One phrase per Layout.tsx nav tab, mirrored client-side by
-# commandDispatch.ts's NAVIGATE_TARGETS. Phrases are distinct enough after
-# "go to " that none is a substring of another, so matchCommand's plain
-# substring rule can't confuse them.
+# Mirrors commandDispatch.ts's NAVIGATE_TARGETS; phrases must stay distinct so matchCommand's substring rule can't confuse them.
 _SEED_COMMANDS = [
     ("go to crawling", "navigate_to_crawl"),
     ("go to collections", "navigate_to_collections"),

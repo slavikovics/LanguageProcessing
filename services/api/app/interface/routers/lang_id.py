@@ -54,8 +54,6 @@ async def _run_lang_id_run(run_id: int) -> None:
         await LangIdTestRunService(session).run_job(run_id)
 
 
-
-
 @router.get("/collections/{collection_id}/lang-id/unlabeled-documents", response_model=list[DocumentOut])
 async def list_unlabeled_documents(
     collection_id: int, limit: int = 50, offset: int = 0, db: AsyncSession = Depends(get_db)
@@ -95,8 +93,6 @@ async def set_language_label(
         _raise_for_lang_id_error(exc)
 
 
-
-
 @router.get("/lang-id/profiles", response_model=list[LangIdProfileOut])
 async def list_profiles(db: AsyncSession = Depends(get_db)) -> list[LangIdProfileOut]:
     service = LangIdProfileService(db)
@@ -123,8 +119,6 @@ async def build_alphabetic_profile(
         return await service.build_lexical_profile("alphabetic", payload.language)
     except LangIdError as exc:
         _raise_for_lang_id_error(exc)
-
-
 
 
 @router.post("/lang-id/neural/train", response_model=LangIdTrainingJobOut, status_code=201)
@@ -182,8 +176,6 @@ async def neural_training_progress_ws(websocket: WebSocket, job_id: int) -> None
         pass
 
 
-
-
 @router.post("/lang-id/identify", response_model=IdentifyResponseOut)
 async def identify_document(
     payload: IdentifyDocumentRequest, db: AsyncSession = Depends(get_db)
@@ -221,8 +213,6 @@ async def identify_text(
     except LangIdError as exc:
         _raise_for_lang_id_error(exc)
     return IdentifyResponseOut(results=[IdentificationOutcomeOut(**vars(o)) for o in outcomes])
-
-
 
 
 @router.post("/lang-id/runs", response_model=list[LangIdRunOut], status_code=201)

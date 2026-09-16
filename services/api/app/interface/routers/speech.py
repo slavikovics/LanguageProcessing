@@ -33,22 +33,14 @@ from app.interface.schemas import (
 router = APIRouter(tags=["speech"])
 logger = logging.getLogger(__name__)
 
+# Must match speech-service's MAX_AUDIO_UPLOAD_BYTES to reject oversized uploads before proxying.
 MAX_AUDIO_UPLOAD_BYTES = 25 * 1024 * 1024
-"""Matches speech-service's MAX_AUDIO_UPLOAD_BYTES (app/routes.py) so an
-oversized upload is rejected here instead of being proxied across the
-network only to be rejected on the other side."""
 
+# 20s ceiling for one stream chunk; batch /speech/stt route needs the larger 150s budget.
 _STREAM_CHUNK_TIMEOUT_SECONDS = 20.0
-"""Each /speech/stt/stream chunk is a few seconds of audio transcribed by
-speech-service's smaller "stream" model — this should return in well under
-a second normally; 20s is a generous ceiling for one slow chunk, not the
-150s worst-case budget the batch /speech/stt route needs."""
 
+# Caps concurrent speech-service requests across sessions to stay within container's cpus budget (docker-compose.yml).
 _live_stt_semaphore = asyncio.Semaphore(get_settings().speech_stream_max_concurrency)
-"""Bounds how many chunks across every open ambient-listening/dictation
-session this api process will have in flight against speech-service at
-once, so concurrent live sessions can't collectively exceed that
-container's cpus= budget (docker-compose.yml)."""
 
 
 def _raise_for_speech_error(exc: SpeechError) -> None:
@@ -57,8 +49,6 @@ def _raise_for_speech_error(exc: SpeechError) -> None:
 
 
 async def _read_capped(upload: UploadFile, max_bytes: int) -> bytes:
-    """Reads the upload in chunks so an oversized file is rejected without
-    ever buffering more than max_bytes + one chunk into memory."""
     chunks: list[bytes] = []
     total = 0
     while True:
@@ -159,24 +149,11 @@ async def delete_speech_command(command_id: int, db: AsyncSession = Depends(get_
 
 @router.websocket("/speech/stt/stream")
 async def stream_transcribe_speech(websocket: WebSocket) -> None:
-    """Live-dictation gateway: the browser restarts MediaRecorder every
-    ~3.5s and sends each independent chunk as a binary frame; each chunk is
-    forwarded to speech-service's /stt (smaller "stream" model,
-    vad_filter=True) and the running transcript is relayed back as JSON,
-    until a {"type":"stop"} frame triggers a final command-match pass. Local
-    backend only — it's the only backend the app supports at all now, but
-    this is also the one path that structurally couldn't use a cloud
-    backend anyway (a network round-trip every ~3.5s isn't practical)."""
     await websocket.accept()
 
     try:
         start_message = await websocket.receive_json()
     except WebSocketDisconnect:
-        # A client that connects and disconnects before ever sending its
-        # start frame (tab closed/navigated away mid-handshake) is a normal
-        # occurrence, not a server error — receive_json() otherwise raises
-        # this uncaught, which surfaces as a logged ASGI exception for
-        # nothing more than an ordinary early disconnect.
         return
 
     if start_message.get("type") != "start":
@@ -197,11 +174,6 @@ async def stream_transcribe_speech(websocket: WebSocket) -> None:
         return
 
     language = start_message.get("language")
-    # Settings' STT "check" widget just previews recognition accuracy — it
-    # has no onCommand consumer at all, so there's nothing useful to do with
-    # a match there, only the cost of the extra DB query and (if the spoken
-    # test text happens to contain a trigger phrase) a misleading "Команда
-    # распознана" notice for a command that isn't actually being acted on.
     match_commands = bool(start_message.get("match_commands", True))
     session = StreamSession()
     client = SpeechServiceClient()
@@ -216,10 +188,6 @@ async def stream_transcribe_speech(websocket: WebSocket) -> None:
                 try:
                     payload = json.loads(text)
                 except ValueError:
-                    # A malformed text frame previously propagated out of
-                    # this loop uncaught, which tears the WebSocket down
-                    # ungracefully (see the broad except Exception blocks
-                    # below for the same rationale) — just ignore it.
                     logger.warning("speech stream: ignoring malformed text frame")
                     continue
                 if payload.get("type") == "stop":
@@ -248,20 +216,9 @@ async def stream_transcribe_speech(websocket: WebSocket) -> None:
                 await websocket.send_json({"type": "error", "detail": exc.detail})
                 continue
             except httpx.HTTPError as exc:
-                # A single slow/reset chunk (speech-service momentarily
-                # overloaded, a dropped connection) shouldn't kill the whole
-                # ambient/dictation session — report it and keep listening
-                # for the next chunk, same as a SpeechServiceError above.
                 await websocket.send_json({"type": "error", "detail": str(exc)})
                 continue
             except Exception:
-                # Anything else here (e.g. a malformed speech-service
-                # response) previously propagated out of this loop
-                # uncaught, which crashes the WebSocket ungracefully — the
-                # browser just sees the connection drop with no "final"
-                # ever having arrived, reported to the user as the
-                # connection having died rather than one bad chunk. Log it
-                # and keep the session alive for the next chunk instead.
                 logger.exception("speech stream: unexpected error transcribing a chunk")
                 await websocket.send_json(
                     {"type": "error", "detail": "internal error transcribing this chunk"}
@@ -299,12 +256,6 @@ async def _finish_stream(websocket: WebSocket, session: StreamSession, *, match_
             ]
             matched = match_command(session.full_text, command_defs)
         except Exception:
-            # A DB hiccup here shouldn't cost the user their transcript — this
-            # previously ran with no try/except, so an error propagated out of
-            # this coroutine uncaught and crashed the WebSocket before "final"
-            # was ever sent, which the browser reports as the connection having
-            # been lost rather than "no command matched". Deliver the
-            # transcript anyway, just without a matched command.
             logger.exception("speech stream: failed to match commands while finishing")
     await websocket.send_json(
         {

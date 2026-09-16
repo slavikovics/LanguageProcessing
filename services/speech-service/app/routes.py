@@ -12,11 +12,7 @@ from app.schemas import SynthesizeRequest, TranscribeResponse
 router = APIRouter(tags=["speech"])
 
 MAX_AUDIO_UPLOAD_BYTES = 25 * 1024 * 1024
-"""Bounds how much audio faster-whisper is asked to decode+transcribe in one
-request. Whisper's memory/CPU cost scales with audio length, so without a
-cap a long enough clip can exhaust the container's resources; the size limit
-here stands in for a duration limit since we don't want to decode audio just
-to measure it. Mirrored in the api service's /speech/stt route."""
+# Caps decode+transcribe cost; mirrors api service's /speech/stt limit.
 
 
 @router.get("/health")
@@ -48,17 +44,7 @@ async def transcribe(
     if backend != "local":
         raise HTTPException(status_code=422, detail=f"unknown backend: {backend}")
 
-    # faster-whisper's model.transcribe() is a synchronous, CPU-bound call
-    # (0.3-1.5x real-time even on the fast "stream" model) — called directly
-    # it blocks this process's *entire* asyncio event loop for its whole
-    # duration, which starves everything else the container is doing
-    # concurrently: other in-flight STT chunks queue up and can time out,
-    # and TTS byte delivery on /tts stalls long enough for the client to see
-    # the connection reset. This matters far more now than it used to: live
-    # streaming calls this endpoint every ~3.5s instead of once per
-    # utterance. Offloading to a worker thread lets ctranslate2 (which
-    # releases the GIL during its C++ inner loop) actually run concurrently
-    # with the rest of the event loop.
+    # Offload to a thread: whisper's transcribe() is blocking and would stall the event loop.
     transcript, detected_language = await run_in_threadpool(
         stt_local.transcribe,
         audio_bytes,
@@ -78,8 +64,6 @@ async def transcribe(
 
 
 async def _read_capped(upload: UploadFile, max_bytes: int) -> bytes:
-    """Reads the upload in chunks so an oversized file is rejected without
-    ever buffering more than max_bytes + one chunk into memory."""
     chunks: list[bytes] = []
     total = 0
     while True:

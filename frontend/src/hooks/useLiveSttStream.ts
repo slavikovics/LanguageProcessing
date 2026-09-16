@@ -11,71 +11,26 @@ export type LiveSttUnavailableReason =
   | "mic_lost";
 
 const SILENCE_LEVEL_THRESHOLD = 0.06;
-/** How long after stop() to wait for a "final" before giving up on the
- * connection and force-closing it ourselves. Must outlast the backend's own
- * per-chunk ceiling (_STREAM_CHUNK_TIMEOUT_SECONDS = 20s in routers/
- * speech.py) plus some room for a cold Whisper model load — the previous
- * 5s was tight enough that a single slow-but-legitimate final chunk (first
- * request after the speech-service container/model just started, or one
- * queued behind another concurrent live session) could get force-closed by
- * the client while the server was still genuinely working on it, which then
- * surfaced to the user as a false "Соединение ... потеряно" even though
- * nothing had actually failed. */
+// Must outlast backend's ~20s chunk ceiling plus cold-model-load time, or a slow final looks lost.
 const STOP_SAFETY_NET_MS = 22000;
-/** Above this normalized mic loudness (see micVolumeMeter's 0..1 scale) a
- * frame counts as "the user is talking" for silence-based auto-stop. */
 
 interface UseLiveSttStreamOptions {
   language?: string;
-  /** How often (ms) MediaRecorder is stopped and restarted on the same
-   * stream — each restart yields one independently-decodable audio chunk,
-   * sent to the server as soon as it's ready. Default 3500ms: short enough
-   * to feel live, long enough that faster-whisper's "base" stream model
-   * (see speech-service/app/stt_local.py) stays comfortably faster than
-   * real-time on the container's CPU budget. */
   chunkMs?: number;
-  /** Floor (ms) on how long the *current* chunk's recorder has been running
-   * before stop() is honored — a MediaRecorder stopped only a few hundred ms
-   * after starting can produce a blob too short for the browser's encoder to
-   * finalize into a valid container, which faster-whisper can't decode. A
-   * user calling stop() right after a chunk restarted (or right after a
-   * short utterance) is the common way to hit that, so stop() waits out the
-   * remainder of this floor instead of stopping immediately. */
+  // Recorder stopped too soon after starting can yield a blob too short for the browser encoder to finalize.
   minChunkMs?: number;
-  /** When set, stop() is called automatically once the mic has gone quiet
-   * for `silenceTimeoutMs` after having heard some speech — the
-   * Siri/Google-Assistant style "keep listening until you stop talking"
-   * turn-taking, instead of requiring an explicit manual stop. Needs
-   * AudioContext support to detect silence at all (see
-   * micVolumeMeter.isVolumeMeterSupported); where it's unavailable this is
-   * silently a no-op and the caller's own stop() control remains the only
-   * way to end the turn. */
   autoStopOnSilence?: boolean;
-  /** How long (ms) the mic must stay under SILENCE_LEVEL_THRESHOLD after
-   * having heard speech before autoStopOnSilence ends the turn. */
   silenceTimeoutMs?: number;
-  /** Whether the server should check the finished transcript against
-   * speech_commands at all. Default true; a caller with no onFinal
-   * consumer for `matchedCommand` (e.g. Settings' STT accuracy preview,
-   * which only wants plain text back) should pass false so the widget
-   * doesn't look like it's "reacting" to what was said. */
   matchCommands?: boolean;
   onPartial?: (chunkText: string, fullText: string) => void;
   onFinal?: (fullText: string, matchedCommand: SpeechCommand | null) => void;
   onError?: (detail: string) => void;
   onUnavailable?: (reason: LiveSttUnavailableReason) => void;
-  /** Fired on every animation frame while the mic is live with a normalized
-   * 0..1 loudness reading, for driving a volume-reactive UI (e.g. a ring
-   * around the mic button) — separate from onPartial/onFinal, which only
-   * fire once per ~3.5s chunk and are far too coarse for that. */
   onVolume?: (level: number) => void;
 }
 
 interface UseLiveSttStreamResult {
   isStreaming: boolean;
-  /** Resolves once the outcome is known: true if the connection actually
-   * opened, false if it failed/was rejected (onUnavailable has already been
-   * called in that case) or if a start() was already in flight. */
   start: () => Promise<boolean>;
   stop: () => void;
 }
@@ -84,22 +39,6 @@ export function isLiveSttSupported(): boolean {
   return typeof MediaRecorder !== "undefined" && typeof WebSocket !== "undefined";
 }
 
-/**
- * Drives live speech-to-text: restarts MediaRecorder every `chunkMs` on one
- * shared mic stream (see the plan — a rolling buffer of ondataavailable
- * timeslices isn't reliably independently-decodable; a fresh MediaRecorder
- * per chunk always is) and streams each chunk to /speech/stt/stream over a
- * WebSocket, relaying partial/final transcripts back through callbacks.
- * Local faster-whisper backend only — this is the only STT backend the app
- * supports.
- *
- * Deliberately not built on useJobProgress's shape: that hook is read-only
- * JSON-over-WS with a polling fallback; this one is bidirectional
- * (binary audio out, JSON in) and owns mic lifecycle, with no meaningful
- * polling fallback — on an unexpected disconnect it just reports
- * "connection_lost" and stops, leaving the caller to fall back to a batch
- * recording if it wants to.
- */
 export function useLiveSttStream(options: UseLiveSttStreamOptions): UseLiveSttStreamResult {
   const {
     language,
@@ -116,17 +55,7 @@ export function useLiveSttStream(options: UseLiveSttStreamOptions): UseLiveSttSt
   } = options;
   const [isStreaming, setIsStreaming] = useState(false);
 
-  // Latest-value refs for the callback props: start() only actually runs
-  // once per session (its WebSocket handlers are set up a single time, when
-  // the connection opens) but the calling component can re-render with new
-  // callback closures at any point during that session — e.g.
-  // SpeechModeContext recreates its onVolume/onPartial/etc. whenever
-  // activationPhrase or the command list changes. Closing directly over
-  // `options.onX` in the handlers below would freeze them at whatever those
-  // callbacks happened to be at connect time, silently ignoring any settings
-  // change made while already listening until the mic was restarted.
-  // Dereferencing through a ref instead means every already-open session
-  // picks up the latest callback on its very next event.
+  // Refs (not closures) so already-open sessions pick up new callback props without a restart.
   const onPartialRef = useRef(onPartial);
   onPartialRef.current = onPartial;
   const onFinalRef = useRef(onFinal);
@@ -148,22 +77,9 @@ export function useLiveSttStream(options: UseLiveSttStreamOptions): UseLiveSttSt
   const hasSpokenRef = useRef(false);
   const stoppingRef = useRef(false);
   const gotFinalRef = useRef(false);
-  /** Set by reportMicLost so ws.onclose (which fires right after its own
-   * wsRef.current?.close() call) reports the more specific "mic_lost"
-   * reason instead of also reporting a redundant "connection_lost" for the
-   * very same event. */
   const micLostRef = useRef(false);
   const chunkStartedAtRef = useRef(0);
-  /** Set synchronously the instant start() is called, before any await —
-   * guards against a caller invoking start() again while a previous call is
-   * still connecting (e.g. a UI that only flips its "listening" state after
-   * start()'s promise resolves lets a second rapid click race in during that
-   * window). Without this, each racing call opens its own mic stream and
-   * WebSocket, and only the last one written into these refs is ever
-   * stopped — the earlier ones leak, silently keep transcribing, and queue
-   * up behind each other and any other live session on the shared backend
-   * concurrency limit (a real incident: a burst of un-debounced clicks on
-   * the ambient mic button opened 7 overlapping sessions in ~1.5s). */
+  // Guards against overlapping start() calls before the first connects (seen: 7 sessions from rapid clicks).
   const activeRef = useRef(false);
 
   const cleanup = useCallback(() => {
@@ -185,14 +101,6 @@ export function useLiveSttStream(options: UseLiveSttStreamOptions): UseLiveSttSt
     setIsStreaming(false);
   }, []);
 
-  /** Ends the session the same way an unrecoverable failure would (report,
-   * close, clean up) when the mic itself disappears mid-session — device
-   * unplugged, OS/browser revoked the permission, another app took
-   * exclusive access. Without this, the recorder-restart cycle either threw
-   * uncaught inside a MediaRecorder event handler or just silently stopped
-   * producing chunks, leaving the UI stuck showing "listening" forever with
-   * no further transcript and no explanation — easy to hit on a long
-   * recording simply by being open for longer. */
   const reportMicLost = useCallback(() => {
     if (stoppingRef.current) return;
     stoppingRef.current = true;
@@ -211,9 +119,7 @@ export function useLiveSttStream(options: UseLiveSttStreamOptions): UseLiveSttSt
     try {
       recorder = new MediaRecorder(stream);
     } catch {
-      // Constructing on a stream whose track already ended throws
-      // synchronously rather than ever firing an event — see
-      // reportMicLost's comment.
+      // A stream whose track already ended throws synchronously here rather than firing an event.
       reportMicLost();
       return;
     }
@@ -255,9 +161,7 @@ export function useLiveSttStream(options: UseLiveSttStreamOptions): UseLiveSttSt
     } else {
       recorderRef.current?.stop();
     }
-    // Safety net: if the server never answers the stop frame with "final"
-    // (dropped connection, server error), don't leave the mic indicator on
-    // forever.
+    // Safety net if the server never answers the stop frame with "final".
     setTimeout(() => {
       if (!gotFinalRef.current && wsRef.current) {
         wsRef.current.close();
@@ -294,10 +198,7 @@ export function useLiveSttStream(options: UseLiveSttStreamOptions): UseLiveSttSt
     lastLoudAtRef.current = Date.now();
     streamRef.current = stream;
     wsRef.current = ws;
-    // { once: true } also protects against the normal-stop path re-firing
-    // this: cleanup() below calls track.stop(), which itself dispatches
-    // "ended" — reportMicLost's stoppingRef guard would no-op that second
-    // call anyway, but this avoids even queuing it.
+    // { once: true }: cleanup()'s own track.stop() also dispatches "ended", which would otherwise re-fire this.
     stream.getTracks().forEach((track) => track.addEventListener("ended", reportMicLost, { once: true }));
     volumeMeterCleanupRef.current = attachVolumeMeter(stream, (level) => {
       if (level > SILENCE_LEVEL_THRESHOLD) {

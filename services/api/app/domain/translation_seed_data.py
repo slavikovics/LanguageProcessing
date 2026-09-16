@@ -1,16 +1,3 @@
-"""Starter English -> French dictionary for the direct (word-for-word)
-translation system (LR4, variant 11: English-French, medical articles and
-fine-art criticism). Lives in app.domain (rather than migrations/versions,
-which alembic scans for revision scripts) so migration 0013_translation.py
-can import it for the initial bulk insert; extended afterwards through the
-dictionary CRUD utility in the UI.
-
-Each entry is (source_lemma, pos, target_text). `pos` follows spaCy's
-universal POS tag set; entries with pos=None match any POS.
-"""
-
-# Function words — the closed-class vocabulary needed for the translated
-# text to read as connected French rather than isolated content words.
 FUNCTION_WORDS: list[tuple[str, str | None, str]] = [
     ("the", "DET", "le"),
     ("a", "DET", "un"),
@@ -139,7 +126,6 @@ FUNCTION_WORDS: list[tuple[str, str | None, str]] = [
     ("no", "INTJ", "non"),
 ]
 
-# General-purpose vocabulary common to both scientific and critical prose.
 GENERAL_VOCAB: list[tuple[str, str | None, str]] = [
     ("study", "NOUN", "étude"),
     ("study", "VERB", "étudier"),
@@ -223,8 +209,6 @@ GENERAL_VOCAB: list[tuple[str, str | None, str]] = [
     ("necessary", "ADJ", "nécessaire"),
 ]
 
-# Medical / life-sciences vocabulary (variant 11 domain 1: scientific
-# articles on medicine).
 MEDICAL_VOCAB: list[tuple[str, str | None, str]] = [
     ("patient", "NOUN", "patient"),
     ("doctor", "NOUN", "médecin"),
@@ -284,8 +268,6 @@ MEDICAL_VOCAB: list[tuple[str, str | None, str]] = [
     ("survival", "NOUN", "survie"),
 ]
 
-# Fine-art criticism vocabulary (variant 11 domain 2: critique of visual
-# art).
 ART_VOCAB: list[tuple[str, str | None, str]] = [
     ("painting", "NOUN", "peinture"),
     ("paint", "VERB", "peindre"),

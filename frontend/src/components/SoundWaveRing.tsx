@@ -1,12 +1,5 @@
 import { cn } from "@/lib/utils";
 
-/**
- * Concentric ripples that imitate a sound wave radiating outward from a
- * button. Shared by every "audio is active" indicator in the app — the
- * assistant mic, voice input recording, and TTS playback — so they all read
- * the same way no matter the button shape underneath (`rounded` lets a
- * square icon button still emit circular ripples, or match its own corners).
- */
 export function SoundWaveRing({
   active,
   color = "bg-primary/40",

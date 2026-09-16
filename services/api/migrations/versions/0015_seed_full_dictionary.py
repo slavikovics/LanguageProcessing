@@ -13,16 +13,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 CHUNK_SIZE = 5000
 
-# A real, broad-coverage EN -> FR bilingual lexicon (MUSE, Facebook Research:
-# https://github.com/facebookresearch/MUSE, dictionaries/en-fr.txt), deduped
-# to one translation per source word, filtered to alphabetic pairs, and kept
-# only for source words in the top 50k most common English words (hermitdave
-# /FrequencyWords, subtitle-frequency corpus) — this drops MUSE's long tail
-# of place names/abbreviations picked up from its training corpus. Each word
-# is POS-tagged out of context with spaCy (en_core_web_sm) rather than left
-# under an "any POS" sentinel, so the dictionary carries real grammatical
-# information; entries whose (lemma, pos) already exists in the curated set
-# from migration 0013 are skipped to avoid a unique-constraint clash.
+# Source: MUSE (Facebook Research) EN-FR lexicon, filtered/POS-tagged; entries already in migration 0013 are skipped.
 DICTIONARY_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "app", "domain", "dictionaries", "en_fr_muse.tsv"
 )

@@ -26,9 +26,7 @@ export function SummarizationResultCard({
   const [error, setError] = useState<string | null>(null);
 
   const summaryText = outcome.sentences.map((sentence) => sentence.text).join(" ");
-  // Makes the "read this" voice command work here (LR9) — the raw summary
-  // registers first so it's what gets read if a polished version also
-  // appears below, matching top-to-bottom page order.
+  // Registers raw summary first so "read this" follows top-to-bottom page order.
   useReadableText(summaryText);
   useReadableText(!polishing && polished ? polished : "");
 
