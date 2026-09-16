@@ -241,17 +241,30 @@ entity "translation_dictionary_entries" as translation_dictionary_entries <<new>
   notes : text
 }
 
+entity "translation_test_runs" as translation_test_runs <<new>> {
+  * id : integer <<generated>>
+  --
+  collection_id : integer <<FK>>
+  source_lang : varchar
+  target_lang : varchar
+  status : varchar
+  documents_total : integer
+  documents_processed : integer
+}
+
 entity "translation_runs" as translation_runs <<new>> {
   * id : integer <<generated>>
   --
   document_id : integer <<FK, nullable>>
   collection_id : integer <<FK, nullable>>
+  test_run_id : integer <<FK, nullable>>
   source_lang : varchar
   target_lang : varchar
   source_text : text
   translated_text : text
   word_count : integer
   translated_word_count : integer
+  translated_text_word_count : integer
   elapsed_ms : float
 }
 
@@ -310,5 +323,8 @@ document_summaries ||--o{ document_summary_polishes
 collections |o--o{ translation_runs
 documents   |o--o{ translation_runs
 translation_runs ||--o{ translation_run_words
+
+collections           ||--o{ translation_test_runs
+translation_test_runs |o--o{ translation_runs
 
 @enduml
