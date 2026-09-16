@@ -88,3 +88,19 @@ class SummarizationRunStatus(str, Enum):
             SummarizationRunStatus.FAILED,
             SummarizationRunStatus.CANCELLED,
         }
+
+
+class TranslationTestRunStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+    @property
+    def is_terminal(self) -> bool:
+        return self in {
+            TranslationTestRunStatus.COMPLETED,
+            TranslationTestRunStatus.FAILED,
+            TranslationTestRunStatus.CANCELLED,
+        }

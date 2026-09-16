@@ -1,9 +1,13 @@
 from __future__ import annotations
 
-from ips_db import TranslationDictionaryEntry, TranslationRun, TranslationRunWord
+import datetime as dt
+
+from ips_db import TranslationDictionaryEntry, TranslationRun, TranslationRunWord, TranslationTestRun
 from ips_db.models.translation import ANY_POS
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.domain.enums import TranslationTestRunStatus
 
 
 class TranslationDictionaryRepository:
@@ -144,16 +148,20 @@ class TranslationRunRepository:
         word_count: int,
         translated_word_count: int,
         elapsed_ms: float,
+        test_run_id: int | None = None,
+        translated_text_word_count: int = 0,
     ) -> TranslationRun:
         run = TranslationRun(
             document_id=document_id,
             collection_id=collection_id,
+            test_run_id=test_run_id,
             source_lang=source_lang,
             target_lang=target_lang,
             source_text=source_text,
             translated_text=translated_text,
             word_count=word_count,
             translated_word_count=translated_word_count,
+            translated_text_word_count=translated_text_word_count,
             elapsed_ms=elapsed_ms,
         )
         self._session.add(run)
@@ -177,6 +185,91 @@ class TranslationRunRepository:
             .limit(1)
         )
         return result.scalars().first()
+
+    async def list_for_test_run(self, test_run_id: int) -> list[TranslationRun]:
+        result = await self._session.execute(
+            select(TranslationRun)
+            .where(TranslationRun.test_run_id == test_run_id)
+            .order_by(TranslationRun.id)
+        )
+        return list(result.scalars().all())
+
+
+class TranslationTestRunRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def create(
+        self, *, collection_id: int, source_lang: str, target_lang: str
+    ) -> TranslationTestRun:
+        run = TranslationTestRun(
+            collection_id=collection_id,
+            source_lang=source_lang,
+            target_lang=target_lang,
+            status=TranslationTestRunStatus.PENDING.value,
+        )
+        self._session.add(run)
+        await self._session.flush()
+        return run
+
+    async def get(self, run_id: int) -> TranslationTestRun | None:
+        return await self._session.get(TranslationTestRun, run_id)
+
+    async def list_by_collection(self, collection_id: int) -> list[TranslationTestRun]:
+        result = await self._session.execute(
+            select(TranslationTestRun)
+            .where(TranslationTestRun.collection_id == collection_id)
+            .order_by(TranslationTestRun.id.desc())
+        )
+        return list(result.scalars().all())
+
+    async def mark_running(self, run_id: int, *, documents_total: int) -> bool:
+        result = await self._session.execute(
+            update(TranslationTestRun)
+            .where(
+                TranslationTestRun.id == run_id,
+                TranslationTestRun.status == TranslationTestRunStatus.PENDING.value,
+            )
+            .values(
+                status=TranslationTestRunStatus.RUNNING.value,
+                documents_total=documents_total,
+                started_at=dt.datetime.utcnow(),
+            )
+        )
+        await self._session.commit()
+        return result.rowcount > 0
+
+    async def update_progress(self, run_id: int, *, documents_processed: int) -> None:
+        run = await self._session.get(TranslationTestRun, run_id)
+        if run is None:
+            return
+        run.documents_processed = documents_processed
+        await self._session.commit()
+
+    async def mark_completed(self, run_id: int) -> None:
+        run = await self._session.get(TranslationTestRun, run_id)
+        if run is None:
+            return
+        run.status = TranslationTestRunStatus.COMPLETED.value
+        run.finished_at = dt.datetime.utcnow()
+        await self._session.commit()
+
+    async def mark_failed(self, run_id: int, *, error_message: str) -> None:
+        run = await self._session.get(TranslationTestRun, run_id)
+        if run is None:
+            return
+        run.status = TranslationTestRunStatus.FAILED.value
+        run.error_message = error_message[:1000]
+        run.finished_at = dt.datetime.utcnow()
+        await self._session.commit()
+
+    async def mark_cancelled(self, run_id: int) -> None:
+        run = await self._session.get(TranslationTestRun, run_id)
+        if run is None:
+            return
+        run.status = TranslationTestRunStatus.CANCELLED.value
+        run.finished_at = dt.datetime.utcnow()
+        await self._session.commit()
 
 
 class TranslationRunWordRepository:

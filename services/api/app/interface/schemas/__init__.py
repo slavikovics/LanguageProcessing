@@ -69,7 +69,10 @@ from .translation import (
     TranslationDictionaryEntryUpdate,
     TranslationDictionaryPageOut,
     TranslationRunOut,
+    TranslationRunSummaryOut,
     TranslationRunWordOut,
+    TranslationTestRunCreate,
+    TranslationTestRunOut,
 )
 
 __all__ = [
@@ -136,6 +139,9 @@ __all__ = [
     "TranslationDictionaryPageOut",
     "TranslationDictionaryEntryCreate",
     "TranslationDictionaryEntryUpdate",
+    "TranslationTestRunCreate",
+    "TranslationTestRunOut",
+    "TranslationRunSummaryOut",
     "SynthesizeSpeechRequest",
     "TranscribeSpeechResponseOut",
     "SpeechCommandOut",

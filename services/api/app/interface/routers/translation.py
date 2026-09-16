@@ -1,8 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException
+import asyncio
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.translation import TranslationDictionaryService, TranslationService
-from app.core.database import get_db
+from app.application.translation import (
+    TranslationDictionaryService,
+    TranslationService,
+    TranslationTestRunService,
+)
+from app.core.config import get_settings
+from app.core.database import SessionLocal, get_db
 from app.domain.translation import TranslationError
 from app.interface.schemas import (
     ParseSentenceRequest,
@@ -15,15 +22,25 @@ from app.interface.schemas import (
     TranslationDictionaryEntryUpdate,
     TranslationDictionaryPageOut,
     TranslationRunOut,
+    TranslationRunSummaryOut,
     TranslationRunWordOut,
+    TranslationTestRunCreate,
+    TranslationTestRunOut,
 )
 
 router = APIRouter(tags=["translation"])
+
+_TERMINAL_TEST_RUN_STATUSES = {"completed", "failed", "cancelled"}
 
 
 def _raise_for_translation_error(exc: TranslationError) -> None:
     status = 404 if "not found" in str(exc) else 422
     raise HTTPException(status_code=status, detail=str(exc)) from exc
+
+
+async def _run_translation_test_run(run_id: int) -> None:
+    async with SessionLocal() as session:
+        await TranslationTestRunService(session).run_job(run_id)
 
 
 @router.post("/translation/runs", response_model=TranslationRunOut, status_code=201)
@@ -104,6 +121,95 @@ async def parse_sentence(
     except TranslationError as exc:
         _raise_for_translation_error(exc)
     return ParseSentenceResponseOut(tokens=[SyntaxTokenOut(**tok) for tok in tokens])
+
+
+@router.post("/translation/test-runs", response_model=TranslationTestRunOut, status_code=201)
+async def create_translation_test_run(
+    payload: TranslationTestRunCreate, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)
+) -> TranslationTestRunOut:
+    service = TranslationTestRunService(db)
+    try:
+        run = await service.start_run(
+            payload.collection_id, source_lang=payload.source_lang, target_lang=payload.target_lang
+        )
+    except TranslationError as exc:
+        _raise_for_translation_error(exc)
+    background_tasks.add_task(_run_translation_test_run, run.id)
+    return run
+
+
+@router.post("/translation/test-runs/{run_id}/cancel", response_model=TranslationTestRunOut)
+async def cancel_translation_test_run(run_id: int, db: AsyncSession = Depends(get_db)) -> TranslationTestRunOut:
+    service = TranslationTestRunService(db)
+    try:
+        return await service.cancel_run(run_id)
+    except TranslationError as exc:
+        _raise_for_translation_error(exc)
+
+
+@router.get("/translation/test-runs/{run_id}", response_model=TranslationTestRunOut)
+async def get_translation_test_run(run_id: int, db: AsyncSession = Depends(get_db)) -> TranslationTestRunOut:
+    service = TranslationTestRunService(db)
+    run = await service.get_run(run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="translation test run not found")
+    return run
+
+
+@router.get(
+    "/collections/{collection_id}/translation/test-runs", response_model=list[TranslationTestRunOut]
+)
+async def list_translation_test_runs_by_collection(
+    collection_id: int, db: AsyncSession = Depends(get_db)
+) -> list[TranslationTestRunOut]:
+    service = TranslationTestRunService(db)
+    return await service.list_runs_by_collection(collection_id)
+
+
+@router.websocket("/translation/test-runs/ws/{run_id}")
+async def translation_test_run_progress_ws(websocket: WebSocket, run_id: int) -> None:
+    await websocket.accept()
+    settings = get_settings()
+    last_payload: str | None = None
+    try:
+        while True:
+            async with SessionLocal() as session:
+                service = TranslationTestRunService(session)
+                run = await service.get_run(run_id)
+                if run is None:
+                    await websocket.send_json({"error": "translation test run not found"})
+                    break
+                payload_model = TranslationTestRunOut.model_validate(run)
+
+            payload = payload_model.model_dump_json()
+            if payload != last_payload:
+                await websocket.send_text(payload)
+                last_payload = payload
+
+            if payload_model.status in _TERMINAL_TEST_RUN_STATUSES:
+                break
+            await asyncio.sleep(settings.crawl_progress_poll_interval_seconds)
+    except WebSocketDisconnect:
+        pass
+
+
+@router.get("/translation/test-runs/{run_id}/results", response_model=list[TranslationRunOut])
+async def get_translation_test_run_results(
+    run_id: int, db: AsyncSession = Depends(get_db)
+) -> list[TranslationRunOut]:
+    service = TranslationTestRunService(db)
+    return await service.get_run_results(run_id)
+
+
+@router.get("/translation/test-runs/{run_id}/summary", response_model=TranslationRunSummaryOut)
+async def get_translation_test_run_summary(
+    run_id: int, db: AsyncSession = Depends(get_db)
+) -> TranslationRunSummaryOut:
+    service = TranslationTestRunService(db)
+    try:
+        return await service.get_run_summary(run_id)
+    except TranslationError as exc:
+        _raise_for_translation_error(exc)
 
 
 @router.get("/translation/dictionary", response_model=TranslationDictionaryPageOut)

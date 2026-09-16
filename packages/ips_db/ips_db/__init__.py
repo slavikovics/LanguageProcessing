@@ -30,6 +30,7 @@ from .models import (
     TranslationDictionaryEntry,
     TranslationRun,
     TranslationRunWord,
+    TranslationTestRun,
 )
 
 __all__ = [
@@ -63,5 +64,6 @@ __all__ = [
     "TranslationDictionaryEntry",
     "TranslationRun",
     "TranslationRunWord",
+    "TranslationTestRun",
     "SpeechCommand",
 ]

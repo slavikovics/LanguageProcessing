@@ -27,14 +27,50 @@ class TranslationRunOut(BaseModel):
     id: int
     document_id: int | None
     collection_id: int | None
+    test_run_id: int | None
     source_lang: str
     target_lang: str
     source_text: str
     translated_text: str
     word_count: int
     translated_word_count: int
+    translated_text_word_count: int
     elapsed_ms: float
     created_at: dt.datetime
+
+
+class TranslationTestRunCreate(BaseModel):
+    collection_id: int
+    source_lang: str = DEFAULT_SOURCE_LANGUAGE
+    target_lang: str = DEFAULT_TARGET_LANGUAGE
+
+
+class TranslationTestRunOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    collection_id: int
+    source_lang: str
+    target_lang: str
+    status: str
+    documents_total: int
+    documents_processed: int
+    error_message: str | None
+    created_at: dt.datetime
+    started_at: dt.datetime | None
+    finished_at: dt.datetime | None
+
+
+class TranslationRunSummaryOut(BaseModel):
+    run_id: int
+    source_lang: str
+    target_lang: str
+    documents_translated: int
+    mean_elapsed_ms: float
+    mean_word_count: float
+    mean_translated_word_count: float
+    mean_translated_text_word_count: float
+    mean_coverage_ratio: float
 
 
 class TranslationRunWordOut(BaseModel):

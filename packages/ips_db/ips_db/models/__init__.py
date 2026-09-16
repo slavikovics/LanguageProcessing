@@ -8,7 +8,12 @@ from .lang_id import LangIdProfile, LangIdResult, LangIdRun, LangIdRunMetric, La
 from .search import MetricResult, Query, RelevanceJudgment, SearchModel, SearchResult, SearchRun
 from .speech import SpeechCommand
 from .summarization import DocumentSummary, DocumentSummaryPolish, SummarizationRun
-from .translation import TranslationDictionaryEntry, TranslationRun, TranslationRunWord
+from .translation import (
+    TranslationDictionaryEntry,
+    TranslationRun,
+    TranslationRunWord,
+    TranslationTestRun,
+)
 
 __all__ = [
     "Base",
@@ -41,5 +46,6 @@ __all__ = [
     "TranslationDictionaryEntry",
     "TranslationRun",
     "TranslationRunWord",
+    "TranslationTestRun",
     "SpeechCommand",
 ]

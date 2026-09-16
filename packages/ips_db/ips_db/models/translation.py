@@ -32,6 +32,24 @@ class TranslationDictionaryEntry(Base):
     )
 
 
+class TranslationTestRun(Base):
+    __tablename__ = "translation_test_runs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    collection_id: Mapped[int] = mapped_column(ForeignKey("collections.id", ondelete="CASCADE"))
+    source_lang: Mapped[str] = mapped_column(String(10), default="en")
+    target_lang: Mapped[str] = mapped_column(String(10), default="fr")
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+
+    documents_total: Mapped[int] = mapped_column(Integer, default=0)
+    documents_processed: Mapped[int] = mapped_column(Integer, default=0)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
+    started_at: Mapped[dt.datetime | None] = mapped_column(nullable=True)
+    finished_at: Mapped[dt.datetime | None] = mapped_column(nullable=True)
+
+
 class TranslationRun(Base):
     __tablename__ = "translation_runs"
 
@@ -42,12 +60,16 @@ class TranslationRun(Base):
     collection_id: Mapped[int | None] = mapped_column(
         ForeignKey("collections.id", ondelete="CASCADE"), nullable=True
     )
+    test_run_id: Mapped[int | None] = mapped_column(
+        ForeignKey("translation_test_runs.id", ondelete="CASCADE"), nullable=True
+    )
     source_lang: Mapped[str] = mapped_column(String(10), default="en")
     target_lang: Mapped[str] = mapped_column(String(10), default="fr")
     source_text: Mapped[str] = mapped_column(Text)
     translated_text: Mapped[str] = mapped_column(Text)
     word_count: Mapped[int] = mapped_column(Integer, default=0)
     translated_word_count: Mapped[int] = mapped_column(Integer, default=0)
+    translated_text_word_count: Mapped[int] = mapped_column(Integer, default=0)
     elapsed_ms: Mapped[float] = mapped_column(Float, default=0.0)
     created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
 

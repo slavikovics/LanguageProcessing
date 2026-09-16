@@ -37,10 +37,14 @@ class DocumentRepository:
         )
         return int(result.scalar_one())
 
-    async def list_all_by_collection(self, collection_id: int) -> list[Document]:
-        result = await self._session.execute(
-            select(Document).where(Document.collection_id == collection_id).order_by(Document.id)
-        )
+    async def list_all_by_collection(
+        self, collection_id: int, *, language: str | None = None
+    ) -> list[Document]:
+        stmt = select(Document).where(Document.collection_id == collection_id)
+        if language is not None:
+            stmt = stmt.where(Document.language == language)
+        stmt = stmt.order_by(Document.id)
+        result = await self._session.execute(stmt)
         return list(result.scalars().all())
 
     async def list_by_ids(self, document_ids: list[int]) -> list[Document]:

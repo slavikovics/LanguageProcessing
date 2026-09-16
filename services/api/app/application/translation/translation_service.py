@@ -36,6 +36,8 @@ class TranslationService:
         collection_id: int | None = None,
         source_lang: str = DEFAULT_SOURCE_LANGUAGE,
         target_lang: str = DEFAULT_TARGET_LANGUAGE,
+        test_run_id: int | None = None,
+        lookup_override: dict[str, str] | None = None,
     ) -> TranslationRun:
         if document_id is not None:
             document = await self._documents.get(document_id)
@@ -48,7 +50,11 @@ class TranslationService:
         else:
             raise TranslationError("either document_id or non-empty text must be provided")
 
-        lookup = await self._dictionary.as_lookup(source_lang=source_lang, target_lang=target_lang)
+        lookup = (
+            lookup_override
+            if lookup_override is not None
+            else await self._dictionary.as_lookup(source_lang=source_lang, target_lang=target_lang)
+        )
 
         started = time.perf_counter()
         result = await self._nlp.translate(source_text, lookup)
@@ -57,12 +63,14 @@ class TranslationService:
         run = await self._runs.create(
             document_id=document_id,
             collection_id=collection_id,
+            test_run_id=test_run_id,
             source_lang=source_lang,
             target_lang=target_lang,
             source_text=source_text,
             translated_text=result["translated_text"],
             word_count=result["word_count"],
             translated_word_count=result["translated_word_count"],
+            translated_text_word_count=len(result["translated_text"].split()),
             elapsed_ms=elapsed_ms,
         )
         await self._run_words.bulk_create(run.id, result["words"])
