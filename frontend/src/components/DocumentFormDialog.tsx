@@ -4,11 +4,13 @@ import { createDocument, getDocument, updateDocument } from "../api/client";
 import type { DocumentSummary } from "../api/types";
 import { extractFromHtml } from "../lib/htmlExtraction";
 
+import { SpeakButton } from "@/components/SpeakButton";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useSpeechMode } from "@/context/SpeechModeContext";
 
 export function DocumentFormDialog({
   mode,
@@ -30,6 +32,19 @@ export function DocumentFormDialog({
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const { setActiveDocumentText } = useSpeechMode();
+
+  // An open document dialog takes priority over any page's own readable
+  // blocks for the "read this" voice command (LR9) — see
+  // SpeechModeContext's getActiveDocumentText.
+  useEffect(() => {
+    if (mode === "closed") {
+      setActiveDocumentText(null);
+      return;
+    }
+    setActiveDocumentText(text);
+    return () => setActiveDocumentText(null);
+  }, [mode, text, setActiveDocumentText]);
 
   useEffect(() => {
     if (mode === "create") {
@@ -116,10 +131,13 @@ export function DocumentFormDialog({
           <div className="grid gap-1.5">
             <div className="flex items-center justify-between">
               <Label>Текст документа</Label>
-              <Button type="button" variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()}>
-                <FileUp className="size-3.5" />
-                Загрузить HTML-файл
-              </Button>
+              <div className="flex items-center gap-1">
+                <SpeakButton text={text} size="icon-sm" variant="ghost" />
+                <Button type="button" variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()}>
+                  <FileUp className="size-3.5" />
+                  Загрузить HTML-файл
+                </Button>
+              </div>
               <input
                 ref={fileInputRef}
                 type="file"

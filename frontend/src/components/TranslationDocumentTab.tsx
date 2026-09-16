@@ -4,10 +4,12 @@ import { useState } from "react";
 import { createTranslationRun } from "@/api/client";
 import type { DocumentSummary, TranslationRun } from "@/api/types";
 import { DocumentCombobox } from "@/components/DocumentCombobox";
+import { SpeakButton } from "@/components/SpeakButton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useReadableText } from "@/context/SpeechModeContext";
 import { escapeHtml, openPrintView } from "@/lib/printView";
 
 export function TranslationDocumentTab({
@@ -25,6 +27,10 @@ export function TranslationDocumentTab({
   const [error, setError] = useState<string | null>(null);
 
   const canTranslate = selectedDocument !== null || pastedText.trim().length > 0;
+  // Makes the "read this" voice command work here (LR9) — source registers
+  // before the translation, matching the left-to-right column order below.
+  useReadableText(run?.source_text ?? "");
+  useReadableText(run?.translated_text ?? "");
 
   async function handleTranslate() {
     setLoading(true);
@@ -141,25 +147,31 @@ export function TranslationDocumentTab({
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardHeader className="flex-row items-center justify-between gap-3">
-              <CardTitle className="text-base">Исходный текст ({run.source_lang.toUpperCase()})</CardTitle>
+              <div className="flex items-center gap-1.5">
+                <CardTitle className="text-base">Исходный текст ({run.source_lang.toUpperCase()})</CardTitle>
+                <SpeakButton text={run.source_text} size="icon-sm" variant="ghost" />
+              </div>
               <span className="text-sm whitespace-nowrap text-muted-foreground">
                 Слов: <span className="font-medium text-foreground">{run.word_count}</span>
               </span>
             </CardHeader>
             <CardContent>
-              <p className="whitespace-pre-wrap text-sm">{run.source_text}</p>
+              <p className="whitespace-pre-wrap text-sm break-words">{run.source_text}</p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex-row items-center justify-between gap-3">
-              <CardTitle className="text-base">Перевод ({run.target_lang.toUpperCase()})</CardTitle>
+              <div className="flex items-center gap-1.5">
+                <CardTitle className="text-base">Перевод ({run.target_lang.toUpperCase()})</CardTitle>
+                <SpeakButton text={run.translated_text} size="icon-sm" variant="ghost" />
+              </div>
               <span className="text-sm whitespace-nowrap text-muted-foreground">
                 Переведено: <span className="font-medium text-foreground">{run.translated_word_count}</span>{" "}
                 ({translatedPercent}%)
               </span>
             </CardHeader>
             <CardContent>
-              <p className="whitespace-pre-wrap text-sm">{run.translated_text}</p>
+              <p className="whitespace-pre-wrap text-sm break-words">{run.translated_text}</p>
             </CardContent>
           </Card>
         </div>

@@ -21,6 +21,7 @@ from .models import (
     SearchModel,
     SearchResult,
     SearchRun,
+    SpeechCommand,
     Term,
     TermWeight,
     DocumentSummary,
@@ -62,4 +63,5 @@ __all__ = [
     "TranslationDictionaryEntry",
     "TranslationRun",
     "TranslationRunWord",
+    "SpeechCommand",
 ]

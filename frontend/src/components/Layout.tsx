@@ -6,10 +6,13 @@ import {
   Languages,
   Library,
   Search,
+  Settings,
   Waypoints,
 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 
+import { AssistantMicButton } from "@/components/AssistantMicButton";
 import { CollectionSwitcher } from "@/components/CollectionSwitcher";
 import { ModeToggle } from "@/components/mode-toggle";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -24,14 +27,31 @@ const NAV_ITEMS = [
   { to: "/lang-id", label: "Язык", icon: Languages },
   { to: "/summarization", label: "Реферирование", icon: FileText },
   { to: "/translation", label: "Перевод", icon: ArrowLeftRight },
+  { to: "/settings", label: "Настройки", icon: Settings },
   { to: "/help", label: "Справка", icon: HelpCircle },
 ];
 
 export function Layout() {
+  const navPillRef = useRef<HTMLDivElement>(null);
+  const [navWidth, setNavWidth] = useState<number | null>(null);
+
+  useEffect(() => {
+    const el = navPillRef.current;
+    if (!el) return;
+    const updateWidth = () => setNavWidth(el.getBoundingClientRect().width);
+    updateWidth();
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div data-slot="app-shell" className="h-screen overflow-hidden bg-background">
-      <header className="pointer-events-none fixed inset-x-0 top-0 z-40 flex justify-center px-4 py-3">
-        <div className="pointer-events-auto flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border bg-card/90 p-1.5 pt-2 shadow-lg backdrop-blur-md">
+      <header className="pointer-events-none fixed inset-x-0 top-0 z-40 flex flex-col items-center gap-2 px-4 py-3">
+        <div
+          ref={navPillRef}
+          className="pointer-events-auto flex max-w-full items-center gap-1 overflow-x-auto rounded-xl border bg-card/90 p-1.5 pt-2 shadow-lg backdrop-blur-md"
+        >
           <nav className="flex shrink-0 items-center gap-1">
             {NAV_ITEMS.map((item) => (
               <NavLink
@@ -59,10 +79,14 @@ export function Layout() {
         </div>
       </header>
       <ScrollArea className="h-full">
-        <main className="mx-auto w-full max-w-6xl px-6 pt-24 pb-6 md:px-8 md:pt-28 md:pb-8">
+        <main
+          className="mx-auto w-full max-w-[96rem] px-6 pt-24 pb-6 md:px-8 md:pt-28 md:pb-8"
+          style={navWidth ? { maxWidth: `${navWidth}px` } : undefined}
+        >
           <Outlet />
         </main>
       </ScrollArea>
+      <AssistantMicButton />
     </div>
   );
 }

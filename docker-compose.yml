@@ -64,6 +64,29 @@ services:
     volumes:
       - ./packages/nlp_core:/app/packages/nlp_core
 
+  speech-service:
+    build:
+      context: .
+      dockerfile: services/speech-service/Dockerfile
+    restart: unless-stopped
+    environment:
+      SPEECH_MODELS_DIR: /app/models
+      WHISPER_CPU_THREADS: ${WHISPER_CPU_THREADS:-4}
+      WHISPER_STREAM_MODEL_SIZE: ${WHISPER_STREAM_MODEL_SIZE:-base}
+      PYTHONUNBUFFERED: "1"
+    ports:
+      - "8004:8004"
+    volumes:
+      - speech_models:/app/models
+    # Backstop for oversized STT/TTS input slipping past the app-level
+    # limits (app/schemas.py, app/routes.py): caps let the local Whisper/
+    # Piper models get OOM-killed or throttled inside this one container
+    # instead of exhausting host memory/CPU and taking the rest down.
+    mem_limit: 4g
+    mem_reservation: 1g
+    cpus: 4.0
+    pids_limit: 256
+
   api:
     build:
       context: .
@@ -74,6 +97,7 @@ services:
       NLP_SERVICE_URL: ${NLP_SERVICE_URL:-http://nlp-service:8001}
       LANG_ID_SERVICE_URL: ${LANG_ID_SERVICE_URL:-http://lang-id-service:8002}
       SUMMARIZATION_SERVICE_URL: ${SUMMARIZATION_SERVICE_URL:-http://summarization-service:8003}
+      SPEECH_SERVICE_URL: ${SPEECH_SERVICE_URL:-http://speech-service:8004}
       PYTHONUNBUFFERED: "1"
     ports:
       - "8000:8000"
@@ -85,6 +109,8 @@ services:
       lang-id-service:
         condition: service_started
       summarization-service:
+        condition: service_started
+      speech-service:
         condition: service_started
     volumes:
       - ./packages/ips_db:/app/packages/ips_db
@@ -132,3 +158,4 @@ services:
 volumes:
   postgres_data:
   frontend_node_modules:
+  speech_models:

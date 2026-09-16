@@ -70,6 +70,12 @@ class SummarizationMethod(str, Enum):
     EMBEDDINGS = "embeddings"
 
 
+class SpeechBackend(str, Enum):
+    """Local faster-whisper/Piper is the only supported speech backend."""
+
+    LOCAL = "local"
+
+
 class SummarizationRunStatus(str, Enum):
     PENDING = "pending"
     RUNNING = "running"

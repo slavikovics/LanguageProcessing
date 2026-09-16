@@ -4,5 +4,6 @@ export * from "./indexing";
 export * from "./search";
 export * from "./metrics";
 export * from "./langId";
+export * from "./speech";
 export * from "./summarization";
 export * from "./translation";

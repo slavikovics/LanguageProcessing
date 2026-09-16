@@ -5,13 +5,14 @@ import {
   SearchIcon,
   SlidersHorizontal,
 } from "lucide-react";
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { clearJudgment, listJudgments, search, setJudgment } from "../api/client";
 import type { SearchResponse } from "../api/types";
 
 import { CollectionJudgmentBrowser } from "@/components/CollectionJudgmentBrowser";
 import { ResultCard } from "@/components/ResultCard";
+import { VoiceInputButton } from "@/components/VoiceInputButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +20,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { useCollectionContext } from "@/context/CollectionContext";
 import { useSearchModelContext } from "@/context/SearchModelContext";
+import { useSpeechMode } from "@/context/SpeechModeContext";
+import { useSpeechPlayback } from "@/context/SpeechPlaybackContext";
+import { dispatchSpeechCommandAction } from "@/lib/commandDispatch";
 import { clampNumberInput } from "@/lib/utils";
 
 const JUDGMENT_MODE_STORAGE_KEY = "ips-judgment-mode";
@@ -26,6 +30,10 @@ const JUDGMENT_MODE_STORAGE_KEY = "ips-judgment-mode";
 export function SearchPage() {
   const { selected, selectedId, latestIndexJob } = useCollectionContext();
   const { models, selectedModelKey, setSelectedModelKey } = useSearchModelContext();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { speak, stop: stopSpeaking } = useSpeechPlayback();
+  const { getActiveDocumentText } = useSpeechMode();
   const [text, setText] = useState("");
   const [topK, setTopK] = useState<number | "">(10);
   const [submittedWords, setSubmittedWords] = useState<string[]>([]);
@@ -52,15 +60,14 @@ export function SearchPage() {
     localStorage.setItem(JUDGMENT_MODE_STORAGE_KEY, enabled ? "1" : "0");
   }
 
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
+  async function performSearch(queryText: string) {
     setError(null);
 
     if (selectedId === null) {
       setError("Выберите коллекцию вверху страницы.");
       return;
     }
-    if (!text.trim()) {
+    if (!queryText.trim()) {
       setError("Введите текст запроса.");
       return;
     }
@@ -71,12 +78,12 @@ export function SearchPage() {
     try {
       const result = await search({
         collection_id: selectedId,
-        text,
+        text: queryText,
         top_k: clampNumberInput(topK, 1, 100),
         model: selectedModelKey,
       });
       setResponse(result);
-      setSubmittedWords(text.trim().split(/\s+/));
+      setSubmittedWords(queryText.trim().split(/\s+/));
       try {
         const existing = await listJudgments(result.query_id);
         setJudgments(
@@ -95,6 +102,32 @@ export function SearchPage() {
       setLoading(false);
     }
   }
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    await performSearch(text);
+  }
+
+  // Cross-page bridge for voice commands (navigate_search/clear_query):
+  // dispatchSpeechCommandAction navigates here with ?voiceQuery=<text>
+  // (possibly empty, for "clear search") whether the command was heard by
+  // this page's own mic button or by global speech mode elsewhere in the
+  // app. The param is stripped right after so a refresh doesn't re-run it.
+  useEffect(() => {
+    const voiceQuery = searchParams.get("voiceQuery");
+    if (voiceQuery === null) return;
+    setText(voiceQuery);
+    if (voiceQuery.trim()) void performSearch(voiceQuery);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("voiceQuery");
+        return next;
+      },
+      { replace: true },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   async function handleToggleRelevant(documentId: number) {
     if (!response) return;
@@ -156,6 +189,17 @@ export function SearchPage() {
                 className="pl-9"
               />
             </div>
+            <VoiceInputButton
+              onTranscript={setText}
+              onCommand={(command, transcript) =>
+                dispatchSpeechCommandAction(command.action, transcript, {
+                  navigate,
+                  speak,
+                  stopSpeaking,
+                  getActiveDocumentText,
+                })
+              }
+            />
             <Button
               type="button"
               variant={settingsOpen ? "secondary" : "outline"}

@@ -37,6 +37,13 @@ from .metrics import (
     RelevanceJudgmentOut,
 )
 from .search import SearchHitOut, SearchModelOut, SearchRequest, SearchResponseOut
+from .speech import (
+    SpeechCommandCreate,
+    SpeechCommandOut,
+    SpeechCommandUpdate,
+    SynthesizeSpeechRequest,
+    TranscribeSpeechResponseOut,
+)
 from .summarization import (
     DocumentSummaryOut,
     KeywordGroupOut,
@@ -129,4 +136,9 @@ __all__ = [
     "TranslationDictionaryPageOut",
     "TranslationDictionaryEntryCreate",
     "TranslationDictionaryEntryUpdate",
+    "SynthesizeSpeechRequest",
+    "TranscribeSpeechResponseOut",
+    "SpeechCommandOut",
+    "SpeechCommandCreate",
+    "SpeechCommandUpdate",
 ]

@@ -94,6 +94,52 @@
   }
 }
 
+/* Sound-wave ripple: three of these are stacked with staggered
+   animation-delay (see SoundWaveRing) so rings continuously launch and
+   expand outward, reading as a wave rather than one pulse. */
+@keyframes sound-wave {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+@layer utilities {
+  .animate-sound-wave {
+    animation: sound-wave 1.6s cubic-bezier(0.25, 0.6, 0.35, 1) infinite;
+  }
+}
+
+/* Command-recognized wave (see CommandWaveOverlay): a ring whose CENTER is
+   pinned to the mic button (via the component's right/bottom placement,
+   which positions the element's un-transformed corner at that center point)
+   while only its radius (scale) grows — translate(50%, 50%) resolves against
+   the element's own static, un-animated size (per the CSS transform spec),
+   so it stays a constant offset throughout the animation regardless of the
+   scale factor, keeping the visual center fixed instead of drifting outward
+   as earlier corner-anchored versions did. One-shot ("forwards", not
+   infinite) — it's a confirmation pulse, not an ongoing indicator. */
+@keyframes command-wave {
+  0% {
+    transform: translate(50%, 50%) scale(0);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(50%, 50%) scale(80);
+    opacity: 0;
+  }
+}
+
+@layer utilities {
+  .animate-command-wave {
+    animation: command-wave 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+}
+
 /* Themes the browser's native scrollbar (used on elements we can't route
    through the Radix ScrollArea, e.g. <textarea> and dialog overflow) so it
    matches the ScrollArea thumb instead of the OS default. */
