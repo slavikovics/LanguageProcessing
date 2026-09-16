@@ -2,14 +2,50 @@ export interface TranslationRun {
   id: number;
   document_id: number | null;
   collection_id: number | null;
+  test_run_id: number | null;
   source_lang: string;
   target_lang: string;
   source_text: string;
   translated_text: string;
   word_count: number;
   translated_word_count: number;
+  translated_text_word_count: number;
   elapsed_ms: number;
   created_at: string;
+}
+
+export type TranslationTestRunStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
+
+export const TERMINAL_TRANSLATION_TEST_RUN_STATUSES: readonly TranslationTestRunStatus[] = [
+  "completed",
+  "failed",
+  "cancelled",
+];
+
+export interface TranslationTestRun {
+  id: number;
+  collection_id: number;
+  source_lang: string;
+  target_lang: string;
+  status: TranslationTestRunStatus;
+  documents_total: number;
+  documents_processed: number;
+  error_message: string | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+export interface TranslationRunSummary {
+  run_id: number;
+  source_lang: string;
+  target_lang: string;
+  documents_translated: number;
+  mean_elapsed_ms: number;
+  mean_word_count: number;
+  mean_translated_word_count: number;
+  mean_translated_text_word_count: number;
+  mean_coverage_ratio: number;
 }
 
 export interface TranslationRunWord {

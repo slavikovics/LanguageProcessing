@@ -4,9 +4,11 @@ import type {
   TranslationDictionaryEntryInput,
   TranslationDictionaryPage,
   TranslationRun,
+  TranslationRunSummary,
   TranslationRunWord,
+  TranslationTestRun,
 } from "../types";
-import { request } from "./http";
+import { request, webSocketUrl } from "./http";
 
 export function createTranslationRun(payload: {
   documentId?: number;
@@ -39,6 +41,45 @@ export function getLatestTranslationRunForCollection(
 
 export function listTranslationRuns(limit = 20): Promise<TranslationRun[]> {
   return request<TranslationRun[]>(`/translation/runs?limit=${limit}`);
+}
+
+export function createTranslationTestRun(payload: {
+  collectionId: number;
+  sourceLang?: string;
+  targetLang?: string;
+}): Promise<TranslationTestRun> {
+  return request<TranslationTestRun>("/translation/test-runs", {
+    method: "POST",
+    body: JSON.stringify({
+      collection_id: payload.collectionId,
+      source_lang: payload.sourceLang,
+      target_lang: payload.targetLang,
+    }),
+  });
+}
+
+export function getTranslationTestRun(id: number): Promise<TranslationTestRun> {
+  return request<TranslationTestRun>(`/translation/test-runs/${id}`);
+}
+
+export function cancelTranslationTestRun(id: number): Promise<TranslationTestRun> {
+  return request<TranslationTestRun>(`/translation/test-runs/${id}/cancel`, { method: "POST" });
+}
+
+export function listTranslationTestRunsByCollection(collectionId: number): Promise<TranslationTestRun[]> {
+  return request<TranslationTestRun[]>(`/collections/${collectionId}/translation/test-runs`);
+}
+
+export function translationTestRunWebSocketUrl(id: number): string {
+  return webSocketUrl(`/translation/test-runs/ws/${id}`);
+}
+
+export function getTranslationTestRunResults(runId: number): Promise<TranslationRun[]> {
+  return request<TranslationRun[]>(`/translation/test-runs/${runId}/results`);
+}
+
+export function getTranslationTestRunSummary(runId: number): Promise<TranslationRunSummary> {
+  return request<TranslationRunSummary>(`/translation/test-runs/${runId}/summary`);
 }
 
 export function getTranslationRunWords(runId: number): Promise<TranslationRunWord[]> {

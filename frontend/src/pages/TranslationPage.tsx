@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TranslationDictionaryTab } from "@/components/TranslationDictionaryTab";
 import { TranslationDocumentTab } from "@/components/TranslationDocumentTab";
 import { TranslationSyntaxTab } from "@/components/TranslationSyntaxTab";
+import { TranslationTestingTab } from "@/components/TranslationTestingTab";
 import { TranslationWordListTab } from "@/components/TranslationWordListTab";
 import { useCollectionContext } from "@/context/CollectionContext";
 
@@ -64,6 +65,7 @@ export function TranslationPage() {
       >
         <TabsList>
           <TabsTrigger value="translate">Перевод</TabsTrigger>
+          <TabsTrigger value="testing">Тестирование</TabsTrigger>
           <TabsTrigger value="words">Слова</TabsTrigger>
           <TabsTrigger value="syntax">Синтаксис</TabsTrigger>
           <TabsTrigger value="dictionary">Словарь</TabsTrigger>
@@ -71,6 +73,10 @@ export function TranslationPage() {
 
         <TabsContent value="translate" className="pt-4">
           <TranslationDocumentTab collectionId={selectedId} run={run} onRunCreated={setRun} />
+        </TabsContent>
+
+        <TabsContent value="testing" className="pt-4 data-[state=inactive]:hidden" forceMount>
+          <TranslationTestingTab collectionId={selectedId} />
         </TabsContent>
 
         <TabsContent value="words" className="pt-4 data-[state=inactive]:hidden" forceMount>
