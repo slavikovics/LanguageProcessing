@@ -14,7 +14,7 @@ export function SummarizationPage() {
   if (selectedId === null || !selected) {
     return (
       <Card>
-        <CardHeader className="text-center">
+        <CardHeader>
           <CardTitle>Нет выбранной коллекции</CardTitle>
           <CardDescription>
             Выберите или создайте коллекцию через переключатель вверху страницы — реферат
@@ -39,13 +39,13 @@ export function SummarizationPage() {
             <HelpCircle className="size-4" />
           </Link>
         </Button>
-        <CardHeader className="text-center">
+        <CardHeader>
           <CardTitle>Автоматическое реферирование документов</CardTitle>
           <CardDescription>
-            Три метода извлечения ключевых предложений — алгоритм из методички (модифицированный
-            TF-IDF и положение предложения), TextRank и эмбеддинги — постройте и сравните
-            классический реферат и иерархический список ключевых слов, при желании
-            перефразируйте текст с помощью LLM.
+            Три метода извлечения ключевых предложений — модифицированный TF-IDF с учётом позиции
+            предложения, графовый TextRank и косинусная близость эмбеддингов (к центроиду документа
+            или к вашему запросу) — постройте и сравните реферат и иерархический список ключевых
+            слов, при желании перефразируйте текст с помощью LLM.
           </CardDescription>
         </CardHeader>
       </Card>

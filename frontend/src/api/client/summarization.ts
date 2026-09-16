@@ -11,11 +11,26 @@ import { request, webSocketUrl } from "./http";
 
 export function summarizeDocument(
   documentId: number,
-  { methods, sentenceCount = 10 }: { methods?: SummarizationMethod[]; sentenceCount?: number } = {},
+  {
+    methods,
+    sentenceCount = 10,
+    keywordCount = 15,
+    query,
+  }: {
+    methods?: SummarizationMethod[];
+    sentenceCount?: number;
+    keywordCount?: number;
+    query?: string;
+  } = {},
 ): Promise<SummarizeDocumentResponse> {
   return request<SummarizeDocumentResponse>(`/documents/${documentId}/summarize`, {
     method: "POST",
-    body: JSON.stringify({ methods, sentence_count: sentenceCount }),
+    body: JSON.stringify({
+      methods,
+      sentence_count: sentenceCount,
+      keyword_count: keywordCount,
+      query: query || null,
+    }),
   });
 }
 

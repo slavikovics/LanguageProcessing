@@ -27,6 +27,7 @@ import {
 import { escapeHtml, markdownToPrintHtml, openPrintView } from "@/lib/printView";
 
 const DEFAULT_SENTENCE_COUNT = 10;
+const DEFAULT_KEYWORD_COUNT = 15;
 const ALL_METHODS = "all" as const;
 type MethodSelection = SummarizationMethod | typeof ALL_METHODS;
 
@@ -39,6 +40,8 @@ export function SummarizationDocumentTab({ collectionId }: { collectionId: numbe
   const [selectedDocument, setSelectedDocument] = useState<DocumentSummary | null>(null);
   const [method, setMethod] = useState<MethodSelection>(SUMMARIZATION_METHODS[0]);
   const [sentenceCount, setSentenceCount] = useState(DEFAULT_SENTENCE_COUNT);
+  const [keywordCount, setKeywordCount] = useState(DEFAULT_KEYWORD_COUNT);
+  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [keywords, setKeywords] = useState<KeywordGroup[]>([]);
@@ -63,7 +66,12 @@ export function SummarizationDocumentTab({ collectionId }: { collectionId: numbe
     setPolishedByMethod({});
     try {
       const methods = method === ALL_METHODS ? [...SUMMARIZATION_METHODS] : [method];
-      const response = await summarizeDocument(documentId, { methods, sentenceCount });
+      const response = await summarizeDocument(documentId, {
+        methods,
+        sentenceCount,
+        keywordCount,
+        query: query.trim() || undefined,
+      });
       setKeywords(response.keywords);
       setOutcomes(response.results);
 
@@ -79,7 +87,7 @@ export function SummarizationDocumentTab({ collectionId }: { collectionId: numbe
     } finally {
       setLoading(false);
     }
-  }, [selectedDocument, method, sentenceCount]);
+  }, [selectedDocument, method, sentenceCount, keywordCount, query]);
 
   function keywordHierarchyLines(groups: KeywordGroup[]): string[] {
     return groups.flatMap((group) => [group.term, ...group.children.map((child) => `  ${child}`)]);
@@ -197,29 +205,73 @@ export function SummarizationDocumentTab({ collectionId }: { collectionId: numbe
               />
             </div>
 
-            <Button type="button" onClick={handleSummarize} disabled={selectedDocument === null || loading}>
-              {loading ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <FileText className="size-4" />
-              )}
-              {loading ? "Построение…" : "Построить реферат"}
-            </Button>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="summarization-keyword-count">Слов в списке ключевых слов</Label>
+              <Input
+                id="summarization-keyword-count"
+                type="number"
+                min={1}
+                max={100}
+                value={keywordCount}
+                onChange={(event) => setKeywordCount(Number(event.target.value) || 1)}
+                className="w-32"
+              />
+            </div>
+
           </div>
 
-          {selectedDocument?.url && (
-            <p className="text-xs text-muted-foreground">
-              Исходный документ:{" "}
-              <a
-                href={selectedDocument.url}
-                target="_blank"
-                rel="noreferrer"
-                className="text-primary underline-offset-2 hover:underline"
-              >
-                {selectedDocument.url}
-              </a>
-            </p>
+          {(method === "embeddings" || method === ALL_METHODS) && (
+            <div className="flex flex-col gap-1.5 sm:max-w-md">
+              <Label htmlFor="summarization-query">Запрос (эмбеддинги, необязательно)</Label>
+              <Input
+                id="summarization-query"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Оставьте пустым для реферата по центроиду документа"
+              />
+            </div>
           )}
+
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            {selectedDocument?.url ? (
+              <p className="text-xs text-muted-foreground">
+                Исходный документ:{" "}
+                <a
+                  href={selectedDocument.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary underline-offset-2 hover:underline"
+                >
+                  {selectedDocument.url}
+                </a>
+              </p>
+            ) : (
+              <span />
+            )}
+
+            <div className="flex flex-wrap gap-2">
+              {outcomes.length > 0 && (
+                <>
+                  <Button type="button" variant="outline" size="sm" onClick={handleSaveToFile}>
+                    <Save className="size-3.5" />
+                    Сохранить в файл
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={handlePrint}>
+                    <Printer className="size-3.5" />
+                    Печать
+                  </Button>
+                </>
+              )}
+              <Button type="button" onClick={handleSummarize} disabled={selectedDocument === null || loading}>
+                {loading ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <FileText className="size-4" />
+                )}
+                {loading ? "Построение…" : "Построить реферат"}
+              </Button>
+            </div>
+          </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
         </CardContent>
@@ -228,23 +280,11 @@ export function SummarizationDocumentTab({ collectionId }: { collectionId: numbe
       {outcomes.length > 0 && (
         <>
           <Card>
-            <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
-              <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                <h3 className="shrink-0 text-sm font-medium">Ключевые слова:</h3>
-                <p className="min-w-0 truncate text-sm text-muted-foreground">
-                  {keywords.map((group) => group.term).join(", ")}
-                </p>
-              </div>
-              <div className="flex shrink-0 gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={handleSaveToFile}>
-                  <Save className="size-3.5" />
-                  Сохранить в файл
-                </Button>
-                <Button type="button" variant="outline" size="sm" onClick={handlePrint}>
-                  <Printer className="size-3.5" />
-                  Печать
-                </Button>
-              </div>
+            <CardContent className="flex min-w-0 items-center gap-1.5 py-4">
+              <h3 className="shrink-0 text-sm font-medium">Ключевые слова:</h3>
+              <p className="min-w-0 truncate text-sm text-muted-foreground">
+                {keywords.map((group) => group.term).join(", ")}
+              </p>
             </CardContent>
           </Card>
 

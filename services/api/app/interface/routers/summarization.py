@@ -45,7 +45,11 @@ async def summarize_document(
     service = DocumentSummarizationService(db)
     try:
         keywords, outcomes = await service.summarize_document(
-            document_id, methods=payload.methods, sentence_count=payload.sentence_count
+            document_id,
+            methods=payload.methods,
+            sentence_count=payload.sentence_count,
+            keyword_count=payload.keyword_count,
+            query=payload.query,
         )
     except SummarizationError as exc:
         _raise_for_summarization_error(exc)

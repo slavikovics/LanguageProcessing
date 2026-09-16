@@ -90,6 +90,19 @@ def test_rank_sentences_by_embedding_centrality_rejects_length_mismatch():
         summarization.rank_sentences_by_embedding_centrality(["a", "b"], [[1.0, 0.0]])
 
 
+def test_rank_sentences_by_query_similarity_prefers_sentence_closest_to_query():
+    sentences = ["a", "b", "c"]
+    embeddings = [[1.0, 0.0], [0.0, 1.0], [0.6, 0.6]]
+    scores = summarization.rank_sentences_by_query_similarity(sentences, embeddings, [0.0, 1.0])
+    best = max(scores, key=lambda s: s.weight)
+    assert best.index == 1
+
+
+def test_rank_sentences_by_query_similarity_rejects_length_mismatch():
+    with pytest.raises(ValueError):
+        summarization.rank_sentences_by_query_similarity(["a", "b"], [[1.0, 0.0]], [1.0, 0.0])
+
+
 def test_select_summary_sentences_returns_top_n_in_original_order():
     scores = [
         summarization.SentenceScore(index=0, text="s0", weight=0.1),

@@ -179,6 +179,25 @@ def rank_sentences_by_embedding_centrality(
     ]
 
 
+def rank_sentences_by_query_similarity(
+    sentences: Sequence[str],
+    sentence_embeddings: Sequence[Sequence[float]],
+    query_embedding: Sequence[float],
+) -> list[SentenceScore]:
+    """Query-oriented variant of the embeddings method: score(Si) =
+    cosine(embedding(Si), embedding(query)) — same embedding space as
+    `rank_sentences_by_embedding_centrality`, but ranked toward relevance to a
+    user query instead of toward the whole document's centroid."""
+    if len(sentences) != len(sentence_embeddings):
+        raise ValueError("sentences and sentence_embeddings must be the same length")
+    return [
+        SentenceScore(
+            index=i, text=sentences[i], weight=_cosine(sentence_embeddings[i], query_embedding)
+        )
+        for i in range(len(sentences))
+    ]
+
+
 def select_summary_sentences(
     scores: Sequence[SentenceScore], target_count: int
 ) -> list[SentenceScore]:

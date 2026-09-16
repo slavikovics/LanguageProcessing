@@ -6,7 +6,7 @@ import os
 
 import httpx
 
-MODEL_NAME = os.environ.get("OPENROUTER_CHAT_MODEL", "qwen/qwen-2.5-7b-instruct")
+MODEL_NAME = os.environ.get("OPENROUTER_CHAT_MODEL", "qwen/qwen3.8-flash")
 
 _API_URL = "https://openrouter.ai/api/v1/chat/completions"
 

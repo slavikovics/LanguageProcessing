@@ -33,11 +33,21 @@ class SummarizationServiceClient:
         )
 
     async def summarize_embeddings(
-        self, sentences: list[str], embeddings: list[list[float]], sentence_count: int
+        self,
+        sentences: list[str],
+        embeddings: list[list[float]],
+        sentence_count: int,
+        *,
+        query_embedding: list[float] | None = None,
     ) -> dict[str, Any]:
         return await self._post(
             "/summarize/embeddings",
-            {"sentences": sentences, "embeddings": embeddings, "sentence_count": sentence_count},
+            {
+                "sentences": sentences,
+                "embeddings": embeddings,
+                "sentence_count": sentence_count,
+                "query_embedding": query_embedding,
+            },
         )
 
     async def extract_keyword_hierarchy(

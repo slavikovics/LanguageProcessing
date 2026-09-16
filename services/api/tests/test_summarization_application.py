@@ -68,7 +68,7 @@ async def _seed_two_document_collection(session_factory) -> tuple[int, int]:
 
 class _FakeSummarizationClient(SummarizationServiceClient):
     def __init__(self) -> None:
-        pass
+        self.embeddings_calls: list[dict] = []
 
     async def _select(self, sentences: list[str], sentence_count: int) -> dict:
         selected = sentences[:sentence_count]
@@ -86,7 +86,10 @@ class _FakeSummarizationClient(SummarizationServiceClient):
         sentences = [s.strip() for s in text.split(".") if s.strip()]
         return await self._select(sentences, sentence_count)
 
-    async def summarize_embeddings(self, sentences, embeddings, sentence_count) -> dict:
+    async def summarize_embeddings(
+        self, sentences, embeddings, sentence_count, *, query_embedding=None
+    ) -> dict:
+        self.embeddings_calls.append({"query_embedding": query_embedding})
         return await self._select(sentences, sentence_count)
 
     async def extract_keyword_hierarchy(self, text, term_weights, *, top_n=15, max_children=5):
@@ -103,6 +106,9 @@ class _FakeNlpClient(NlpServiceClient):
 
     async def embed_documents(self, texts: list[str]) -> list[list[float]]:
         return [[1.0, 0.0] for _ in texts]
+
+    async def embed_query(self, text: str) -> list[float]:
+        return [0.0, 1.0]
 
     async def polish(self, text: str, *, language: str | None = None) -> dict:
         return {"polished_markdown": f"Polished: {text}", "model": "fake/test-model"}
@@ -165,6 +171,46 @@ async def test_summarize_document_runs_all_methods_and_persists_summaries(sessio
         assert len(stored) == 3
         assert all(row.run_id is None for row in stored)
         assert all(row.total_chars == len(document.clean_text) for row in stored)
+
+
+async def test_summarize_document_keyword_count_caps_keyword_hierarchy(session_factory):
+    doc_a_id, _doc_b_id = await _seed_two_document_collection(session_factory)
+    async with session_factory() as session:
+        service = DocumentSummarizationService(
+            session,
+            nlp_client=_FakeNlpClient(),
+            summarization_client=_FakeSummarizationClient(),
+        )
+        keywords, _outcomes = await service.summarize_document(
+            doc_a_id, methods=["algorithmic"], sentence_count=1, keyword_count=1
+        )
+    assert [k.term for k in keywords] == ["laser"]
+
+
+async def test_summarize_document_with_query_forwards_query_embedding_for_embeddings_method(
+    session_factory,
+):
+    doc_a_id, _doc_b_id = await _seed_two_document_collection(session_factory)
+    async with session_factory() as session:
+        summarization_client = _FakeSummarizationClient()
+        service = DocumentSummarizationService(
+            session, nlp_client=_FakeNlpClient(), summarization_client=summarization_client
+        )
+        await service.summarize_document(
+            doc_a_id, methods=["embeddings"], sentence_count=1, query="laser types"
+        )
+    assert summarization_client.embeddings_calls == [{"query_embedding": [0.0, 1.0]}]
+
+
+async def test_summarize_document_without_query_omits_query_embedding(session_factory):
+    doc_a_id, _doc_b_id = await _seed_two_document_collection(session_factory)
+    async with session_factory() as session:
+        summarization_client = _FakeSummarizationClient()
+        service = DocumentSummarizationService(
+            session, nlp_client=_FakeNlpClient(), summarization_client=summarization_client
+        )
+        await service.summarize_document(doc_a_id, methods=["embeddings"], sentence_count=1)
+    assert summarization_client.embeddings_calls == [{"query_embedding": None}]
 
 
 async def test_polish_summary_persists_and_returns_polished_text(session_factory):

@@ -72,6 +72,21 @@ def test_summarize_embeddings_picks_sentence_closest_to_centroid():
     assert body["selected"][0]["index"] == 2
 
 
+def test_summarize_embeddings_with_query_picks_sentence_closest_to_query():
+    response = client.post(
+        "/summarize/embeddings",
+        json={
+            "sentences": ["a", "b", "c"],
+            "embeddings": [[1.0, 0.0], [0.0, 1.0], [0.6, 0.6]],
+            "sentence_count": 1,
+            "query_embedding": [0.0, 1.0],
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["selected"][0]["index"] == 1
+
+
 def test_keywords_hierarchy_returns_roots_with_matching_phrases():
     response = client.post(
         "/keywords/hierarchy",

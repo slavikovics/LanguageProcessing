@@ -17,8 +17,9 @@ from app.infrastructure.summarization_client import SummarizationServiceClient
 
 from .term_weights import compute_modified_term_weights
 
-DEFAULT_KEYWORD_COUNT = None
-"""`None` = full vocabulary, no cap on the number of keyword-hierarchy roots."""
+DEFAULT_KEYWORD_COUNT = 15
+"""Default cap on the number of keyword-hierarchy roots, used when the caller
+doesn't request a specific count."""
 
 
 class DocumentSummarizationService:
@@ -38,7 +39,13 @@ class DocumentSummarizationService:
         self._summarization = summarization_client or SummarizationServiceClient()
 
     async def summarize_document(
-        self, document_id: int, *, methods: list[str] | None = None, sentence_count: int = 10
+        self,
+        document_id: int,
+        *,
+        methods: list[str] | None = None,
+        sentence_count: int = 10,
+        keyword_count: int = DEFAULT_KEYWORD_COUNT,
+        query: str | None = None,
     ) -> tuple[list[KeywordGroup], list[SummaryOutcome]]:
         document = await self._documents.get(document_id)
         if document is None:
@@ -57,13 +64,15 @@ class DocumentSummarizationService:
                 "document has no indexed terms yet — run indexing for this collection first"
             )
         keyword_groups = await self._summarization.extract_keyword_hierarchy(
-            document.clean_text, term_weights, top_n=DEFAULT_KEYWORD_COUNT
+            document.clean_text, term_weights, top_n=keyword_count
         )
         keywords = [KeywordGroup(term=g["term"], children=g["children"]) for g in keyword_groups]
 
         outcomes: list[SummaryOutcome] = []
         for method in requested_methods:
-            outcome = await self.run_method(method, document.clean_text, term_weights, sentence_count)
+            outcome = await self.run_method(
+                method, document.clean_text, term_weights, sentence_count, query=query
+            )
             outcomes.append(outcome)
             await self._summaries.create(
                 run_id=None,
@@ -80,14 +89,20 @@ class DocumentSummarizationService:
         return keywords, outcomes
 
     async def run_method(
-        self, method: str, text: str, term_weights: dict[str, float], sentence_count: int
+        self,
+        method: str,
+        text: str,
+        term_weights: dict[str, float],
+        sentence_count: int,
+        *,
+        query: str | None = None,
     ) -> SummaryOutcome:
         if method == "algorithmic":
             body = await self._summarization.summarize_algorithmic(text, term_weights, sentence_count)
         elif method == "textrank":
             body = await self._summarization.summarize_textrank(text, sentence_count)
         elif method == "embeddings":
-            body = await self._run_embeddings_method(text, sentence_count)
+            body = await self._run_embeddings_method(text, sentence_count, query=query)
         else:
             raise SummarizationError(f"unknown summarization method: {method}")
 
@@ -100,14 +115,25 @@ class DocumentSummarizationService:
             document_chars=len(text),
         )
 
-    async def _run_embeddings_method(self, text: str, sentence_count: int) -> dict:
+    async def _run_embeddings_method(
+        self, text: str, sentence_count: int, *, query: str | None = None
+    ) -> dict:
         sentences = await self._nlp.split_sentences(text)
         if not sentences:
             return {"selected": [], "total_sentences": 0, "elapsed_ms": 0.0}
         started = time.perf_counter()
         vectors = await self._nlp.embed_documents(sentences)
         embed_elapsed_ms = (time.perf_counter() - started) * 1000
-        body = await self._summarization.summarize_embeddings(sentences, vectors, sentence_count)
+
+        query_embedding: list[float] | None = None
+        if query:
+            query_started = time.perf_counter()
+            query_embedding = await self._nlp.embed_query(query)
+            embed_elapsed_ms += (time.perf_counter() - query_started) * 1000
+
+        body = await self._summarization.summarize_embeddings(
+            sentences, vectors, sentence_count, query_embedding=query_embedding
+        )
         body["elapsed_ms"] = body["elapsed_ms"] + embed_elapsed_ms
         return body
 

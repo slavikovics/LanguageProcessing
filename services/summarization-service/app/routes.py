@@ -54,9 +54,14 @@ async def summarize_textrank(payload: TextRankSummarizeRequest) -> SummarizeResp
 @router.post("/summarize/embeddings", response_model=SummarizeResponse)
 async def summarize_embeddings(payload: EmbeddingSummarizeRequest) -> SummarizeResponse:
     started = time.perf_counter()
-    scores = summarization.rank_sentences_by_embedding_centrality(
-        payload.sentences, payload.embeddings
-    )
+    if payload.query_embedding is not None:
+        scores = summarization.rank_sentences_by_query_similarity(
+            payload.sentences, payload.embeddings, payload.query_embedding
+        )
+    else:
+        scores = summarization.rank_sentences_by_embedding_centrality(
+            payload.sentences, payload.embeddings
+        )
     elapsed_ms = (time.perf_counter() - started) * 1000
     return _to_response(scores, payload.sentence_count, elapsed_ms)
 

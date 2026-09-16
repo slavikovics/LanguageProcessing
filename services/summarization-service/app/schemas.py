@@ -28,6 +28,7 @@ class EmbeddingSummarizeRequest(BaseModel):
     sentences: list[str]
     embeddings: list[list[float]]
     sentence_count: int = 10
+    query_embedding: list[float] | None = None
 
 
 class KeywordGroup(BaseModel):
