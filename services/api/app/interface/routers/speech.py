@@ -191,7 +191,7 @@ async def stream_transcribe_speech(websocket: WebSocket) -> None:
                     logger.warning("speech stream: ignoring malformed text frame")
                     continue
                 if payload.get("type") == "stop":
-                    await _finish_stream(websocket, session, match_commands=match_commands)
+                    await _finish_stream(websocket, session, match_commands=match_commands, language=language)
                     break
                 continue
 
@@ -237,12 +237,14 @@ async def stream_transcribe_speech(websocket: WebSocket) -> None:
         pass
 
 
-async def _finish_stream(websocket: WebSocket, session: StreamSession, *, match_commands: bool = True) -> None:
+async def _finish_stream(
+    websocket: WebSocket, session: StreamSession, *, match_commands: bool = True, language: str | None = None
+) -> None:
     matched = None
     if match_commands:
         try:
             async with SessionLocal() as db_session:
-                commands = await SpeechCommandRepository(db_session).list_active()
+                commands = await SpeechCommandRepository(db_session).list_active(language)
             command_defs = [
                 SpeechCommandDef(
                     id=c.id,

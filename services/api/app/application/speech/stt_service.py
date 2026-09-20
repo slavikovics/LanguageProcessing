@@ -35,7 +35,7 @@ class SpeechRecognitionService:
             elapsed_ms=body["elapsed_ms"],
         )
 
-        active_commands = await self._commands.list_active()
+        active_commands = await self._commands.list_active(language)
         command_defs = [
             SpeechCommandDef(
                 id=c.id,

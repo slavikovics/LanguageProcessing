@@ -13,10 +13,11 @@ class SpeechCommandRepository:
         result = await self._session.execute(select(SpeechCommand).order_by(SpeechCommand.id))
         return list(result.scalars().all())
 
-    async def list_active(self) -> list[SpeechCommand]:
-        result = await self._session.execute(
-            select(SpeechCommand).where(SpeechCommand.is_active.is_(True)).order_by(SpeechCommand.id)
-        )
+    async def list_active(self, language: str | None = None) -> list[SpeechCommand]:
+        query = select(SpeechCommand).where(SpeechCommand.is_active.is_(True))
+        if language:
+            query = query.where(SpeechCommand.language == language)
+        result = await self._session.execute(query.order_by(SpeechCommand.id))
         return list(result.scalars().all())
 
     async def get(self, command_id: int) -> SpeechCommand | None:

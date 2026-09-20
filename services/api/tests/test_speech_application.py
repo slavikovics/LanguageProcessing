@@ -95,6 +95,28 @@ async def test_recognition_service_returns_none_when_no_command_matches(session_
 
 
 @pytest.mark.asyncio
+async def test_recognition_service_matches_only_commands_of_requested_language(session_factory):
+    async with session_factory() as session:
+        commands = SpeechCommandService(session)
+        await commands.create_command(phrase="search for", action="navigate_search", language="en")
+        await commands.create_command(phrase="найди", action="navigate_search", language="ru")
+
+        service = SpeechRecognitionService(
+            session, client=_FakeSpeechServiceClient(transcript="найди кошек")
+        )
+        _outcome, matched_ru = await service.transcribe(
+            b"fake-audio", filename="a.wav", content_type="audio/wav", backend="local", language="ru"
+        )
+        assert matched_ru is not None
+        assert matched_ru.language == "ru"
+
+        _outcome, matched_en = await service.transcribe(
+            b"fake-audio", filename="a.wav", content_type="audio/wav", backend="local", language="en"
+        )
+        assert matched_en is None
+
+
+@pytest.mark.asyncio
 async def test_command_service_crud(session_factory):
     async with session_factory() as session:
         service = SpeechCommandService(session)
