@@ -1,0 +1,1522 @@
+{
+ "en": {
+  "cmd": [
+   {
+    "voice": "en_US-amy-medium",
+    "text": "search for machine learning applications",
+    "hyp": "Search for machine learning applications.",
+    "ms": 4872.608153997135,
+    "wall": 4.979991838001297,
+    "dur": 2.7399546485260773,
+    "matched": "navigate_search",
+    "expected": "navigate_search",
+    "wer": 0.0,
+    "nref": 5
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "search for machine learning applications",
+    "hyp": "Search for machine learning applications.",
+    "ms": 3728.9764050001395,
+    "wall": 3.7624945110001136,
+    "dur": 2.0085260770975055,
+    "matched": "navigate_search",
+    "expected": "navigate_search",
+    "wer": 0.0,
+    "nref": 5
+   },
+   {
+    "voice": "en_US-amy-medium",
+    "text": "clear search",
+    "hyp": "clear search.",
+    "ms": 2588.2087149984727,
+    "wall": 2.6110485449971748,
+    "dur": 0.9752380952380952,
+    "matched": "clear_query",
+    "expected": "clear_query",
+    "wer": 0.0,
+    "nref": 2
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "clear search",
+    "hyp": "CLEAR CERT",
+    "ms": 2571.5747909998754,
+    "wall": 2.592215122997004,
+    "dur": 0.626938775510204,
+    "matched": null,
+    "expected": "clear_query",
+    "wer": 0.5,
+    "nref": 2
+   },
+   {
+    "voice": "en_US-amy-medium",
+    "text": "read this",
+    "hyp": "Read this.",
+    "ms": 2592.8694819995144,
+    "wall": 2.617001368998899,
+    "dur": 0.9636281179138322,
+    "matched": "read_document",
+    "expected": "read_document",
+    "wer": 0.0,
+    "nref": 2
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "read this",
+    "hyp": "Read this!",
+    "ms": 2652.279494999675,
+    "wall": 2.672339158001705,
+    "dur": 0.6849886621315193,
+    "matched": "read_document",
+    "expected": "read_document",
+    "wer": 0.0,
+    "nref": 2
+   },
+   {
+    "voice": "en_US-amy-medium",
+    "text": "stop reading",
+    "hyp": "Stop reading.",
+    "ms": 2598.064018002333,
+    "wall": 2.618762381000124,
+    "dur": 1.0797278911564625,
+    "matched": "stop_speaking",
+    "expected": "stop_speaking",
+    "wer": 0.0,
+    "nref": 2
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "stop reading",
+    "hyp": "Stop reading.",
+    "ms": 2557.618337999884,
+    "wall": 2.5780114279987174,
+    "dur": 0.893968253968254,
+    "matched": "stop_speaking",
+    "expected": "stop_speaking",
+    "wer": 0.0,
+    "nref": 2
+   },
+   {
+    "voice": "en_US-amy-medium",
+    "text": "go to crawling",
+    "hyp": "Go to Crawling.",
+    "ms": 2632.8250670012494,
+    "wall": 2.653849371999968,
+    "dur": 1.1029478458049886,
+    "matched": "navigate_to_crawl",
+    "expected": "navigate_to_crawl",
+    "wer": 0.0,
+    "nref": 3
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "go to crawling",
+    "hyp": "Go to crawling.",
+    "ms": 2607.066433,
+    "wall": 2.6321787829983805,
+    "dur": 0.6849886621315193,
+    "matched": "navigate_to_crawl",
+    "expected": "navigate_to_crawl",
+    "wer": 0.0,
+    "nref": 3
+   },
+   {
+    "voice": "en_US-amy-medium",
+    "text": "go to collections",
+    "hyp": "Go to Collections.",
+    "ms": 2629.9846040019474,
+    "wall": 2.6516789790002804,
+    "dur": 1.3815873015873017,
+    "matched": "navigate_to_collections",
+    "expected": "navigate_to_collections",
+    "wer": 0.0,
+    "nref": 3
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "go to collections",
+    "hyp": "Go to Collections",
+    "ms": 2621.203089998744,
+    "wall": 2.641938142998697,
+    "dur": 0.8707482993197279,
+    "matched": "navigate_to_collections",
+    "expected": "navigate_to_collections",
+    "wer": 0.0,
+    "nref": 3
+   },
+   {
+    "voice": "en_US-amy-medium",
+    "text": "go to search",
+    "hyp": "Go to search.",
+    "ms": 2597.1609949992853,
+    "wall": 2.6171060189990385,
+    "dur": 1.1493877551020408,
+    "matched": "navigate_to_search",
+    "expected": "navigate_to_search",
+    "wer": 0.0,
+    "nref": 3
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "go to search",
+    "hyp": "Go to search.",
+    "ms": 2547.09692400138,
+    "wall": 2.5669626759990933,
+    "dur": 0.7546485260770975,
+    "matched": "navigate_to_search",
+    "expected": "navigate_to_search",
+    "wer": 0.0,
+    "nref": 3
+   },
+   {
+    "voice": "en_US-amy-medium",
+    "text": "go to metrics",
+    "hyp": "Go to Metrics.",
+    "ms": 2630.7434830014245,
+    "wall": 2.655021107999346,
+    "dur": 1.1609977324263039,
+    "matched": "navigate_to_metrics",
+    "expected": "navigate_to_metrics",
+    "wer": 0.0,
+    "nref": 3
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "go to metrics",
+    "hyp": "Go to Metrics.",
+    "ms": 2626.924162002979,
+    "wall": 2.64697277400046,
+    "dur": 0.8591383219954648,
+    "matched": "navigate_to_metrics",
+    "expected": "navigate_to_metrics",
+    "wer": 0.0,
+    "nref": 3
+   },
+   {
+    "voice": "en_US-amy-medium",
+    "text": "go to language identification",
+    "hyp": "Go to Language Identification.",
+    "ms": 2643.1671589998587,
+    "wall": 2.662613942997268,
+    "dur": 2.4380952380952383,
+    "matched": "navigate_to_lang_id",
+    "expected": "navigate_to_lang_id",
+    "wer": 0.0,
+    "nref": 4
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "go to language identification",
+    "hyp": "Go to Language Identification.",
+    "ms": 2716.586485003063,
+    "wall": 2.735834770002839,
+    "dur": 1.6370068027210884,
+    "matched": "navigate_to_lang_id",
+    "expected": "navigate_to_lang_id",
+    "wer": 0.0,
+    "nref": 4
+   },
+   {
+    "voice": "en_US-amy-medium",
+    "text": "go to summarization",
+    "hyp": "Go to Summarization.",
+    "ms": 2660.6072829999903,
+    "wall": 2.6842612370019197,
+    "dur": 1.6950566893424037,
+    "matched": "navigate_to_summarization",
+    "expected": "navigate_to_summarization",
+    "wer": 0.0,
+    "nref": 3
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "go to summarization",
+    "hyp": "Go to summarization.",
+    "ms": 2674.6033599993098,
+    "wall": 2.705282636001357,
+    "dur": 1.195827664399093,
+    "matched": "navigate_to_summarization",
+    "expected": "navigate_to_summarization",
+    "wer": 0.0,
+    "nref": 3
+   },
+   {
+    "voice": "en_US-amy-medium",
+    "text": "go to translation",
+    "hyp": "Go to translation.",
+    "ms": 2608.0225890000293,
+    "wall": 2.6285551950022636,
+    "dur": 1.555736961451247,
+    "matched": "navigate_to_translation",
+    "expected": "navigate_to_translation",
+    "wer": 0.0,
+    "nref": 3
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "go to translation",
+    "hyp": "Go to translation.",
+    "ms": 2567.1771449997323,
+    "wall": 2.5867769209980906,
+    "dur": 1.0565079365079366,
+    "matched": "navigate_to_translation",
+    "expected": "navigate_to_translation",
+    "wer": 0.0,
+    "nref": 3
+   },
+   {
+    "voice": "en_US-amy-medium",
+    "text": "go to settings",
+    "hyp": "Go to Settings.",
+    "ms": 2586.5149820019724,
+    "wall": 2.6078682439983822,
+    "dur": 1.1261678004535147,
+    "matched": "navigate_to_settings",
+    "expected": "navigate_to_settings",
+    "wer": 0.0,
+    "nref": 3
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "go to settings",
+    "hyp": "Build the settings.",
+    "ms": 2527.314249000483,
+    "wall": 2.5480515150011342,
+    "dur": 0.8243083900226758,
+    "matched": null,
+    "expected": "navigate_to_settings",
+    "wer": 0.6666666666666666,
+    "nref": 3
+   },
+   {
+    "voice": "en_US-amy-medium",
+    "text": "go to help",
+    "hyp": "Go to help.",
+    "ms": 2628.89169799746,
+    "wall": 2.6540056800004095,
+    "dur": 0.8707482993197279,
+    "matched": "navigate_to_help",
+    "expected": "navigate_to_help",
+    "wer": 0.0,
+    "nref": 3
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "go to help",
+    "hyp": "Go to help.",
+    "ms": 2522.3957800008066,
+    "wall": 2.54338360499969,
+    "dur": 0.603718820861678,
+    "matched": "navigate_to_help",
+    "expected": "navigate_to_help",
+    "wer": 0.0,
+    "nref": 3
+   }
+  ],
+  "neg": [
+   {
+    "voice": "en_US-amy-medium",
+    "text": "The model converges after ten epochs of training.",
+    "hyp": "The model converges after 10 epochs of training.",
+    "ms": 2869.8582270008046,
+    "wall": 2.8895718999992823,
+    "dur": 3.3436734693877552,
+    "matched": null,
+    "wer": 0.125,
+    "nref": 8
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "The model converges after ten epochs of training.",
+    "hyp": "The model converges after 10 epochs of training.",
+    "ms": 2880.233815001702,
+    "wall": 2.9025103599997237,
+    "dur": 2.716734693877551,
+    "matched": null,
+    "wer": 0.125,
+    "nref": 8
+   },
+   {
+    "voice": "en_US-amy-medium",
+    "text": "We evaluate the algorithm on three public benchmarks.",
+    "hyp": "We evaluate the algorithm on three public benchmarks.",
+    "ms": 2831.7123479973816,
+    "wall": 2.852202894002403,
+    "dur": 3.900952380952381,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 8
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "We evaluate the algorithm on three public benchmarks.",
+    "hyp": "We evaluate the algorithm on three public benchmarks.",
+    "ms": 2755.382366001868,
+    "wall": 2.780583994997869,
+    "dur": 3.030204081632653,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 8
+   },
+   {
+    "voice": "en_US-amy-medium",
+    "text": "Neural networks learn distributed representations of words.",
+    "hyp": "neural networks learn distributed representations of words.",
+    "ms": 2732.721667001897,
+    "wall": 2.754279230000975,
+    "dur": 4.017052154195011,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 7
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "Neural networks learn distributed representations of words.",
+    "hyp": "Neural networks learn distributed representations of words.",
+    "ms": 2802.2008309999364,
+    "wall": 2.822836915998778,
+    "dur": 3.3436734693877552,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 7
+   },
+   {
+    "voice": "en_US-amy-medium",
+    "text": "The crawler downloads pages and stores them in a database.",
+    "hyp": "The crawler downloads pages and stores them in a database.",
+    "ms": 2869.708461999835,
+    "wall": 2.8918596080002317,
+    "dur": 3.947392290249433,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 10
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "The crawler downloads pages and stores them in a database.",
+    "hyp": "The crawler downloads pages and stores them in a database.",
+    "ms": 2861.0908210030175,
+    "wall": 2.882700924998062,
+    "dur": 3.006984126984127,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 10
+   },
+   {
+    "voice": "en_US-amy-medium",
+    "text": "Precision and recall are computed for every query.",
+    "hyp": "precision and recall are computed for every query.",
+    "ms": 2806.876086000557,
+    "wall": 2.8338208530003612,
+    "dur": 3.4249433106575964,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 8
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "Precision and recall are computed for every query.",
+    "hyp": "Precision and Recall are computed for every query.",
+    "ms": 2816.580000002432,
+    "wall": 2.8373655599971244,
+    "dur": 2.7980045351473923,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 8
+   },
+   {
+    "voice": "en_US-amy-medium",
+    "text": "The search for optimal hyperparameters is expensive.",
+    "hyp": "The search for optimal hyperparameters is expensive.",
+    "ms": 2837.085154002125,
+    "wall": 2.8572720299998764,
+    "dur": 3.436553287981859,
+    "matched": "navigate_search",
+    "wer": 0.0,
+    "nref": 7
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "The search for optimal hyperparameters is expensive.",
+    "hyp": "The search for optimal hyperparameters is expensive.",
+    "ms": 2839.9370789993554,
+    "wall": 2.859642667001026,
+    "dur": 2.670294784580499,
+    "matched": "navigate_search",
+    "wer": 0.0,
+    "nref": 7
+   },
+   {
+    "voice": "en_US-amy-medium",
+    "text": "Please go to the next section of the article.",
+    "hyp": "Please go to the next section of the article.",
+    "ms": 2846.374448003189,
+    "wall": 2.8673556200010353,
+    "dur": 3.01859410430839,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 9
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "Please go to the next section of the article.",
+    "hyp": "Please go to the next section of the article.",
+    "ms": 2693.349166002008,
+    "wall": 2.7180375949974405,
+    "dur": 1.9853061224489796,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 9
+   }
+  ],
+  "sen": [
+   {
+    "voice": "en_US-amy-medium",
+    "text": "Recent advances in deep learning have transformed natural language processing.",
+    "hyp": "Recent advances in deep learning have transformed natural language processing.",
+    "ms": 2881.9993140023143,
+    "wall": 2.903054558999429,
+    "dur": 5.282539682539682,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 10
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "Recent advances in deep learning have transformed natural language processing.",
+    "hyp": "Recent advances in deep learning have transformed natural language processing.",
+    "ms": 2820.2399679976224,
+    "wall": 2.847001205002016,
+    "dur": 4.249251700680272,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 10
+   },
+   {
+    "voice": "en_GB-alba-medium",
+    "text": "Recent advances in deep learning have transformed natural language processing.",
+    "hyp": "Recent advances in deep learning have transformed natural language processing.",
+    "ms": 2771.904547000304,
+    "wall": 2.792195811998681,
+    "dur": 4.725260770975057,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 10
+   },
+   {
+    "voice": "en_US-amy-medium",
+    "text": "We represent each document as a weighted vector of terms.",
+    "hyp": "We represent each document as a weighted vector of terms.",
+    "ms": 2748.603694999474,
+    "wall": 2.7692335579995415,
+    "dur": 3.8080725623582765,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 10
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "We represent each document as a weighted vector of terms.",
+    "hyp": "we represent each document as a weighted vector of terms.",
+    "ms": 2803.779325000505,
+    "wall": 2.828986745000293,
+    "dur": 3.1579138321995464,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 10
+   },
+   {
+    "voice": "en_GB-alba-medium",
+    "text": "We represent each document as a weighted vector of terms.",
+    "hyp": "We represent each document as a weighted vector of terms.",
+    "ms": 2259.158484997897,
+    "wall": 2.2787037170019175,
+    "dur": 3.9706122448979593,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 10
+   },
+   {
+    "voice": "en_US-amy-medium",
+    "text": "Documents are ranked by the cosine similarity to the query vector.",
+    "hyp": "Documents are ranked by the cosine similarity to the query vector.",
+    "ms": 2318.7715750027564,
+    "wall": 2.3327643379998335,
+    "dur": 4.539501133786848,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 11
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "Documents are ranked by the cosine similarity to the query vector.",
+    "hyp": "Documents are ranked by the cosine similarity to the query vector.",
+    "ms": 2298.3804200011946,
+    "wall": 2.3129927429981763,
+    "dur": 3.4946031746031747,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 11
+   },
+   {
+    "voice": "en_GB-alba-medium",
+    "text": "Documents are ranked by the cosine similarity to the query vector.",
+    "hyp": "Documents are ranked by the cosine similarity to the query vector.",
+    "ms": 2342.5909860015963,
+    "wall": 2.3580710670030385,
+    "dur": 3.5526530612244898,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 11
+   },
+   {
+    "voice": "en_US-amy-medium",
+    "text": "The proposed indexing module updates the vocabulary incrementally.",
+    "hyp": "the proposed indexing module updates the vocabulary incrementally.",
+    "ms": 2234.441931999754,
+    "wall": 2.2524661700008437,
+    "dur": 4.5859410430839,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 8
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "The proposed indexing module updates the vocabulary incrementally.",
+    "hyp": "The proposed indexing module updates the vocabulary incrementally.",
+    "ms": 2265.1321990015276,
+    "wall": 2.2802682430010464,
+    "dur": 3.610702947845805,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 8
+   },
+   {
+    "voice": "en_GB-alba-medium",
+    "text": "The proposed indexing module updates the vocabulary incrementally.",
+    "hyp": "The proposed indexing module updates the vocabulary incrementally.",
+    "ms": 2244.23152899908,
+    "wall": 2.2587830679985927,
+    "dur": 3.622312925170068,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 8
+   },
+   {
+    "voice": "en_US-amy-medium",
+    "text": "Experiments show that the vector model outperforms boolean retrieval.",
+    "hyp": "Experiments show that the vector model outperforms Boolean retrieval.",
+    "ms": 2359.4672819999687,
+    "wall": 2.3751479259990447,
+    "dur": 4.539501133786848,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 9
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "Experiments show that the vector model outperforms boolean retrieval.",
+    "hyp": "Experiments show that the vector model outperforms Boolean retrieval.",
+    "ms": 2374.5983579974563,
+    "wall": 2.3898707920016022,
+    "dur": 3.6687528344671203,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 9
+   },
+   {
+    "voice": "en_GB-alba-medium",
+    "text": "Experiments show that the vector model outperforms boolean retrieval.",
+    "hyp": "Experiments show that the vector model outperforms Boolean retrieval.",
+    "ms": 2387.7848999982234,
+    "wall": 2.406132735999563,
+    "dur": 3.866122448979592,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 9
+   },
+   {
+    "voice": "en_US-amy-medium",
+    "text": "Term frequency and inverse document frequency are combined into one weight.",
+    "hyp": "term frequency and inverse document frequency are combined into one weight.",
+    "ms": 2348.3358129997214,
+    "wall": 2.3624630919985066,
+    "dur": 4.992290249433107,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 11
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "Term frequency and inverse document frequency are combined into one weight.",
+    "hyp": "The term frequency and inverse document frequency are combined into one weight.",
+    "ms": 2336.104633999639,
+    "wall": 2.3498074620001717,
+    "dur": 4.2260317460317465,
+    "matched": null,
+    "wer": 0.09090909090909091,
+    "nref": 11
+   },
+   {
+    "voice": "en_GB-alba-medium",
+    "text": "Term frequency and inverse document frequency are combined into one weight.",
+    "hyp": "The term frequency and inverse document frequency are combined into one weight.",
+    "ms": 2409.427244998369,
+    "wall": 2.424303202998999,
+    "dur": 4.214421768707483,
+    "matched": null,
+    "wer": 0.09090909090909091,
+    "nref": 11
+   },
+   {
+    "voice": "en_US-amy-medium",
+    "text": "The transformer architecture relies entirely on self-attention mechanisms.",
+    "hyp": "The transformer architecture relies entirely on self-attention mechanisms.",
+    "ms": 2320.7935959981114,
+    "wall": 2.3366467190026015,
+    "dur": 4.957460317460318,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 9
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "The transformer architecture relies entirely on self-attention mechanisms.",
+    "hyp": "The transformer architecture relies entirely on self-attention mechanisms.",
+    "ms": 2347.434882998641,
+    "wall": 2.3652788660001534,
+    "dur": 4.156371882086168,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 9
+   },
+   {
+    "voice": "en_GB-alba-medium",
+    "text": "The transformer architecture relies entirely on self-attention mechanisms.",
+    "hyp": "The transformer architecture relies entirely on self-attention mechanisms.",
+    "ms": 2300.280194998777,
+    "wall": 2.3139947560011933,
+    "dur": 4.73687074829932,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 9
+   },
+   {
+    "voice": "en_US-amy-medium",
+    "text": "Stemming and lemmatization reduce inflected words to a common base form.",
+    "hyp": "Stemming and limitization reduce inflected words to a common base form.",
+    "ms": 2374.1479580021405,
+    "wall": 2.3886855799974,
+    "dur": 4.876190476190477,
+    "matched": null,
+    "wer": 0.09090909090909091,
+    "nref": 11
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "Stemming and lemmatization reduce inflected words to a common base form.",
+    "hyp": "Stemming and limitization reduce inflected words to a common base form.",
+    "ms": 2397.782124000514,
+    "wall": 2.4124274530004186,
+    "dur": 4.0751020408163265,
+    "matched": null,
+    "wer": 0.09090909090909091,
+    "nref": 11
+   },
+   {
+    "voice": "en_GB-alba-medium",
+    "text": "Stemming and lemmatization reduce inflected words to a common base form.",
+    "hyp": "stemming and limitisation would use inflected words to a common base form.",
+    "ms": 2418.912272001762,
+    "wall": 2.434227246998489,
+    "dur": 4.295691609977324,
+    "matched": null,
+    "wer": 0.2727272727272727,
+    "nref": 11
+   },
+   {
+    "voice": "en_US-amy-medium",
+    "text": "A support vector machine finds the hyperplane that separates the two classes.",
+    "hyp": "A support vector machine finds the hyperblane that separates the two classes.",
+    "ms": 2386.1326059995918,
+    "wall": 2.404785222999635,
+    "dur": 4.9806802721088435,
+    "matched": null,
+    "wer": 0.08333333333333333,
+    "nref": 12
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "A support vector machine finds the hyperplane that separates the two classes.",
+    "hyp": "A support vector machine finds the hyperplane that separates the two classes.",
+    "ms": 2362.3009210023156,
+    "wall": 2.3772063449978305,
+    "dur": 4.08671201814059,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 12
+   },
+   {
+    "voice": "en_GB-alba-medium",
+    "text": "A support vector machine finds the hyperplane that separates the two classes.",
+    "hyp": "A support vector machine finds the hyperplane that separates the two classes.",
+    "ms": 2432.321349999256,
+    "wall": 2.446884630997374,
+    "dur": 4.214421768707483,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 12
+   },
+   {
+    "voice": "en_US-amy-medium",
+    "text": "Cross-lingual embeddings allow searching documents in several languages at once.",
+    "hyp": "Cross-lingual embeddings allow searching documents in several languages at once.",
+    "ms": 2367.310655001347,
+    "wall": 2.3818291810021037,
+    "dur": 5.166439909297052,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 11
+   },
+   {
+    "voice": "en_US-ryan-medium",
+    "text": "Cross-lingual embeddings allow searching documents in several languages at once.",
+    "hyp": "Cross-lingual embeddings allow searching documents in several languages at once.",
+    "ms": 2437.5019279978005,
+    "wall": 2.4510325490009564,
+    "dur": 4.249251700680272,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 11
+   },
+   {
+    "voice": "en_GB-alba-medium",
+    "text": "Cross-lingual embeddings allow searching documents in several languages at once.",
+    "hyp": "Cross-lingual embeddings allow searching documents in several languages at once.",
+    "ms": 2350.503650999599,
+    "wall": 2.3690769970016845,
+    "dur": 5.201269841269841,
+    "matched": null,
+    "wer": 0.0,
+    "nref": 11
+   }
+  ]
+ },
+ "en_stream": [
+  {
+   "kind": "cmd",
+   "voice": "en_US-amy-medium",
+   "hyp": "Search for Machine Learning Applications.",
+   "wer": 0.0,
+   "nref": 5,
+   "ms": 869.0310120000504,
+   "dur": 2.7399546485260773
+  },
+  {
+   "kind": "cmd",
+   "voice": "en_US-ryan-medium",
+   "hyp": "Search for Machine Learning Applications.",
+   "wer": 0.0,
+   "nref": 5,
+   "ms": 858.9147999991837,
+   "dur": 2.0085260770975055
+  },
+  {
+   "kind": "cmd",
+   "voice": "en_US-amy-medium",
+   "hyp": "Clear Search.",
+   "wer": 0.0,
+   "nref": 2,
+   "ms": 744.9590510004782,
+   "dur": 0.9752380952380952
+  },
+  {
+   "kind": "cmd",
+   "voice": "en_US-ryan-medium",
+   "hyp": "Clear search.",
+   "wer": 0.0,
+   "nref": 2,
+   "ms": 1012.5382840014936,
+   "dur": 0.626938775510204
+  },
+  {
+   "kind": "cmd",
+   "voice": "en_US-amy-medium",
+   "hyp": "Read this.",
+   "wer": 0.0,
+   "nref": 2,
+   "ms": 788.1884449998324,
+   "dur": 0.9636281179138322
+  },
+  {
+   "kind": "cmd",
+   "voice": "en_US-ryan-medium",
+   "hyp": "Read this.",
+   "wer": 0.0,
+   "nref": 2,
+   "ms": 773.7773640001251,
+   "dur": 0.6849886621315193
+  },
+  {
+   "kind": "cmd",
+   "voice": "en_US-amy-medium",
+   "hyp": "Stop reading.",
+   "wer": 0.0,
+   "nref": 2,
+   "ms": 776.3425609991828,
+   "dur": 1.0797278911564625
+  },
+  {
+   "kind": "cmd",
+   "voice": "en_US-ryan-medium",
+   "hyp": "Stop reading.",
+   "wer": 0.0,
+   "nref": 2,
+   "ms": 745.9056580009928,
+   "dur": 0.893968253968254
+  },
+  {
+   "kind": "cmd",
+   "voice": "en_US-amy-medium",
+   "hyp": "Go to crawling.",
+   "wer": 0.0,
+   "nref": 3,
+   "ms": 833.0751930006954,
+   "dur": 1.1029478458049886
+  },
+  {
+   "kind": "cmd",
+   "voice": "en_US-ryan-medium",
+   "hyp": "Go to crawling.",
+   "wer": 0.0,
+   "nref": 3,
+   "ms": 757.7150120014267,
+   "dur": 0.6849886621315193
+  },
+  {
+   "kind": "cmd",
+   "voice": "en_US-amy-medium",
+   "hyp": "Go to Collections.",
+   "wer": 0.0,
+   "nref": 3,
+   "ms": 805.0529690008261,
+   "dur": 1.3815873015873017
+  },
+  {
+   "kind": "cmd",
+   "voice": "en_US-ryan-medium",
+   "hyp": "Code of Collections",
+   "wer": 0.6666666666666666,
+   "nref": 3,
+   "ms": 791.8783289969724,
+   "dur": 0.8707482993197279
+  },
+  {
+   "kind": "cmd",
+   "voice": "en_US-amy-medium",
+   "hyp": "go to search",
+   "wer": 0.0,
+   "nref": 3,
+   "ms": 781.4639579992217,
+   "dur": 1.1493877551020408
+  },
+  {
+   "kind": "cmd",
+   "voice": "en_US-ryan-medium",
+   "hyp": "Go to search.",
+   "wer": 0.0,
+   "nref": 3,
+   "ms": 777.9005859993049,
+   "dur": 0.7546485260770975
+  },
+  {
+   "kind": "cmd",
+   "voice": "en_US-amy-medium",
+   "hyp": "Go to Metrics.",
+   "wer": 0.0,
+   "nref": 3,
+   "ms": 818.87112700133,
+   "dur": 1.1609977324263039
+  },
+  {
+   "kind": "cmd",
+   "voice": "en_US-ryan-medium",
+   "hyp": "Go to Metrics.",
+   "wer": 0.0,
+   "nref": 3,
+   "ms": 788.4445029994822,
+   "dur": 0.8591383219954648
+  },
+  {
+   "kind": "cmd",
+   "voice": "en_US-amy-medium",
+   "hyp": "Go to language identification.",
+   "wer": 0.0,
+   "nref": 4,
+   "ms": 804.0095969990944,
+   "dur": 2.4380952380952383
+  },
+  {
+   "kind": "cmd",
+   "voice": "en_US-ryan-medium",
+   "hyp": "Go to Language Identification.",
+   "wer": 0.0,
+   "nref": 4,
+   "ms": 828.5711949974939,
+   "dur": 1.6370068027210884
+  },
+  {
+   "kind": "cmd",
+   "voice": "en_US-amy-medium",
+   "hyp": "Go to summarisation.",
+   "wer": 0.3333333333333333,
+   "nref": 3,
+   "ms": 793.8501429998723,
+   "dur": 1.6950566893424037
+  },
+  {
+   "kind": "cmd",
+   "voice": "en_US-ryan-medium",
+   "hyp": "Go to summarization.",
+   "wer": 0.0,
+   "nref": 3,
+   "ms": 804.4264630007092,
+   "dur": 1.195827664399093
+  },
+  {
+   "kind": "cmd",
+   "voice": "en_US-amy-medium",
+   "hyp": "Go to translation",
+   "wer": 0.0,
+   "nref": 3,
+   "ms": 752.792084000248,
+   "dur": 1.555736961451247
+  },
+  {
+   "kind": "cmd",
+   "voice": "en_US-ryan-medium",
+   "hyp": "Go to translation.",
+   "wer": 0.0,
+   "nref": 3,
+   "ms": 813.7286710007174,
+   "dur": 1.0565079365079366
+  },
+  {
+   "kind": "cmd",
+   "voice": "en_US-amy-medium",
+   "hyp": "Go to Settings",
+   "wer": 0.0,
+   "nref": 3,
+   "ms": 804.2090580020158,
+   "dur": 1.1261678004535147
+  },
+  {
+   "kind": "cmd",
+   "voice": "en_US-ryan-medium",
+   "hyp": "Build the settings.",
+   "wer": 0.6666666666666666,
+   "nref": 3,
+   "ms": 816.1889069997414,
+   "dur": 0.8243083900226758
+  },
+  {
+   "kind": "cmd",
+   "voice": "en_US-amy-medium",
+   "hyp": "Go to help.",
+   "wer": 0.0,
+   "nref": 3,
+   "ms": 777.0909099999699,
+   "dur": 0.8707482993197279
+  },
+  {
+   "kind": "cmd",
+   "voice": "en_US-ryan-medium",
+   "hyp": "So to help",
+   "wer": 0.3333333333333333,
+   "nref": 3,
+   "ms": 1752.4509110007784,
+   "dur": 0.603718820861678
+  },
+  {
+   "kind": "sen",
+   "voice": "en_US-amy-medium",
+   "hyp": "Recent advances in deep learning have transformed natural language processing.",
+   "wer": 0.0,
+   "nref": 10,
+   "ms": 894.8810180008877,
+   "dur": 5.282539682539682
+  },
+  {
+   "kind": "sen",
+   "voice": "en_US-ryan-medium",
+   "hyp": "Recent advances in deep learning have transformed natural language processing.",
+   "wer": 0.0,
+   "nref": 10,
+   "ms": 838.3827850011585,
+   "dur": 4.249251700680272
+  },
+  {
+   "kind": "sen",
+   "voice": "en_GB-alba-medium",
+   "hyp": "Recent advances in deep learning have transformed natural language processing.",
+   "wer": 0.0,
+   "nref": 10,
+   "ms": 900.2982009988045,
+   "dur": 4.725260770975057
+  },
+  {
+   "kind": "sen",
+   "voice": "en_US-amy-medium",
+   "hyp": "We represent each document as a weighted vector of terms.",
+   "wer": 0.0,
+   "nref": 10,
+   "ms": 878.5938170003647,
+   "dur": 3.8080725623582765
+  },
+  {
+   "kind": "sen",
+   "voice": "en_US-ryan-medium",
+   "hyp": "We represent each document as a weighted vector of terms.",
+   "wer": 0.0,
+   "nref": 10,
+   "ms": 883.3144979980716,
+   "dur": 3.1579138321995464
+  },
+  {
+   "kind": "sen",
+   "voice": "en_GB-alba-medium",
+   "hyp": "We represent each document as a weighted vector of terms.",
+   "wer": 0.0,
+   "nref": 10,
+   "ms": 928.4971109991602,
+   "dur": 3.9706122448979593
+  },
+  {
+   "kind": "sen",
+   "voice": "en_US-amy-medium",
+   "hyp": "Documents are ranked by the cosine similarity to the query vector.",
+   "wer": 0.0,
+   "nref": 11,
+   "ms": 949.5415240016882,
+   "dur": 4.539501133786848
+  },
+  {
+   "kind": "sen",
+   "voice": "en_US-ryan-medium",
+   "hyp": "Documents are ranked by the cosign similarity to the query vector.",
+   "wer": 0.09090909090909091,
+   "nref": 11,
+   "ms": 881.453516001784,
+   "dur": 3.4946031746031747
+  },
+  {
+   "kind": "sen",
+   "voice": "en_GB-alba-medium",
+   "hyp": "Documents are ranked by the co-sign similarity to the query vector.",
+   "wer": 0.18181818181818182,
+   "nref": 11,
+   "ms": 929.4522240015795,
+   "dur": 3.5526530612244898
+  },
+  {
+   "kind": "sen",
+   "voice": "en_US-amy-medium",
+   "hyp": "the proposed indexing module updates the vocabulary incrementally.",
+   "wer": 0.0,
+   "nref": 8,
+   "ms": 920.5793559995072,
+   "dur": 4.5859410430839
+  },
+  {
+   "kind": "sen",
+   "voice": "en_US-ryan-medium",
+   "hyp": "The proposed indexing module updates the vocabulary incrementally.",
+   "wer": 0.0,
+   "nref": 8,
+   "ms": 887.5233130020206,
+   "dur": 3.610702947845805
+  },
+  {
+   "kind": "sen",
+   "voice": "en_GB-alba-medium",
+   "hyp": "The proposed indexing module updates the vocabulary incrementally.",
+   "wer": 0.0,
+   "nref": 8,
+   "ms": 919.017674998031,
+   "dur": 3.622312925170068
+  },
+  {
+   "kind": "sen",
+   "voice": "en_US-amy-medium",
+   "hyp": "Experiments show that the vector model outperforms Boolean retrieval.",
+   "wer": 0.0,
+   "nref": 9,
+   "ms": 930.8841480014962,
+   "dur": 4.539501133786848
+  },
+  {
+   "kind": "sen",
+   "voice": "en_US-ryan-medium",
+   "hyp": "Experiments show that the vector model outperforms Boolean retrieval.",
+   "wer": 0.0,
+   "nref": 9,
+   "ms": 954.1882849989634,
+   "dur": 3.6687528344671203
+  },
+  {
+   "kind": "sen",
+   "voice": "en_GB-alba-medium",
+   "hyp": "Experiments show that the vector model out to forms Boolean retrieval.",
+   "wer": 0.3333333333333333,
+   "nref": 9,
+   "ms": 930.5887939990498,
+   "dur": 3.866122448979592
+  },
+  {
+   "kind": "sen",
+   "voice": "en_US-amy-medium",
+   "hyp": "term frequency and inverse document frequency are combined into one weight.",
+   "wer": 0.0,
+   "nref": 11,
+   "ms": 951.3701350006158,
+   "dur": 4.992290249433107
+  },
+  {
+   "kind": "sen",
+   "voice": "en_US-ryan-medium",
+   "hyp": "Term frequency, an inverse document frequency, are combined into one weight.",
+   "wer": 0.09090909090909091,
+   "nref": 11,
+   "ms": 946.1348820004787,
+   "dur": 4.2260317460317465
+  },
+  {
+   "kind": "sen",
+   "voice": "en_GB-alba-medium",
+   "hyp": "term frequency and inverse document frequency are combined into one weight.",
+   "wer": 0.0,
+   "nref": 11,
+   "ms": 930.6491290008125,
+   "dur": 4.214421768707483
+  },
+  {
+   "kind": "sen",
+   "voice": "en_US-amy-medium",
+   "hyp": "The transformer architecture relies entirely on self-attention mechanisms.",
+   "wer": 0.0,
+   "nref": 9,
+   "ms": 933.8892150008178,
+   "dur": 4.957460317460318
+  },
+  {
+   "kind": "sen",
+   "voice": "en_US-ryan-medium",
+   "hyp": "The transformer architecture relies entirely on self-attention mechanisms.",
+   "wer": 0.0,
+   "nref": 9,
+   "ms": 921.7580860022281,
+   "dur": 4.156371882086168
+  },
+  {
+   "kind": "sen",
+   "voice": "en_GB-alba-medium",
+   "hyp": "The transformer architecture relies entirely on self-attention mechanisms.",
+   "wer": 0.0,
+   "nref": 9,
+   "ms": 870.6812109994644,
+   "dur": 4.73687074829932
+  },
+  {
+   "kind": "sen",
+   "voice": "en_US-amy-medium",
+   "hyp": "Stemming and lemonization reduce inflected words to a common bass form.",
+   "wer": 0.18181818181818182,
+   "nref": 11,
+   "ms": 939.2249800002901,
+   "dur": 4.876190476190477
+  },
+  {
+   "kind": "sen",
+   "voice": "en_US-ryan-medium",
+   "hyp": "Stemming and lemonization reduce inflected words to a common bass form.",
+   "wer": 0.18181818181818182,
+   "nref": 11,
+   "ms": 918.250860999251,
+   "dur": 4.0751020408163265
+  },
+  {
+   "kind": "sen",
+   "voice": "en_GB-alba-medium",
+   "hyp": "Stemming and limitisation reduce inflected words to a common base form.",
+   "wer": 0.09090909090909091,
+   "nref": 11,
+   "ms": 972.7400400006445,
+   "dur": 4.295691609977324
+  },
+  {
+   "kind": "sen",
+   "voice": "en_US-amy-medium",
+   "hyp": "A support vector machine finds the hyperplane that separates the two classes.",
+   "wer": 0.0,
+   "nref": 12,
+   "ms": 905.5997100003879,
+   "dur": 4.9806802721088435
+  },
+  {
+   "kind": "sen",
+   "voice": "en_US-ryan-medium",
+   "hyp": "A support vector machine finds the hyperplane that separates the two classes.",
+   "wer": 0.0,
+   "nref": 12,
+   "ms": 909.1409309985465,
+   "dur": 4.08671201814059
+  },
+  {
+   "kind": "sen",
+   "voice": "en_GB-alba-medium",
+   "hyp": "A support vector machine finds the hyperplane that separates the two classes.",
+   "wer": 0.0,
+   "nref": 12,
+   "ms": 916.9314819991996,
+   "dur": 4.214421768707483
+  },
+  {
+   "kind": "sen",
+   "voice": "en_US-amy-medium",
+   "hyp": "Cross-langual embeddings allow searching documents in several languages at once.",
+   "wer": 0.09090909090909091,
+   "nref": 11,
+   "ms": 943.3925960001943,
+   "dur": 5.166439909297052
+  },
+  {
+   "kind": "sen",
+   "voice": "en_US-ryan-medium",
+   "hyp": "Cross-lingual embeddings allow searching documents in several languages at once.",
+   "wer": 0.0,
+   "nref": 11,
+   "ms": 984.3272200014326,
+   "dur": 4.249251700680272
+  },
+  {
+   "kind": "sen",
+   "voice": "en_GB-alba-medium",
+   "hyp": "Cross-link will embeddings allow searching documents in several languages at once.",
+   "wer": 0.18181818181818182,
+   "nref": 11,
+   "ms": 917.8885399996943,
+   "dur": 5.201269841269841
+  }
+ ],
+ "noise": {
+  "20": [
+   [
+    0.0,
+    10,
+    "Recent advances in deep learning have transformed natural language processing."
+   ],
+   [
+    0.0,
+    10,
+    "We represent each document as a weighted vector of terms."
+   ],
+   [
+    0.0,
+    11,
+    "Documents are ranked by the cosine similarity to the query vector."
+   ],
+   [
+    0.0,
+    8,
+    "the proposed indexing module updates the vocabulary incrementally."
+   ],
+   [
+    0.0,
+    9,
+    "Experiments show that the vector model outperforms Boolean retrieval."
+   ],
+   [
+    0.0,
+    11,
+    "term frequency and inverse document frequency are combined into one weight."
+   ],
+   [
+    0.0,
+    9,
+    "The transformer architecture relies entirely on self-attention mechanisms."
+   ],
+   [
+    0.09090909090909091,
+    11,
+    "Stemming and limitization reduce inflected words to a common base form."
+   ],
+   [
+    0.08333333333333333,
+    12,
+    "A support vector machine finds the hyperblane that separates the two classes."
+   ],
+   [
+    0.0,
+    11,
+    "Cross-lingual embeddings allow searching documents in several languages at once."
+   ]
+  ],
+  "10": [
+   [
+    0.0,
+    10,
+    "Recent advances in deep learning have transformed natural language processing."
+   ],
+   [
+    0.0,
+    10,
+    "We represent each document as a weighted vector of terms."
+   ],
+   [
+    0.0,
+    11,
+    "Documents are ranked by the cosine similarity to the query vector."
+   ],
+   [
+    0.0,
+    8,
+    "the proposed indexing module updates the vocabulary incrementally."
+   ],
+   [
+    0.0,
+    9,
+    "Experiments show that the vector model outperforms Boolean retrieval."
+   ],
+   [
+    0.0,
+    11,
+    "term frequency and inverse document frequency are combined into one weight."
+   ],
+   [
+    0.0,
+    9,
+    "The transformer architecture relies entirely on self-attention mechanisms."
+   ],
+   [
+    0.09090909090909091,
+    11,
+    "Stemming and limitization reduce inflected words to a common base form."
+   ],
+   [
+    0.08333333333333333,
+    12,
+    "A support vector machine finds the hyperblane that separates the two classes."
+   ],
+   [
+    0.0,
+    11,
+    "Cross-lingual embeddings allow searching documents in several languages at once."
+   ]
+  ],
+  "5": [
+   [
+    0.0,
+    10,
+    "Recent advances in deep learning have transformed natural language processing."
+   ],
+   [
+    0.0,
+    10,
+    "We represent each document as a weighted vector of terms."
+   ],
+   [
+    0.0,
+    11,
+    "Documents are ranked by the cosine similarity to the query vector."
+   ],
+   [
+    0.0,
+    8,
+    "The proposed indexing module updates the vocabulary incrementally."
+   ],
+   [
+    0.0,
+    9,
+    "Experiments show that the vector model outperforms Boolean retrieval."
+   ],
+   [
+    0.0,
+    11,
+    "term frequency and inverse document frequency are combined into one weight."
+   ],
+   [
+    0.0,
+    9,
+    "The transformer architecture relies entirely on self-attention mechanisms."
+   ],
+   [
+    0.09090909090909091,
+    11,
+    "stemming and limitization reduce inflected words to a common base form."
+   ],
+   [
+    0.08333333333333333,
+    12,
+    "A support vector machine finds the hyperblane that separates the two classes."
+   ],
+   [
+    0.0,
+    11,
+    "Cross-lingual embeddings allow searching documents in several languages at once."
+   ]
+  ],
+  "0": [
+   [
+    0.0,
+    10,
+    "Recent advances in deep learning have transformed natural language processing."
+   ],
+   [
+    0.0,
+    10,
+    "We represent each document as a weighted vector of terms."
+   ],
+   [
+    0.09090909090909091,
+    11,
+    "Documents are ranked by the cosine similarity to the theory vector."
+   ],
+   [
+    0.0,
+    8,
+    "The proposed indexing module updates the vocabulary incrementally."
+   ],
+   [
+    0.2222222222222222,
+    9,
+    "Experiments show that the vector model outperforms 3 in retrieval."
+   ],
+   [
+    0.09090909090909091,
+    11,
+    "The term frequency and inverse document frequency are combined into one weight."
+   ],
+   [
+    0.0,
+    9,
+    "The transformer architecture relies entirely on self-attention mechanisms."
+   ],
+   [
+    0.09090909090909091,
+    11,
+    "stemming and limitization reduce inflected words to a common base form."
+   ],
+   [
+    0.08333333333333333,
+    12,
+    "A support vector machine finds the hypergrain that separates the two classes."
+   ],
+   [
+    0.0,
+    11,
+    "Cross-lingual embeddings allow searching documents in several languages at once."
+   ]
+  ]
+ }
+}

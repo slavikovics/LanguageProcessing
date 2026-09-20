@@ -1,0 +1,28 @@
+@startuml tts-sequence
+
+' =====================================================================
+'  Обмен сообщениями при синтезе одного фрагмента текста.
+' =====================================================================
+
+actor "Пользователь" as user
+participant "Frontend" as fe
+participant "API\n/speech/tts" as api
+participant "Speech-service\n/tts" as sp
+participant "Piper\n(ONNX-голос)" as piper
+
+user -> fe : нажимает «Озвучить»\n(или «Озвучить из буфера»)
+fe -> fe : chunkTextForSpeech(text)
+fe -> api : POST /speech/tts\n{text, voice, rate}
+api -> api : проверка длины (1..5000)
+api -> sp : POST /tts (stream)
+sp -> sp : проверка backend, длины
+sp -> piper : synthesize(text, length_scale = 1/rate)
+loop для каждого предложения текста
+  piper --> sp : int16-аудио предложения
+  sp --> api : WAV-заголовок (в первом блоке) + PCM
+  api --> fe : поток audio/wav без буферизации
+end
+fe -> fe : исправить размеры в заголовке WAV,\ndecodeAudioData
+fe -> user : воспроизведение через Web Audio API\n(GainNode = громкость)
+
+@enduml

@@ -1,0 +1,32 @@
+@startuml stt-stream-sequence
+
+' =====================================================================
+'  Потоковое распознавание речи по WebSocket /speech/stt/stream.
+' =====================================================================
+
+actor "Пользователь" as user
+participant "Frontend" as fe
+participant "API\nWebSocket" as api
+participant "Speech-service\n/stt" as sp
+participant "faster-whisper\n(base, int8)" as w
+database "PostgreSQL" as db
+
+user -> fe : нажимает на микрофон
+fe -> api : {"type": "start", "language": "ru", "match_commands": false}
+loop каждые 3,5 с, пока запись идёт
+  fe -> api : аудиокуск (webm/opus)
+  api -> sp : POST /stt (audio, language, initial_prompt =\nпоследние 200 символов уже распознанного,\nvad_filter = true, use_stream_model = true)
+  sp -> w : transcribe(audio)
+  w --> sp : сегменты -> текст, язык
+  sp --> api : {transcript, detected_language, elapsed_ms}
+  api --> fe : {"type": "partial", "chunk_text", "full_text"}
+end
+user -> fe : нажимает на микрофон повторно
+fe -> api : {"type": "stop"}
+api -> db : SELECT команды WHERE is_active AND language = ...
+db --> api : список команд
+api -> api : match_command(full_text, команды)
+api --> fe : {"type": "final", "text", "matched_command"}
+fe -> fe : закрыть сокет, освободить микрофон
+
+@enduml

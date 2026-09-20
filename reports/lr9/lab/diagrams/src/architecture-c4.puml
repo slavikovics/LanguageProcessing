@@ -1,0 +1,52 @@
+@startuml architecture-c4
+!include ../stdlib/C4_Container.puml
+
+' =====================================================================
+'  C4-диаграмма контейнеров; общая для всех лабораторных работ курса.
+'  Компоненты и связи, добавленные в ЛР9 (распознавание речи), помечены
+'  тегом "new" -- зелёная заливка. speech-service, появившийся в ЛР8,
+'  расширен распознаванием (faster-whisper); список команд, на которые
+'  система реагирует, хранится в БД и редактируется из интерфейса.
+' =====================================================================
+
+LAYOUT_WITH_LEGEND()
+LAYOUT_TOP_DOWN()
+
+AddElementTag("new", $bgColor="#2e7d32", $fontColor="#ffffff", $borderColor="#1b5e20", $legendText="добавлено в ЛР9")
+AddRelTag("new", $textColor="#2e7d32", $lineColor="#2e7d32", $legendText="добавлено в ЛР9")
+
+Person(user, "Пользователь", "Формулирует запросы, управляет коллекциями, размечает релевантность и истинный язык документов")
+
+System_Boundary(system, "Информационно-поисковая система (варианты 22 / 25 / 16 / 11 / 1)") {
+  Container(frontend, "Frontend", "React + Vite + TypeScript", "Голосовой режим управления приложением, микрофон в строке поиска, настройки языка распознавания и список голосовых команд (ЛР9)", $tags="new")
+  Container(api, "API", "Python, FastAPI", "Шлюз и координация; WebSocket /speech/stt/stream, POST /speech/stt, CRUD списка команд /speech/commands, сопоставление фразы с командой (ЛР9)", $tags="new")
+  Container(nlp, "NLP-service", "Python, FastAPI + nlp_core", "Токенизация, TF-IDF, косинусная мера, метрики ROMIP, извлечение содержимого страницы, перефразирование через LLM, прямой и трансферный перевод по словарю, синтаксический разбор")
+  Container(mt, "MT-service", "Python, FastAPI + Transformers/PyTorch", "Нейросетевой перевод локальной предобученной моделью MarianMT")
+  Container(speech, "Speech-service", "Python, FastAPI + faster-whisper", "Распознавание речи локальной моделью Whisper (small для файлов, base для потока), синтез речи (ЛР8), распознавание (ЛР9)", $tags="new")
+  Container(crawler, "Crawler-service", "Python, httpx + BeautifulSoup", "Обход веб-страниц в ширину, извлечение и очистка текста")
+  Container(langid, "Lang-ID-service", "Python, FastAPI + PyTorch", "Определение языка тремя методами")
+  Container(summarization, "Summarization-service", "Python, FastAPI + nlp_core", "Реферирование тремя методами и иерархический список ключевых слов")
+  ContainerDb(db, "PostgreSQL", "PostgreSQL + pgvector", "Документы, термы, веса, запросы, выдача, разметка, профили языков, рефераты, словарь и история переводов, таблица голосовых команд speech_commands (ЛР9)", $tags="new")
+}
+
+System_Ext(web, "Веб-сайты", "Источники документов в сети Интернет")
+System_Ext(openrouter, "OpenRouter", "Внешний поставщик векторных представлений текста (эмбеддингов) и LLM-модели перефразирования")
+System_Ext(browser, "Браузер пользователя", "Микрофон (getUserMedia/MediaRecorder), Web Audio API для вывода звука, Web Speech API для чернового субтитра")
+
+Rel(user, frontend, "Использует", "HTTPS")
+Rel(frontend, api, "Вызывает", "REST/JSON")
+Rel(api, nlp, "Индексация, поиск, метрики, эмбеддинги, перефразирование, перевод, синтаксический разбор", "HTTP")
+Rel(nlp, mt, "Отправляет предложения на нейросетевой перевод", "HTTP")
+Rel(api, crawler, "Запуск и наблюдение за заданиями на обход", "HTTP")
+Rel(api, db, "Читает/пишет документы, словари, прогоны, команды", "SQL")
+Rel(nlp, db, "Читает/пишет веса терминов", "SQL")
+Rel(nlp, openrouter, "Получает эмбеддинги и перефразированный текст", "HTTPS")
+Rel(crawler, db, "Сохраняет документы и статус заданий", "SQL")
+Rel(crawler, web, "Обходит (robots.txt, ограничение частоты)", "HTTP")
+Rel(api, langid, "Профили языков, определение языка, обучение классификатора", "HTTP")
+Rel(api, summarization, "Реферирование и список ключевых слов", "HTTP")
+Rel(frontend, browser, "Захват микрофона, воспроизведение звука, черновое распознавание", "Web APIs", $tags="new")
+Rel(api, speech, "Распознавание: POST /stt (файл) и покусочное POST /stt (поток); синтез из ЛР8: POST /tts", "HTTP", $tags="new")
+Rel(frontend, api, "Аудиокуски по WebSocket /speech/stt/stream, список команд по REST (ЛР9)", "WebSocket, REST/JSON", $tags="new")
+
+@enduml

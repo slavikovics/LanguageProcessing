@@ -1,0 +1,40 @@
+@startuml tts-playback
+
+' =====================================================================
+'  Потоковое озвучивание с упреждающей выборкой следующего фрагмента
+'  (SpeechPlaybackContext.tsx): пока звучит фрагмент i, запрос на синтез
+'  фрагмента i+1 уже отправлен, поэтому пауза между фрагментами --
+'  только разница (время синтеза - длительность звучания), если она > 0.
+' =====================================================================
+
+start
+:speak(text): остановить текущее воспроизведение (stop);
+:chunks = chunkTextForSpeech(text);
+if (chunks пуст?) then (да)
+  stop
+endif
+:status = "requesting", i = 0;
+:POST /speech/tts для chunks[0]\n(голос и темп -- из настроек);
+repeat
+  :Получить WAV, исправить размеры в заголовке\n(заглушка 0xFFFFFFFF -> реальный размер);
+  :decodeAudioData -> AudioBuffer;
+  if (декодирование не удалось?) then (да)
+    :error = "Не удалось воспроизвести аудио";
+    stop
+  endif
+  :gain = громкость из настроек;\nsource.start(), status = "playing";
+  if (есть chunks[i+1]?) then (да)
+    :Сразу отправить POST /speech/tts для chunks[i+1]\n(предвыборка, promise сохраняется);
+  endif
+  :Ждать source.onended (или stop() пользователем);
+  :i = i + 1;
+  if (i >= chunks.length?) then (да)
+    :stop(): status = "idle";
+    stop
+  endif
+  :Взять готовый promise предвыборки\n(либо запросить chunks[i], если её нет);
+repeat while (звук не остановлен пользователем?) is (да)
+:Прервать все запросы (AbortController);
+stop
+
+@enduml

@@ -1,0 +1,38 @@
+@startuml chunking
+
+' =====================================================================
+'  Разбиение текста на фрагменты для озвучивания (chunkTextForSpeech,
+'  frontend/src/lib/speechChunking.ts). CHUNK_TARGET_LENGTH = 120,
+'  CHUNK_MAX_LENGTH = 240 символов.
+' =====================================================================
+
+start
+:Вход: произвольный текст;
+:Нормализация: последовательности пробельных\nсимволов -> один пробел, trim;
+if (текст пуст?) then (да)
+  :Вернуть пустой список;
+  stop
+endif
+:Разбить на предложения по регулярному выражению\n[^.!?\\n]+[.!?]+(?=\\s|$) | [^.!?\\n]+$;
+:current = "", chunks = [];
+while (есть необработанное предложение s?) is (да)
+  if (длина s > 240?) then (да)
+    :Если current не пуст -- добавить в chunks,\ncurrent = "";
+    :Нарезать s на куски по 240 символов\nи добавить каждый в chunks;
+  else (нет)
+    :candidate = current + " " + s;
+    if (длина candidate > 120\nи current не пуст?) then (да)
+      :Добавить current в chunks;
+      :current = s;
+    else (нет)
+      :current = candidate;
+    endif
+  endif
+endwhile (нет)
+if (current не пуст?) then (да)
+  :Добавить current в chunks;
+endif
+:Вернуть chunks;
+stop
+
+@enduml
