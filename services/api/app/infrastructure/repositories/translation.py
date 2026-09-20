@@ -15,7 +15,6 @@ class TranslationDictionaryRepository:
         self._session = session
 
     async def as_lookup(self, *, source_lang: str, target_lang: str) -> dict[str, str]:
-        # Format expected by nlp_core.translation.translate(); ANY_POS entry is first-in-order fallback.
         result = await self._session.execute(
             select(
                 TranslationDictionaryEntry.source_lemma,
@@ -148,8 +147,10 @@ class TranslationRunRepository:
         word_count: int,
         translated_word_count: int,
         elapsed_ms: float,
+        method: str = "direct",
         test_run_id: int | None = None,
         translated_text_word_count: int = 0,
+        diff_segments: list | None = None,
     ) -> TranslationRun:
         run = TranslationRun(
             document_id=document_id,
@@ -157,12 +158,14 @@ class TranslationRunRepository:
             test_run_id=test_run_id,
             source_lang=source_lang,
             target_lang=target_lang,
+            method=method,
             source_text=source_text,
             translated_text=translated_text,
             word_count=word_count,
             translated_word_count=translated_word_count,
             translated_text_word_count=translated_text_word_count,
             elapsed_ms=elapsed_ms,
+            diff_segments=diff_segments,
         )
         self._session.add(run)
         await self._session.flush()
@@ -177,13 +180,13 @@ class TranslationRunRepository:
         )
         return list(result.scalars().all())
 
-    async def get_latest_for_collection(self, collection_id: int) -> TranslationRun | None:
-        result = await self._session.execute(
-            select(TranslationRun)
-            .where(TranslationRun.collection_id == collection_id)
-            .order_by(TranslationRun.id.desc())
-            .limit(1)
-        )
+    async def get_latest_for_collection(
+        self, collection_id: int, *, method: str | None = None
+    ) -> TranslationRun | None:
+        stmt = select(TranslationRun).where(TranslationRun.collection_id == collection_id)
+        if method is not None:
+            stmt = stmt.where(TranslationRun.method == method)
+        result = await self._session.execute(stmt.order_by(TranslationRun.id.desc()).limit(1))
         return result.scalars().first()
 
     async def list_for_test_run(self, test_run_id: int) -> list[TranslationRun]:
@@ -200,12 +203,13 @@ class TranslationTestRunRepository:
         self._session = session
 
     async def create(
-        self, *, collection_id: int, source_lang: str, target_lang: str
+        self, *, collection_id: int, source_lang: str, target_lang: str, method: str = "direct"
     ) -> TranslationTestRun:
         run = TranslationTestRun(
             collection_id=collection_id,
             source_lang=source_lang,
             target_lang=target_lang,
+            method=method,
             status=TranslationTestRunStatus.PENDING.value,
         )
         self._session.add(run)
@@ -215,12 +219,13 @@ class TranslationTestRunRepository:
     async def get(self, run_id: int) -> TranslationTestRun | None:
         return await self._session.get(TranslationTestRun, run_id)
 
-    async def list_by_collection(self, collection_id: int) -> list[TranslationTestRun]:
-        result = await self._session.execute(
-            select(TranslationTestRun)
-            .where(TranslationTestRun.collection_id == collection_id)
-            .order_by(TranslationTestRun.id.desc())
-        )
+    async def list_by_collection(
+        self, collection_id: int, *, method: str | None = None
+    ) -> list[TranslationTestRun]:
+        stmt = select(TranslationTestRun).where(TranslationTestRun.collection_id == collection_id)
+        if method is not None:
+            stmt = stmt.where(TranslationTestRun.method == method)
+        result = await self._session.execute(stmt.order_by(TranslationTestRun.id.desc()))
         return list(result.scalars().all())
 
     async def mark_running(self, run_id: int, *, documents_total: int) -> bool:
@@ -246,12 +251,14 @@ class TranslationTestRunRepository:
         run.documents_processed = documents_processed
         await self._session.commit()
 
-    async def mark_completed(self, run_id: int) -> None:
+    async def mark_completed(self, run_id: int, *, error_message: str | None = None) -> None:
         run = await self._session.get(TranslationTestRun, run_id)
         if run is None:
             return
         run.status = TranslationTestRunStatus.COMPLETED.value
         run.finished_at = dt.datetime.utcnow()
+        if error_message is not None:
+            run.error_message = error_message[:1000]
         await self._session.commit()
 
     async def mark_failed(self, run_id: int, *, error_message: str) -> None:

@@ -3,6 +3,7 @@ import type {
   TranslationDictionaryEntry,
   TranslationDictionaryEntryInput,
   TranslationDictionaryPage,
+  TranslationMethod,
   TranslationRun,
   TranslationRunSummary,
   TranslationRunWord,
@@ -16,6 +17,7 @@ export function createTranslationRun(payload: {
   collectionId?: number;
   sourceLang?: string;
   targetLang?: string;
+  method?: TranslationMethod;
 }): Promise<TranslationRun> {
   return request<TranslationRun>("/translation/runs", {
     method: "POST",
@@ -25,6 +27,7 @@ export function createTranslationRun(payload: {
       collection_id: payload.collectionId ?? null,
       source_lang: payload.sourceLang,
       target_lang: payload.targetLang,
+      method: payload.method,
     }),
   });
 }
@@ -35,8 +38,12 @@ export function getTranslationRun(runId: number): Promise<TranslationRun> {
 
 export function getLatestTranslationRunForCollection(
   collectionId: number,
+  method?: TranslationMethod,
 ): Promise<TranslationRun | null> {
-  return request<TranslationRun | null>(`/translation/collections/${collectionId}/runs/latest`);
+  const query = method ? `?method=${method}` : "";
+  return request<TranslationRun | null>(
+    `/translation/collections/${collectionId}/runs/latest${query}`,
+  );
 }
 
 export function listTranslationRuns(limit = 20): Promise<TranslationRun[]> {
@@ -47,6 +54,7 @@ export function createTranslationTestRun(payload: {
   collectionId: number;
   sourceLang?: string;
   targetLang?: string;
+  method?: TranslationMethod;
 }): Promise<TranslationTestRun> {
   return request<TranslationTestRun>("/translation/test-runs", {
     method: "POST",
@@ -54,6 +62,7 @@ export function createTranslationTestRun(payload: {
       collection_id: payload.collectionId,
       source_lang: payload.sourceLang,
       target_lang: payload.targetLang,
+      method: payload.method,
     }),
   });
 }
@@ -66,8 +75,12 @@ export function cancelTranslationTestRun(id: number): Promise<TranslationTestRun
   return request<TranslationTestRun>(`/translation/test-runs/${id}/cancel`, { method: "POST" });
 }
 
-export function listTranslationTestRunsByCollection(collectionId: number): Promise<TranslationTestRun[]> {
-  return request<TranslationTestRun[]>(`/collections/${collectionId}/translation/test-runs`);
+export function listTranslationTestRunsByCollection(
+  collectionId: number,
+  method?: TranslationMethod,
+): Promise<TranslationTestRun[]> {
+  const query = method ? `?method=${method}` : "";
+  return request<TranslationTestRun[]>(`/collections/${collectionId}/translation/test-runs${query}`);
 }
 
 export function translationTestRunWebSocketUrl(id: number): string {

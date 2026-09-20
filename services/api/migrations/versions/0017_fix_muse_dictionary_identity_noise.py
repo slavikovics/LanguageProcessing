@@ -13,7 +13,6 @@ depends_on: Union[str, Sequence[str], None] = None
 
 CHUNK_SIZE = 5000
 
-# 0015's rows were keyed by surface form, not lemma, causing identity-translation noise; replaces the whole non-curated slice with a lemma-pooled, re-filtered dictionary.
 DICTIONARY_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "app", "domain", "dictionaries", "en_fr_muse.tsv"
 )

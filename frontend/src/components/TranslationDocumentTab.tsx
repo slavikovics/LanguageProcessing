@@ -2,9 +2,11 @@ import { Languages, Loader2, Printer, Save } from "lucide-react";
 import { useState } from "react";
 
 import { createTranslationRun } from "@/api/client";
-import type { DocumentSummary, TranslationRun } from "@/api/types";
+import type { DocumentSummary, TranslationMethod, TranslationRun } from "@/api/types";
+import { TRANSLATION_METHOD_LABELS } from "@/api/types";
 import { DocumentCombobox } from "@/components/DocumentCombobox";
 import { SpeakButton } from "@/components/SpeakButton";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -14,10 +16,12 @@ import { escapeHtml, openPrintView } from "@/lib/printView";
 
 export function TranslationDocumentTab({
   collectionId,
+  method,
   run,
   onRunCreated,
 }: {
   collectionId: number | null;
+  method: TranslationMethod;
   run: TranslationRun | null;
   onRunCreated: (run: TranslationRun) => void;
 }) {
@@ -27,7 +31,6 @@ export function TranslationDocumentTab({
   const [error, setError] = useState<string | null>(null);
 
   const canTranslate = selectedDocument !== null || pastedText.trim().length > 0;
-  // Registers source before translation, matching left-to-right column order.
   useReadableText(run?.source_text ?? "");
   useReadableText(run?.translated_text ?? "");
 
@@ -39,6 +42,7 @@ export function TranslationDocumentTab({
         documentId: selectedDocument?.id,
         text: selectedDocument ? undefined : pastedText,
         collectionId: selectedDocument ? undefined : (collectionId ?? undefined),
+        method,
       });
       onRunCreated(created);
     } catch (err) {
@@ -163,6 +167,7 @@ export function TranslationDocumentTab({
               <div className="flex items-center gap-1.5">
                 <CardTitle className="text-base">Перевод ({run.target_lang.toUpperCase()})</CardTitle>
                 <SpeakButton text={run.translated_text} size="icon-sm" variant="ghost" />
+                <Badge variant="secondary">{TRANSLATION_METHOD_LABELS[run.method]}</Badge>
               </div>
               <span className="text-sm whitespace-nowrap text-muted-foreground">
                 Переведено: <span className="font-medium text-foreground">{run.translated_word_count}</span>{" "}
@@ -170,7 +175,33 @@ export function TranslationDocumentTab({
               </span>
             </CardHeader>
             <CardContent>
-              <p className="whitespace-pre-wrap text-sm break-words">{run.translated_text}</p>
+              {run.diff_segments && run.diff_segments.length > 0 ? (
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs text-muted-foreground">
+                    <mark className="rounded-sm bg-amber-200 px-0.5 text-foreground dark:bg-amber-400/40">
+                      Выделено
+                    </mark>{" "}
+                    — отличается от прямого перевода: здесь сработало правило трансфера
+                  </p>
+                  <p className="whitespace-pre-wrap text-sm break-words">
+                    {run.diff_segments.map((segment, index) =>
+                      segment.changed ? (
+                        <mark
+                          key={index}
+                          className="rounded-sm bg-amber-200 px-0.5 text-foreground dark:bg-amber-400/40"
+                          title="Отличается от прямого перевода: сработало правило трансфера"
+                        >
+                          {segment.text}
+                        </mark>
+                      ) : (
+                        <span key={index}>{segment.text}</span>
+                      ),
+                    )}
+                  </p>
+                </div>
+              ) : (
+                <p className="whitespace-pre-wrap text-sm break-words">{run.translated_text}</p>
+              )}
             </CardContent>
           </Card>
         </div>

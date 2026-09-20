@@ -10,6 +10,7 @@ from app.core.config import get_settings
 
 class NlpServiceClient:
     EMBEDDING_TIMEOUT = 300.0
+    TRANSLATE_TIMEOUT = 300.0
 
     def __init__(self, base_url: str | None = None, *, timeout: float = 60.0) -> None:
         self._base_url = base_url or get_settings().nlp_service_url
@@ -77,8 +78,14 @@ class NlpServiceClient:
             "/llm/polish", {"text": text, "language": language}, timeout=self.EMBEDDING_TIMEOUT
         )
 
-    async def translate(self, text: str, dictionary: dict[str, str]) -> dict[str, Any]:
-        return await self._post("/translate", {"text": text, "dictionary": dictionary})
+    async def translate(
+        self, text: str, dictionary: dict[str, str], *, method: str = "direct"
+    ) -> dict[str, Any]:
+        return await self._post(
+            "/translate",
+            {"text": text, "dictionary": dictionary, "method": method},
+            timeout=self.TRANSLATE_TIMEOUT,
+        )
 
     async def build_word_list(self, text: str, dictionary: dict[str, str]) -> list[dict[str, Any]]:
         body = await self._post("/translate/word-list", {"text": text, "dictionary": dictionary})

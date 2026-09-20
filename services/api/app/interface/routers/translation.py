@@ -55,6 +55,7 @@ async def create_translation_run(
             collection_id=payload.collection_id,
             source_lang=payload.source_lang,
             target_lang=payload.target_lang,
+            method=payload.method,
         )
     except TranslationError as exc:
         _raise_for_translation_error(exc)
@@ -65,10 +66,10 @@ async def create_translation_run(
     response_model=TranslationRunOut | None,
 )
 async def get_latest_translation_run_for_collection(
-    collection_id: int, db: AsyncSession = Depends(get_db)
+    collection_id: int, method: str | None = None, db: AsyncSession = Depends(get_db)
 ) -> TranslationRunOut | None:
     service = TranslationService(db)
-    return await service.get_latest_for_collection(collection_id)
+    return await service.get_latest_for_collection(collection_id, method=method)
 
 
 @router.get("/translation/runs/{run_id}", response_model=TranslationRunOut)
@@ -130,7 +131,10 @@ async def create_translation_test_run(
     service = TranslationTestRunService(db)
     try:
         run = await service.start_run(
-            payload.collection_id, source_lang=payload.source_lang, target_lang=payload.target_lang
+            payload.collection_id,
+            source_lang=payload.source_lang,
+            target_lang=payload.target_lang,
+            method=payload.method,
         )
     except TranslationError as exc:
         _raise_for_translation_error(exc)
@@ -160,10 +164,10 @@ async def get_translation_test_run(run_id: int, db: AsyncSession = Depends(get_d
     "/collections/{collection_id}/translation/test-runs", response_model=list[TranslationTestRunOut]
 )
 async def list_translation_test_runs_by_collection(
-    collection_id: int, db: AsyncSession = Depends(get_db)
+    collection_id: int, method: str | None = None, db: AsyncSession = Depends(get_db)
 ) -> list[TranslationTestRunOut]:
     service = TranslationTestRunService(db)
-    return await service.list_runs_by_collection(collection_id)
+    return await service.list_runs_by_collection(collection_id, method=method)
 
 
 @router.websocket("/translation/test-runs/ws/{run_id}")

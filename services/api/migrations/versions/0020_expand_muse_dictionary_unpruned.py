@@ -13,10 +13,6 @@ depends_on: Union[str, Sequence[str], None] = None
 
 CHUNK_SIZE = 5000
 
-# 0015/0017 filtered MUSE down to the top-50k frequent English words to cut
-# proper-noun/toponym noise; that cut translation coverage on real texts to
-# ~50%, so this replaces the non-curated slice with the full, unfiltered
-# MUSE en-fr dictionary (113,286 pairs -> 87,729 lemma-pooled entries).
 DICTIONARY_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "app", "domain", "dictionaries", "en_fr_muse.tsv"
 )

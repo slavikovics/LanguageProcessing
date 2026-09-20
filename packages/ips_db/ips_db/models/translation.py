@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import datetime as dt
 
-from sqlalchemy import Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import JSON, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base
 
 
 ANY_POS = "*"
-# Sentinel instead of NULL pos: Postgres treats NULLs as distinct in UNIQUE constraints.
 
 
 class TranslationDictionaryEntry(Base):
@@ -39,6 +38,7 @@ class TranslationTestRun(Base):
     collection_id: Mapped[int] = mapped_column(ForeignKey("collections.id", ondelete="CASCADE"))
     source_lang: Mapped[str] = mapped_column(String(10), default="en")
     target_lang: Mapped[str] = mapped_column(String(10), default="fr")
+    method: Mapped[str] = mapped_column(String(20), default="direct")
     status: Mapped[str] = mapped_column(String(20), default="pending")
 
     documents_total: Mapped[int] = mapped_column(Integer, default=0)
@@ -65,12 +65,14 @@ class TranslationRun(Base):
     )
     source_lang: Mapped[str] = mapped_column(String(10), default="en")
     target_lang: Mapped[str] = mapped_column(String(10), default="fr")
+    method: Mapped[str] = mapped_column(String(20), default="direct")
     source_text: Mapped[str] = mapped_column(Text)
     translated_text: Mapped[str] = mapped_column(Text)
     word_count: Mapped[int] = mapped_column(Integer, default=0)
     translated_word_count: Mapped[int] = mapped_column(Integer, default=0)
     translated_text_word_count: Mapped[int] = mapped_column(Integer, default=0)
     elapsed_ms: Mapped[float] = mapped_column(Float, default=0.0)
+    diff_segments: Mapped[list | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(server_default=func.now())
 
 

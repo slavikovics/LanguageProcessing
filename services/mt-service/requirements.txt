@@ -1,0 +1,9 @@
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+pydantic==2.10.3
+
+# numpy<2 and torch==2.5.1 are installed by the Dockerfile's shared preamble
+# layer (kept identical to services/lang-id-service/Dockerfile), not here.
+
+transformers==4.46.3
+sentencepiece==0.2.0

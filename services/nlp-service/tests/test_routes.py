@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 from nlp_core import tokenization
 
+from app import mt_client
 from app.main import app
 
 client = TestClient(app)
@@ -116,3 +117,26 @@ def test_sentences_endpoint():
     response = client.post("/sentences", json={"text": "Cats run. Dogs bark!"})
     assert response.status_code == 200
     assert response.json()["sentences"] == ["Cats run.", "Dogs bark!"]
+
+
+@pytest.mark.skipif(not _model_available(), reason="en_core_web_sm model not installed")
+def test_translate_endpoint_neural_method_calls_mt_service(monkeypatch):
+    async def fake_translate_sentences(sentences: list[str]) -> list[str]:
+        assert sentences == ["The cat sits."]
+        return ["Le chat est assis."]
+
+    monkeypatch.setattr(mt_client, "translate_sentences", fake_translate_sentences)
+
+    response = client.post(
+        "/translate",
+        json={
+            "text": "The cat sits.",
+            "dictionary": {"cat|NOUN": "chat"},
+            "method": "neural",
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["translated_text"] == "Le chat est assis."
+    assert body["word_count"] == 3
+    assert body["translated_word_count"] == 1

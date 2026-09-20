@@ -36,6 +36,7 @@ class TranslationService:
         collection_id: int | None = None,
         source_lang: str = DEFAULT_SOURCE_LANGUAGE,
         target_lang: str = DEFAULT_TARGET_LANGUAGE,
+        method: str = "direct",
         test_run_id: int | None = None,
         lookup_override: dict[str, str] | None = None,
     ) -> TranslationRun:
@@ -57,7 +58,7 @@ class TranslationService:
         )
 
         started = time.perf_counter()
-        result = await self._nlp.translate(source_text, lookup)
+        result = await self._nlp.translate(source_text, lookup, method=method)
         elapsed_ms = (time.perf_counter() - started) * 1000
 
         run = await self._runs.create(
@@ -66,12 +67,14 @@ class TranslationService:
             test_run_id=test_run_id,
             source_lang=source_lang,
             target_lang=target_lang,
+            method=method,
             source_text=source_text,
             translated_text=result["translated_text"],
             word_count=result["word_count"],
             translated_word_count=result["translated_word_count"],
             translated_text_word_count=len(result["translated_text"].split()),
             elapsed_ms=elapsed_ms,
+            diff_segments=result.get("diff_segments") or None,
         )
         await self._run_words.bulk_create(run.id, result["words"])
         await self._session.commit()
@@ -83,8 +86,10 @@ class TranslationService:
     async def list_runs(self, *, limit: int = 20) -> list[TranslationRun]:
         return await self._runs.list_recent(limit=limit)
 
-    async def get_latest_for_collection(self, collection_id: int) -> TranslationRun | None:
-        return await self._runs.get_latest_for_collection(collection_id)
+    async def get_latest_for_collection(
+        self, collection_id: int, *, method: str | None = None
+    ) -> TranslationRun | None:
+        return await self._runs.get_latest_for_collection(collection_id, method=method)
 
     async def get_run_words(self, run_id: int) -> list[TranslationRunWord]:
         run = await self._runs.get(run_id)

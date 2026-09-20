@@ -26,9 +26,9 @@ class _FakeNlpServiceClient(NlpServiceClient):
     def __init__(self) -> None:
         pass
 
-    async def translate(self, text: str, dictionary: dict[str, str]) -> dict:
+    async def translate(self, text: str, dictionary: dict[str, str], *, method: str = "direct") -> dict:
         return {
-            "translated_text": f"[fr] {text}",
+            "translated_text": f"[{method}] {text}",
             "word_count": len(text.split()),
             "translated_word_count": 1,
             "words": [
@@ -75,15 +75,30 @@ async def test_translate_from_document_persists_run_and_words(session_factory, d
         service = TranslationService(session, nlp_client=_FakeNlpServiceClient())
         run = await service.translate(document_id=document_id, text=None)
 
-        assert run.translated_text == "[fr] The cat sits."
+        assert run.translated_text == "[direct] The cat sits."
         assert run.document_id == document_id
         assert run.source_lang == "en"
         assert run.target_lang == "fr"
+        assert run.method == "direct"
 
         words = await service.get_run_words(run.id)
         assert len(words) == 1
         assert words[0].lemma == "cat"
         assert words[0].translation == "chat"
+
+
+@pytest.mark.asyncio
+async def test_translate_with_transfer_method_persists_method(session_factory, document_id):
+    async with session_factory() as session:
+        service = TranslationService(session, nlp_client=_FakeNlpServiceClient())
+        run = await service.translate(document_id=document_id, text=None, method="transfer")
+
+        assert run.method == "transfer"
+        assert run.translated_text == "[transfer] The cat sits."
+
+        latest = await service.get_latest_for_collection(run.collection_id, method="transfer")
+        assert latest is not None and latest.id == run.id
+        assert await service.get_latest_for_collection(run.collection_id, method="direct") is None
 
 
 @pytest.mark.asyncio

@@ -5,6 +5,7 @@ from . import (
     similarity,
     syntax_parsing,
     tokenization,
+    transfer_translation,
     translation,
     weighting,
 )
@@ -17,5 +18,6 @@ __all__ = [
     "frequent_words",
     "alphabetic",
     "translation",
+    "transfer_translation",
     "syntax_parsing",
 ]

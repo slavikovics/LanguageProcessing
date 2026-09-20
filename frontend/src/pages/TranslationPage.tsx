@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { getLatestTranslationRunForCollection } from "@/api/client";
-import type { TranslationRun } from "@/api/types";
+import type { TranslationMethod, TranslationRun } from "@/api/types";
+import { TRANSLATION_METHOD_LABELS } from "@/api/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,8 +15,11 @@ import { TranslationTestingTab } from "@/components/TranslationTestingTab";
 import { TranslationWordListTab } from "@/components/TranslationWordListTab";
 import { useCollectionContext } from "@/context/CollectionContext";
 
+const TRANSLATION_METHODS: TranslationMethod[] = ["direct", "transfer", "neural"];
+
 export function TranslationPage() {
   const { selectedId } = useCollectionContext();
+  const [method, setMethod] = useState<TranslationMethod>("direct");
   const [run, setRun] = useState<TranslationRun | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") ?? "translate";
@@ -26,13 +30,13 @@ export function TranslationPage() {
       return;
     }
     let cancelled = false;
-    getLatestTranslationRunForCollection(selectedId).then((latest) => {
+    getLatestTranslationRunForCollection(selectedId, method).then((latest) => {
       if (!cancelled) setRun(latest);
     });
     return () => {
       cancelled = true;
     };
-  }, [selectedId]);
+  }, [selectedId, method]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -48,14 +52,31 @@ export function TranslationPage() {
             <HelpCircle className="size-4" />
           </Link>
         </Button>
-        <CardHeader>
-          <CardTitle>Автоматический машинный перевод текстов</CardTitle>
-          <CardDescription>
-            Прямой (пословный) перевод английский → французский: каждое слово ищется в двуязычном
-            словаре по лемме и части речи и заменяется переводом — частотный список слов с
-            грамматической информацией, дерево синтаксического разбора предложения и утилита
-            пополнения словаря на случай пробелов.
-          </CardDescription>
+        <CardHeader className="flex flex-col gap-3">
+          <div>
+            <CardTitle>Автоматический машинный перевод текстов</CardTitle>
+            <CardDescription>
+              Английский → французский. Прямой метод заменяет каждое слово переводом из словаря по
+              лемме и части речи. Трансферный метод дополнительно перестраивает дерево
+              синтаксического разбора (порядок прилагательных, отрицание «ne … pas», слияние
+              предлогов с артиклем). Нейросетевой метод переводит локальной моделью MarianMT без
+              словаря — частотный список слов и покрытие словаря показываются и для него, но
+              относятся только к исходному тексту, а не к качеству нейроперевода.
+            </CardDescription>
+          </div>
+          <div className="flex gap-1.5 self-start rounded-md border p-1">
+            {TRANSLATION_METHODS.map((option) => (
+              <Button
+                key={option}
+                type="button"
+                size="sm"
+                variant={method === option ? "default" : "ghost"}
+                onClick={() => setMethod(option)}
+              >
+                {TRANSLATION_METHOD_LABELS[option]}
+              </Button>
+            ))}
+          </div>
         </CardHeader>
       </Card>
 
@@ -72,11 +93,16 @@ export function TranslationPage() {
         </TabsList>
 
         <TabsContent value="translate" className="pt-4">
-          <TranslationDocumentTab collectionId={selectedId} run={run} onRunCreated={setRun} />
+          <TranslationDocumentTab
+            collectionId={selectedId}
+            method={method}
+            run={run}
+            onRunCreated={setRun}
+          />
         </TabsContent>
 
         <TabsContent value="testing" className="pt-4 data-[state=inactive]:hidden" forceMount>
-          <TranslationTestingTab collectionId={selectedId} />
+          <TranslationTestingTab collectionId={selectedId} method={method} />
         </TabsContent>
 
         <TabsContent value="words" className="pt-4 data-[state=inactive]:hidden" forceMount>

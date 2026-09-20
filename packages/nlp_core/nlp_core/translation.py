@@ -26,6 +26,35 @@ def _match_case(source: str, translation: str) -> str:
     return translation
 
 
+def _record_word_frequency(
+    lemma: str,
+    pos: str,
+    surface: str,
+    frequency: Counter[tuple[str, str]],
+    surface_by_key: dict[tuple[str, str], str],
+) -> None:
+    key = (lemma, pos)
+    frequency[key] += 1
+    surface_by_key.setdefault(key, surface)
+
+
+def _build_word_list(
+    frequency: Counter[tuple[str, str]],
+    surface_by_key: dict[tuple[str, str], str],
+    lookup: DictionaryLookup,
+) -> list["TranslatedWord"]:
+    return [
+        TranslatedWord(
+            lemma=lemma,
+            pos=pos,
+            surface=surface_by_key[(lemma, pos)],
+            frequency=count,
+            translation=_lookup_translation(lookup, lemma, pos),
+        )
+        for (lemma, pos), count in frequency.most_common()
+    ]
+
+
 @dataclass(frozen=True)
 class TranslatedWord:
     lemma: str
@@ -36,11 +65,18 @@ class TranslatedWord:
 
 
 @dataclass(frozen=True)
+class DiffSegment:
+    text: str
+    changed: bool
+
+
+@dataclass(frozen=True)
 class TranslationResult:
     translated_text: str
     word_count: int
     translated_word_count: int
     words: list[TranslatedWord] = field(default_factory=list)
+    diff_segments: list[DiffSegment] = field(default_factory=list)
 
 
 def translate(text: str, lookup: DictionaryLookup) -> TranslationResult:
@@ -63,9 +99,7 @@ def translate(text: str, lookup: DictionaryLookup) -> TranslationResult:
         translation = _lookup_translation(lookup, lemma, pos)
 
         if not tok.is_stop:
-            key = (lemma, pos)
-            frequency[key] += 1
-            surface_by_key.setdefault(key, tok.text.lower())
+            _record_word_frequency(lemma, pos, tok.text.lower(), frequency, surface_by_key)
 
         if translation:
             translated_word_count += 1
@@ -73,16 +107,7 @@ def translate(text: str, lookup: DictionaryLookup) -> TranslationResult:
         else:
             rendered_parts.append(tok.text_with_ws)
 
-    words = [
-        TranslatedWord(
-            lemma=lemma,
-            pos=pos,
-            surface=surface_by_key[(lemma, pos)],
-            frequency=count,
-            translation=_lookup_translation(lookup, lemma, pos),
-        )
-        for (lemma, pos), count in frequency.most_common()
-    ]
+    words = _build_word_list(frequency, surface_by_key, lookup)
 
     return TranslationResult(
         translated_text="".join(rendered_parts),
@@ -93,20 +118,9 @@ def translate(text: str, lookup: DictionaryLookup) -> TranslationResult:
 
 
 def build_word_list(text: str, lookup: DictionaryLookup) -> list[TranslatedWord]:
-    counts: Counter[tuple[str, str]] = Counter()
+    frequency: Counter[tuple[str, str]] = Counter()
     surface_by_key: dict[tuple[str, str], str] = {}
     for tok in tokenize(text):
-        key = (tok.lemma, tok.pos)
-        counts[key] += 1
-        surface_by_key.setdefault(key, tok.text)
+        _record_word_frequency(tok.lemma, tok.pos, tok.text, frequency, surface_by_key)
 
-    return [
-        TranslatedWord(
-            lemma=lemma,
-            pos=pos,
-            surface=surface_by_key[(lemma, pos)],
-            frequency=count,
-            translation=_lookup_translation(lookup, lemma, pos),
-        )
-        for (lemma, pos), count in counts.most_common()
-    ]
+    return _build_word_list(frequency, surface_by_key, lookup)

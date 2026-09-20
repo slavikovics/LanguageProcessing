@@ -24,9 +24,32 @@ async def session_factory(tmp_path):
 class _FakeNlpServiceClient(NlpServiceClient):
     def __init__(self) -> None:
         self.calls = 0
+        self.methods_used: list[str] = []
 
-    async def translate(self, text: str, dictionary: dict[str, str]) -> dict:
+    async def translate(self, text: str, dictionary: dict[str, str], *, method: str = "direct") -> dict:
         self.calls += 1
+        self.methods_used.append(method)
+        return {
+            "translated_text": f"[fr] {text} extra",
+            "word_count": len(text.split()),
+            "translated_word_count": 1,
+            "words": [],
+        }
+
+
+class _FlakyNlpServiceClient(NlpServiceClient):
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def translate(self, text: str, dictionary: dict[str, str], *, method: str = "direct") -> dict:
+        self.calls += 1
+        if self.calls == 1:
+            return {
+                "translated_text": "[fr] broken",
+                "word_count": 1,
+                "translated_word_count": 1,
+                "words": [{"lemma": "x"}],  # missing surface/pos/frequency/translation
+            }
         return {
             "translated_text": f"[fr] {text} extra",
             "word_count": len(text.split()),
@@ -85,6 +108,65 @@ async def test_run_job_translates_all_documents_and_tracks_progress(session_fact
         summary = await service.get_run_summary(run.id)
         assert summary.documents_translated == 2
         assert summary.mean_translated_word_count == 1.0
+
+
+@pytest.mark.asyncio
+async def test_run_job_with_transfer_method_threads_method_through(session_factory, collection_id):
+    fake_nlp = _FakeNlpServiceClient()
+    async with session_factory() as session:
+        translator = TranslationService(session, nlp_client=fake_nlp)
+        service = TranslationTestRunService(session, translation_service=translator)
+        run = await service.start_run(collection_id, method="transfer")
+        assert run.method == "transfer"
+        await service.run_job(run.id)
+
+        assert fake_nlp.methods_used == ["transfer", "transfer"]
+
+        results = await service.get_run_results(run.id)
+        assert all(r.method == "transfer" for r in results)
+
+        summary = await service.get_run_summary(run.id)
+        assert summary.method == "transfer"
+
+
+@pytest.mark.asyncio
+async def test_run_job_recovers_session_after_a_document_fails(session_factory, collection_id):
+    fake_nlp = _FlakyNlpServiceClient()
+    async with session_factory() as session:
+        translator = TranslationService(session, nlp_client=fake_nlp)
+        service = TranslationTestRunService(session, translation_service=translator)
+        run = await service.start_run(collection_id)
+        await service.run_job(run.id)
+
+        finished = await service.get_run(run.id)
+        assert finished.status == "completed"
+        assert finished.documents_processed == 2
+        assert finished.error_message is not None
+        assert "1 of 2" in finished.error_message
+
+        results = await service.get_run_results(run.id)
+        assert len(results) == 1
+
+        summary = await service.get_run_summary(run.id)
+        assert summary.documents_translated == 1
+
+
+@pytest.mark.asyncio
+async def test_run_job_marks_failed_when_every_document_fails(session_factory, collection_id):
+    class _AlwaysFailingNlpServiceClient(NlpServiceClient):
+        async def translate(self, text, dictionary, *, method="direct"):
+            raise RuntimeError("nlp-service unreachable")
+
+    async with session_factory() as session:
+        translator = TranslationService(session, nlp_client=_AlwaysFailingNlpServiceClient())
+        service = TranslationTestRunService(session, translation_service=translator)
+        run = await service.start_run(collection_id)
+        await service.run_job(run.id)
+
+        finished = await service.get_run(run.id)
+        assert finished.status == "failed"
+        assert finished.error_message is not None
+        assert "all 2 documents failed" in finished.error_message
 
 
 @pytest.mark.asyncio

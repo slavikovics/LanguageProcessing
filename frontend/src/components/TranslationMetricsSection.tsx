@@ -8,17 +8,24 @@ import {
   listDocuments,
   listTranslationTestRunsByCollection,
 } from "@/api/client";
-import type { DocumentSummary, TranslationRun, TranslationRunSummary } from "@/api/types";
+import type { DocumentSummary, TranslationMethod, TranslationRun, TranslationRunSummary } from "@/api/types";
+import { TRANSLATION_METHOD_LABELS } from "@/api/types";
 import { downloadCsv, downloadJson } from "@/lib/exportResults";
 import { escapeHtml, openPrintView } from "@/lib/printView";
 
 import { TranslationResultsTable } from "@/components/TranslationResultsTable";
 import { Button } from "@/components/ui/button";
 
+const TRANSLATION_METHODS: TranslationMethod[] = ["direct", "transfer", "neural"];
+
+type SummaryByMethod = Partial<Record<TranslationMethod, TranslationRunSummary>>;
+type ResultsByMethod = Partial<Record<TranslationMethod, TranslationRun[]>>;
+
 export function TranslationMetricsSection({ collectionId }: { collectionId: number | null }) {
-  const [summary, setSummary] = useState<TranslationRunSummary | null>(null);
-  const [results, setResults] = useState<TranslationRun[]>([]);
+  const [summaries, setSummaries] = useState<SummaryByMethod>({});
+  const [resultsByMethod, setResultsByMethod] = useState<ResultsByMethod>({});
   const [documents, setDocuments] = useState<DocumentSummary[]>([]);
+  const [activeMethod, setActiveMethod] = useState<TranslationMethod>("direct");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,26 +33,32 @@ export function TranslationMetricsSection({ collectionId }: { collectionId: numb
     setLoading(true);
     setError(null);
     try {
-      const runs = await listTranslationTestRunsByCollection(id);
-      const latest = runs.find((run) => run.status === "completed") ?? null;
-      if (latest === null) {
-        setSummary(null);
-        setResults([]);
-        setDocuments([]);
-        return;
+      const perMethod = await Promise.all(
+        TRANSLATION_METHODS.map(async (method) => {
+          const runs = await listTranslationTestRunsByCollection(id, method);
+          const latest = runs.find((run) => run.status === "completed") ?? null;
+          if (latest === null) return { method, summary: null, results: [] as TranslationRun[] };
+          const [summary, results] = await Promise.all([
+            getTranslationTestRunSummary(latest.id),
+            getTranslationTestRunResults(latest.id),
+          ]);
+          return { method, summary, results };
+        }),
+      );
+
+      const nextSummaries: SummaryByMethod = {};
+      const nextResults: ResultsByMethod = {};
+      for (const entry of perMethod) {
+        if (entry.summary) nextSummaries[entry.method] = entry.summary;
+        nextResults[entry.method] = entry.results;
       }
-      const [runSummary, runResults, docs] = await Promise.all([
-        getTranslationTestRunSummary(latest.id),
-        getTranslationTestRunResults(latest.id),
-        listDocuments(id, { limit: 500 }),
-      ]);
-      setSummary(runSummary);
-      setResults(runResults);
-      setDocuments(docs);
+      setSummaries(nextSummaries);
+      setResultsByMethod(nextResults);
+      setDocuments(await listDocuments(id, { limit: 500 }));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-      setSummary(null);
-      setResults([]);
+      setSummaries({});
+      setResultsByMethod({});
       setDocuments([]);
     } finally {
       setLoading(false);
@@ -55,11 +68,15 @@ export function TranslationMetricsSection({ collectionId }: { collectionId: numb
   useEffect(() => {
     if (collectionId !== null) void refresh(collectionId);
     else {
-      setSummary(null);
-      setResults([]);
+      setSummaries({});
+      setResultsByMethod({});
       setDocuments([]);
     }
   }, [collectionId, refresh]);
+
+  const summary = summaries[activeMethod] ?? null;
+  const results = resultsByMethod[activeMethod] ?? [];
+  const hasAnySummary = Object.keys(summaries).length > 0;
 
   function handleExportCsv() {
     const rows = documents.map((doc) => {
@@ -73,11 +90,11 @@ export function TranslationMetricsSection({ collectionId }: { collectionId: numb
         elapsed_ms: result?.elapsed_ms ?? "",
       };
     });
-    downloadCsv("translation-results.csv", rows);
+    downloadCsv(`translation-results-${activeMethod}.csv`, rows);
   }
 
   function handleExportJson() {
-    downloadJson("translation-results.json", { summary, results, documents });
+    downloadJson(`translation-results-${activeMethod}.json`, { summary, results, documents });
   }
 
   function handlePrint() {
@@ -104,7 +121,7 @@ export function TranslationMetricsSection({ collectionId }: { collectionId: numb
     openPrintView(
       "Метрики машинного перевода",
       `
-        <h1>Метрики машинного перевода</h1>
+        <h1>Метрики машинного перевода — ${escapeHtml(TRANSLATION_METHOD_LABELS[activeMethod])}</h1>
         ${
           summary
             ? `<p>Документов переведено: ${summary.documents_translated}. Среднее время: ${summary.mean_elapsed_ms.toFixed(
@@ -133,7 +150,7 @@ export function TranslationMetricsSection({ collectionId }: { collectionId: numb
                 size="sm"
                 onClick={() => refresh(collectionId)}
                 disabled={loading}
-                title="Пересчитывает метрики по последнему завершённому тестовому прогону"
+                title="Пересчитывает метрики по последнему завершённому тестовому прогону каждого метода"
               >
                 <RotateCw className={loading ? "size-3.5 animate-spin" : "size-3.5"} />
                 {loading ? "Обновление…" : "Обновить"}
@@ -149,8 +166,8 @@ export function TranslationMetricsSection({ collectionId }: { collectionId: numb
         </div>
         <p className="text-sm text-muted-foreground">
           Число слов до и после перевода, покрытие словаря и время выполнения — считаются по
-          последнему тестовому прогону пословного перевода на англоязычных документах коллекции
-          (по языку, определённому при кроулинге). Запустите тест на странице «Перевод».
+          последнему завершённому тестовому прогону каждого метода на англоязычных документах
+          коллекции (по языку, определённому при кроулинге). Запустите тест на странице «Перевод».
         </p>
       </div>
 
@@ -162,7 +179,7 @@ export function TranslationMetricsSection({ collectionId }: { collectionId: numb
         </p>
       )}
 
-      {collectionId !== null && summary === null && !loading && (
+      {collectionId !== null && !hasAnySummary && !loading && (
         <p className="text-sm text-muted-foreground">
           Пока нет ни одного завершённого теста для этой коллекции. Запустите тест на странице{" "}
           <Link to="/translation" className="text-primary underline-offset-2 hover:underline">
@@ -172,38 +189,109 @@ export function TranslationMetricsSection({ collectionId }: { collectionId: numb
         </p>
       )}
 
-      {summary !== null && (
+      {hasAnySummary && (
         <div className="flex flex-col gap-6">
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
-            <MetricStat label="Документов переведено" value={`${summary.documents_translated}`} />
-            <MetricStat label="Среднее время" value={`${summary.mean_elapsed_ms.toFixed(1)} мс`} />
-            <MetricStat label="Слов до перевода" value={summary.mean_word_count.toFixed(1)} />
-            <MetricStat label="Слов после перевода" value={summary.mean_translated_text_word_count.toFixed(1)} />
-            <MetricStat label="Покрытие словаря" value={`${(summary.mean_coverage_ratio * 100).toFixed(1)}%`} />
-          </div>
+          <ComparisonTable summaries={summaries} />
 
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h3 className="text-base font-medium">Результаты по документам</h3>
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={handleExportCsv}>
-                  <Download className="size-3.5" />
-                  Скачать CSV
+          <div className="flex flex-col gap-4">
+            <div className="flex gap-1.5 self-start rounded-md border p-1">
+              {TRANSLATION_METHODS.map((option) => (
+                <Button
+                  key={option}
+                  type="button"
+                  size="sm"
+                  variant={activeMethod === option ? "default" : "ghost"}
+                  onClick={() => setActiveMethod(option)}
+                  disabled={!summaries[option]}
+                >
+                  {TRANSLATION_METHOD_LABELS[option]}
                 </Button>
-                <Button type="button" variant="outline" size="sm" onClick={handleExportJson}>
-                  <FileJson className="size-3.5" />
-                  Экспорт JSON
-                </Button>
-                <Button type="button" variant="outline" size="sm" onClick={handlePrint}>
-                  <Printer className="size-3.5" />
-                  Печать
-                </Button>
-              </div>
+              ))}
             </div>
-            <TranslationResultsTable documents={documents} results={results} />
+
+            {summary && (
+              <>
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+                  <MetricStat label="Документов переведено" value={`${summary.documents_translated}`} />
+                  <MetricStat label="Среднее время" value={`${summary.mean_elapsed_ms.toFixed(1)} мс`} />
+                  <MetricStat label="Слов до перевода" value={summary.mean_word_count.toFixed(1)} />
+                  <MetricStat
+                    label="Слов после перевода"
+                    value={summary.mean_translated_text_word_count.toFixed(1)}
+                  />
+                  <MetricStat
+                    label="Покрытие словаря"
+                    value={`${(summary.mean_coverage_ratio * 100).toFixed(1)}%`}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h3 className="text-base font-medium">Результаты по документам</h3>
+                    <div className="flex gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={handleExportCsv}>
+                        <Download className="size-3.5" />
+                        Скачать CSV
+                      </Button>
+                      <Button type="button" variant="outline" size="sm" onClick={handleExportJson}>
+                        <FileJson className="size-3.5" />
+                        Экспорт JSON
+                      </Button>
+                      <Button type="button" variant="outline" size="sm" onClick={handlePrint}>
+                        <Printer className="size-3.5" />
+                        Печать
+                      </Button>
+                    </div>
+                  </div>
+                  <TranslationResultsTable documents={documents} results={results} />
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function ComparisonTable({ summaries }: { summaries: SummaryByMethod }) {
+  const rows: { label: string; format: (s: TranslationRunSummary) => string }[] = [
+    { label: "Документов переведено", format: (s) => `${s.documents_translated}` },
+    { label: "Среднее время", format: (s) => `${s.mean_elapsed_ms.toFixed(1)} мс` },
+    { label: "Слов до перевода", format: (s) => s.mean_word_count.toFixed(1) },
+    { label: "Слов после перевода", format: (s) => s.mean_translated_text_word_count.toFixed(1) },
+    { label: "Покрытие словаря", format: (s) => `${(s.mean_coverage_ratio * 100).toFixed(1)}%` },
+  ];
+
+  return (
+    <div className="overflow-x-auto rounded-lg border">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b bg-muted/50">
+            <th className="p-2 text-left font-medium text-muted-foreground">Метрика</th>
+            {TRANSLATION_METHODS.map((method) => (
+              <th key={method} className="p-2 text-left font-medium text-muted-foreground">
+                {TRANSLATION_METHOD_LABELS[method]}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.label} className="border-b last:border-0">
+              <td className="p-2 text-muted-foreground">{row.label}</td>
+              {TRANSLATION_METHODS.map((method) => {
+                const s = summaries[method];
+                return (
+                  <td key={method} className="p-2 font-medium tabular-nums">
+                    {s ? row.format(s) : "—"}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

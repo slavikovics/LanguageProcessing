@@ -16,6 +16,7 @@ class TranslationRunSummary:
     run_id: int
     source_lang: str
     target_lang: str
+    method: str
     documents_translated: int
     mean_elapsed_ms: float
     mean_word_count: float
@@ -25,13 +26,14 @@ class TranslationRunSummary:
 
 
 def summarize_translation_run(
-    *, run_id: int, source_lang: str, target_lang: str, runs: list
+    *, run_id: int, source_lang: str, target_lang: str, method: str = "direct", runs: list
 ) -> TranslationRunSummary:
     if not runs:
         return TranslationRunSummary(
             run_id=run_id,
             source_lang=source_lang,
             target_lang=target_lang,
+            method=method,
             documents_translated=0,
             mean_elapsed_ms=0.0,
             mean_word_count=0.0,
@@ -45,6 +47,7 @@ def summarize_translation_run(
         run_id=run_id,
         source_lang=source_lang,
         target_lang=target_lang,
+        method=method,
         documents_translated=count,
         mean_elapsed_ms=sum(run.elapsed_ms for run in runs) / count,
         mean_word_count=sum(run.word_count for run in runs) / count,

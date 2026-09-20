@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import datetime as dt
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from app.domain.translation import DEFAULT_SOURCE_LANGUAGE, DEFAULT_TARGET_LANGUAGE
+
+TranslationMethod = Literal["direct", "transfer", "neural"]
 
 
 class TranslateRequest(BaseModel):
@@ -13,12 +16,18 @@ class TranslateRequest(BaseModel):
     collection_id: int | None = None
     source_lang: str = DEFAULT_SOURCE_LANGUAGE
     target_lang: str = DEFAULT_TARGET_LANGUAGE
+    method: TranslationMethod = "direct"
 
     @model_validator(mode="after")
     def _require_source(self) -> "TranslateRequest":
         if self.document_id is None and not (self.text and self.text.strip()):
             raise ValueError("either document_id or text must be provided")
         return self
+
+
+class DiffSegmentOut(BaseModel):
+    text: str
+    changed: bool
 
 
 class TranslationRunOut(BaseModel):
@@ -30,12 +39,14 @@ class TranslationRunOut(BaseModel):
     test_run_id: int | None
     source_lang: str
     target_lang: str
+    method: str
     source_text: str
     translated_text: str
     word_count: int
     translated_word_count: int
     translated_text_word_count: int
     elapsed_ms: float
+    diff_segments: list[DiffSegmentOut] | None
     created_at: dt.datetime
 
 
@@ -43,6 +54,7 @@ class TranslationTestRunCreate(BaseModel):
     collection_id: int
     source_lang: str = DEFAULT_SOURCE_LANGUAGE
     target_lang: str = DEFAULT_TARGET_LANGUAGE
+    method: TranslationMethod = "direct"
 
 
 class TranslationTestRunOut(BaseModel):
@@ -52,6 +64,7 @@ class TranslationTestRunOut(BaseModel):
     collection_id: int
     source_lang: str
     target_lang: str
+    method: str
     status: str
     documents_total: int
     documents_processed: int
@@ -65,6 +78,7 @@ class TranslationRunSummaryOut(BaseModel):
     run_id: int
     source_lang: str
     target_lang: str
+    method: str
     documents_translated: int
     mean_elapsed_ms: float
     mean_word_count: float
