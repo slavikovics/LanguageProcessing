@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import { speechStreamWebSocketUrl } from "@/api/client";
 import type { SpeechCommand } from "@/api/types";
 import { attachVolumeMeter } from "@/lib/micVolumeMeter";
-import { PHRASE_PAUSE_MS } from "@/lib/speechTiming";
+import { PHRASE_PAUSE_MS, SILENCE_LEVEL_THRESHOLD } from "@/lib/speechTiming";
 
 export type LiveSttUnavailableReason =
   | "unsupported_browser"
@@ -10,7 +10,6 @@ export type LiveSttUnavailableReason =
   | "connection_lost"
   | "mic_lost";
 
-const SILENCE_LEVEL_THRESHOLD = 0.06;
 // Must outlast backend's ~20s chunk ceiling plus cold-model-load time, or a slow final looks lost.
 const STOP_SAFETY_NET_MS = 22000;
 
@@ -73,6 +72,8 @@ export function useLiveSttStream(options: UseLiveSttStreamOptions): UseLiveSttSt
   const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const volumeMeterCleanupRef = useRef<(() => void) | null>(null);
   const silenceCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Tracked so a stale stop() timer from an earlier session can't kill a session started afterwards.
+  const stopTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const lastLoudAtRef = useRef(0);
   const hasSpokenRef = useRef(false);
   const stoppingRef = useRef(false);
@@ -82,7 +83,13 @@ export function useLiveSttStream(options: UseLiveSttStreamOptions): UseLiveSttSt
   // Guards against overlapping start() calls before the first connects (seen: 7 sessions from rapid clicks).
   const activeRef = useRef(false);
 
+  const clearStopTimers = useCallback(() => {
+    stopTimersRef.current.forEach((timer) => clearTimeout(timer));
+    stopTimersRef.current = [];
+  }, []);
+
   const cleanup = useCallback(() => {
+    clearStopTimers();
     if (restartTimerRef.current !== null) {
       clearTimeout(restartTimerRef.current);
       restartTimerRef.current = null;
@@ -99,7 +106,7 @@ export function useLiveSttStream(options: UseLiveSttStreamOptions): UseLiveSttSt
     wsRef.current = null;
     activeRef.current = false;
     setIsStreaming(false);
-  }, []);
+  }, [clearStopTimers]);
 
   const reportMicLost = useCallback(() => {
     if (stoppingRef.current) return;
@@ -154,25 +161,31 @@ export function useLiveSttStream(options: UseLiveSttStreamOptions): UseLiveSttSt
       clearInterval(silenceCheckIntervalRef.current);
       silenceCheckIntervalRef.current = null;
     }
+    const recorder = recorderRef.current;
+    const ws = wsRef.current;
     const elapsed = Date.now() - chunkStartedAtRef.current;
-    const remaining = minChunkMs - elapsed;
+    const remaining = Math.max(minChunkMs - elapsed, 0);
+    clearStopTimers();
     if (remaining > 0) {
-      setTimeout(() => recorderRef.current?.stop(), remaining);
+      stopTimersRef.current.push(setTimeout(() => recorder?.stop(), remaining));
     } else {
-      recorderRef.current?.stop();
+      recorder?.stop();
     }
     // Safety net if the server never answers the stop frame with "final".
-    setTimeout(() => {
-      if (!gotFinalRef.current && wsRef.current) {
-        wsRef.current.close();
-        cleanup();
-      }
-    }, Math.max(remaining, 0) + STOP_SAFETY_NET_MS);
-  }, [cleanup, minChunkMs]);
+    stopTimersRef.current.push(
+      setTimeout(() => {
+        if (!gotFinalRef.current && ws && wsRef.current === ws) {
+          ws.close();
+          cleanup();
+        }
+      }, remaining + STOP_SAFETY_NET_MS),
+    );
+  }, [cleanup, clearStopTimers, minChunkMs]);
 
   const start = useCallback(async (): Promise<boolean> => {
     if (activeRef.current) return false;
     activeRef.current = true;
+    clearStopTimers();
 
     if (!isLiveSttSupported()) {
       activeRef.current = false;
@@ -269,7 +282,7 @@ export function useLiveSttStream(options: UseLiveSttStreamOptions): UseLiveSttSt
         // onclose fires right after and does the actual cleanup/reporting.
       };
     });
-  }, [language, autoStopOnSilence, silenceTimeoutMs, matchCommands, scheduleChunk, stop, cleanup, reportMicLost]);
+  }, [language, autoStopOnSilence, silenceTimeoutMs, matchCommands, scheduleChunk, stop, cleanup, clearStopTimers, reportMicLost]);
 
   return { isStreaming, start, stop };
 }

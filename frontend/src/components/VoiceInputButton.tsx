@@ -1,15 +1,27 @@
 import { Loader2, Mic, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { listSpeechCommands } from "@/api/client";
 import type { SpeechCommand } from "@/api/types";
 import { SoundWaveRing } from "@/components/SoundWaveRing";
 import { Button } from "@/components/ui/button";
 import { useSpeechSettings } from "@/context/SpeechSettingsContext";
 import { useLiveSttStream } from "@/hooks/useLiveSttStream";
 import { startLiveTranscription } from "@/lib/liveSpeechRecognition";
-import { MESSAGE_HOLD_MS, PHRASE_PAUSE_MS } from "@/lib/speechTiming";
+import { matchCommand } from "@/lib/matchCommand";
+import { isVolumeMeterSupported } from "@/lib/micVolumeMeter";
+import {
+  CAPTION_SETTLE_MS,
+  MAX_UTTERANCE_MS,
+  MESSAGE_HOLD_MS,
+  REPEATED_ERROR_LIMIT,
+  SILENCE_LEVEL_THRESHOLD,
+  UTTERANCE_SILENCE_GAP_MS,
+} from "@/lib/speechTiming";
 
 type Status = "idle" | "recording" | "transcribing";
 
+// Listens continuously until the user presses the button again; each pause in speech ends one utterance,
+// which replaces the previous one via onTranscript (and fires onCommand when it matches a command).
 export function VoiceInputButton({
   onTranscript,
   onCommand,
@@ -31,34 +43,118 @@ export function VoiceInputButton({
   // Live caption (Web Speech API) takes priority over server transcript to avoid overwrite flicker.
   const captionRef = useRef<{ stop: () => void } | null>(null);
   const captionTextRef = useRef("");
+  const captionUpdatedAtRef = useRef(0);
+  const commandsRef = useRef<SpeechCommand[]>([]);
+  const utteranceChunksRef = useRef<string[]>([]);
+  const utteranceStartedAtRef = useRef(0);
+  const lastLoudAtRef = useRef(0);
+  const hasSpokenRef = useRef(false);
+  const consecutiveErrorsRef = useRef(0);
+  const volumeMeterSupportedRef = useRef(isVolumeMeterSupported());
+
+  function startCaption() {
+    captionRef.current = startLiveTranscription(sttLanguage, (text) => {
+      captionUpdatedAtRef.current = Date.now();
+      if (!captionTextRef.current.trim() && text.trim()) {
+        utteranceStartedAtRef.current = Date.now();
+      }
+      captionTextRef.current = text;
+      onTranscript(text);
+    });
+  }
+
+  function stopCaption() {
+    captionRef.current?.stop();
+    captionRef.current = null;
+    captionTextRef.current = "";
+    captionUpdatedAtRef.current = 0;
+  }
+
+  function resetUtterance() {
+    utteranceChunksRef.current = [];
+    hasSpokenRef.current = false;
+    captionTextRef.current = "";
+    captionUpdatedAtRef.current = 0;
+  }
+
+  function emitUtterance(text: string) {
+    onTranscript(text);
+    if (!detectCommands) return;
+    const matched = matchCommand(
+      text,
+      commandsRef.current.filter((command) => command.language === sttLanguage),
+    );
+    if (!matched) return;
+    setNotice(`Команда распознана: «${matched.phrase}»`);
+    onCommand?.(matched, text);
+  }
+
+  function flushUtterance() {
+    const text = captionTextRef.current.trim() || utteranceChunksRef.current.join(" ").trim();
+    resetUtterance();
+    // Full restart (not offset tracking) avoids Chrome re-finalizing stale tail text into the next utterance.
+    if (captionRef.current) {
+      captionRef.current.stop();
+      startCaption();
+    }
+    if (text) emitUtterance(text);
+  }
 
   const live = useLiveSttStream({
     language: sttLanguage,
-    autoStopOnSilence: true,
-    silenceTimeoutMs: PHRASE_PAUSE_MS,
-    matchCommands: detectCommands,
+    matchCommands: false,
     onVolume: (level) => {
       volumeRef.current = level;
-    },
-    onPartial: (_chunkText, fullText) => {
-      if (!captionRef.current) onTranscript(fullText);
-    },
-    onFinal: (fullText, matchedCommand) => {
-      captionRef.current?.stop();
-      captionRef.current = null;
-      const finalText = captionTextRef.current.trim() || fullText;
-      captionTextRef.current = "";
-      onTranscript(finalText);
-      if (detectCommands && matchedCommand) {
-        setNotice(`Команда распознана: «${matchedCommand.phrase}»`);
-        onCommand?.(matchedCommand, finalText);
+      if (!volumeMeterSupportedRef.current) return;
+      const now = Date.now();
+      if (level > SILENCE_LEVEL_THRESHOLD) {
+        lastLoudAtRef.current = now;
+        hasSpokenRef.current = true;
       }
+      const wentQuiet = hasSpokenRef.current && now - lastLoudAtRef.current > UTTERANCE_SILENCE_GAP_MS;
+      const ranTooLong = now - utteranceStartedAtRef.current > MAX_UTTERANCE_MS;
+      // Gate on caption OR server chunks: VAD can return an empty chunk while the caption still has content.
+      const hasPendingContent =
+        utteranceChunksRef.current.length > 0 || captionTextRef.current.trim().length > 0;
+      const captionSettled =
+        !captionRef.current || now - captionUpdatedAtRef.current > CAPTION_SETTLE_MS;
+      if (hasPendingContent && (ranTooLong || (wentQuiet && captionSettled))) {
+        flushUtterance();
+      }
+    },
+    onPartial: (chunkText) => {
+      consecutiveErrorsRef.current = 0;
+      const trimmed = chunkText.trim();
+      if (!trimmed) return;
+      if (!volumeMeterSupportedRef.current) {
+        emitUtterance(trimmed);
+        return;
+      }
+      if (utteranceChunksRef.current.length === 0) utteranceStartedAtRef.current = Date.now();
+      utteranceChunksRef.current.push(trimmed);
+      if (!captionRef.current) onTranscript(utteranceChunksRef.current.join(" "));
+    },
+    onFinal: () => {
+      // User pressed stop: emit whatever was still pending when the recording ended.
+      const text = captionTextRef.current.trim() || utteranceChunksRef.current.join(" ").trim();
+      stopCaption();
+      resetUtterance();
+      if (text) emitUtterance(text);
       setStatus("idle");
     },
-    onError: (detail) => setNotice(`Не удалось распознать фрагмент речи: ${detail}`),
+    onError: () => {
+      // A single failed chunk is transient; only give up when the backend keeps failing.
+      consecutiveErrorsRef.current += 1;
+      if (consecutiveErrorsRef.current < REPEATED_ERROR_LIMIT) return;
+      stopCaption();
+      resetUtterance();
+      live.stop();
+      setError("Соединение с сервером распознавания речи потеряно. Попробуйте снова.");
+      setStatus("idle");
+    },
     onUnavailable: (reason) => {
-      captionRef.current?.stop();
-      captionRef.current = null;
+      stopCaption();
+      resetUtterance();
       setError(
         reason === "mic_denied"
           ? "Не удалось получить доступ к микрофону."
@@ -110,12 +206,20 @@ export function VoiceInputButton({
     if (status === "idle") {
       setError(null);
       setStatus("recording");
-      captionTextRef.current = "";
+      resetUtterance();
+      consecutiveErrorsRef.current = 0;
+      lastLoudAtRef.current = Date.now();
+      if (detectCommands) {
+        void listSpeechCommands()
+          .then((commands) => {
+            commandsRef.current = commands;
+          })
+          .catch(() => {
+            commandsRef.current = [];
+          });
+      }
       void live.start();
-      captionRef.current = startLiveTranscription(sttLanguage, (text) => {
-        captionTextRef.current = text;
-        onTranscript(text);
-      });
+      startCaption();
     } else if (status === "recording") {
       setStatus("transcribing");
       live.stop();

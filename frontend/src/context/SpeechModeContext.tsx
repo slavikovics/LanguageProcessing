@@ -16,18 +16,17 @@ import { isLiveSttSupported, useLiveSttStream } from "@/hooks/useLiveSttStream";
 import { dispatchSpeechCommandAction } from "@/lib/commandDispatch";
 import { startLiveTranscription } from "@/lib/liveSpeechRecognition";
 import { matchCommand } from "@/lib/matchCommand";
-import { MESSAGE_HOLD_MS, PHRASE_PAUSE_MS } from "@/lib/speechTiming";
+import {
+  CAPTION_SETTLE_MS,
+  MAX_UTTERANCE_MS,
+  MESSAGE_HOLD_MS,
+  PHRASE_PAUSE_MS,
+  REPEATED_ERROR_LIMIT,
+  SILENCE_LEVEL_THRESHOLD,
+  UTTERANCE_SILENCE_GAP_MS,
+} from "@/lib/speechTiming";
 import { useSpeechPlayback } from "./SpeechPlaybackContext";
 import { useSpeechSettings } from "./SpeechSettingsContext";
-
-const SILENCE_LEVEL_THRESHOLD = 0.06;
-// Shared with VoiceInputButton's silence wait (speechTiming.ts) so they don't drift apart.
-const UTTERANCE_SILENCE_GAP_MS = PHRASE_PAUSE_MS;
-const MAX_UTTERANCE_MS = 12000;
-// Chrome's recognizer may still be finalizing speech tail; wait for caption stream to settle too.
-const CAPTION_SETTLE_MS = 500;
-// Gateway keeps the socket open on backend failure; treat N consecutive chunk errors as dead.
-const REPEATED_ERROR_LIMIT = 3;
 
 interface SpeechModeContextValue {
   isListening: boolean;
@@ -127,7 +126,10 @@ export function SpeechModeProvider({ children }: { children: ReactNode }) {
         if (index === -1) return false;
         effective = utterance.slice(index + phrase.length).trim();
       }
-      const matched = matchCommand(effective, commandsRef.current);
+      const matched = matchCommand(
+        effective,
+        commandsRef.current.filter((command) => command.language === sttLanguage),
+      );
       if (!matched) return false;
       setCommandFlashToken((token) => token + 1);
       dispatchSpeechCommandAction(matched.action, effective, {
