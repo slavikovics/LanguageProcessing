@@ -9,6 +9,7 @@ import {
   updateSpeechCommand,
 } from "@/api/client";
 import { TTS_VOICES, type SpeechCommand } from "@/api/types";
+import { ClipboardSpeakButton } from "@/components/ClipboardSpeakButton";
 import { SpeakButton } from "@/components/SpeakButton";
 import { VoiceInputButton } from "@/components/VoiceInputButton";
 import { Button } from "@/components/ui/button";
@@ -89,7 +90,7 @@ export function SettingsPage() {
 function TtsSettingsTab() {
   const { voice, rate, volume, update } = useSpeechSettings();
   const [testText, setTestText] = useState(
-    "Пример текста для проверки синтеза речи.",
+    "This is a sample text for testing speech synthesis.",
   );
 
   return (
@@ -146,7 +147,8 @@ function TtsSettingsTab() {
             onChange={(e) => setTestText(e.target.value)}
             className="h-24"
           />
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <ClipboardSpeakButton onText={setTestText} />
             <SpeakButton text={testText} size="sm" variant="secondary" />
           </div>
         </div>
@@ -227,8 +229,8 @@ function SttSettingsTab() {
         <div className="flex flex-col gap-1.5 border-t pt-4">
           <Label>Проверка</Label>
           <p className="text-xs text-muted-foreground">
-            Нажмите на микрофон и продиктуйте фразу — запись остановится сама после короткой паузы,
-            либо нажмите на кнопку ещё раз, чтобы остановить её раньше.
+            Нажмите на микрофон и говорите — распознавание не прекращается, пока вы не нажмёте на
+            кнопку ещё раз. Каждая фраза, после которой вы делаете паузу, заменяет предыдущую.
           </p>
           <div className="flex items-center gap-3">
             <VoiceInputButton onTranscript={setTranscript} detectCommands={false} />
