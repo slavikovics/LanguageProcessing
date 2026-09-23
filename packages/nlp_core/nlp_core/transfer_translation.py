@@ -6,6 +6,7 @@ import re
 from collections import Counter
 from dataclasses import dataclass
 
+from . import fr_morphology
 from .syntax_parsing import get_parser_pipeline
 from .translation import (
     DictionaryLookup,
@@ -50,6 +51,8 @@ class _Token:
     is_stop: bool
     sent_id: int
     no_space_before: bool
+    morph: dict[str, str]
+    is_sent_start: bool
 
 
 @dataclass
@@ -57,6 +60,7 @@ class _Unit:
     token: _Token | None = None
     literal_text: str | None = None
     literal_sent_id: int = 0
+    forced_translation: str | None = None
 
     @property
     def sent_id(self) -> int:
@@ -87,6 +91,8 @@ def _analyze(text: str) -> tuple[list[_Token], dict[int, _Token]]:
                 is_stop=tok.is_stop,
                 sent_id=max(sent_id, 0),
                 no_space_before=not prev_had_trailing_space,
+                morph=tok.morph.to_dict() if tok.morph else {},
+                is_sent_start=tok.is_sent_start,
             )
         )
         prev_had_trailing_space = bool(tok.whitespace_)
@@ -97,7 +103,9 @@ def _index_of(units: list[_Unit], token_i: int) -> int | None:
     return next((idx for idx, u in enumerate(units) if u.token is not None and u.token.i == token_i), None)
 
 
-def _apply_negation(units: list[_Unit], tokens_by_i: dict[int, _Token]) -> list[_Unit]:
+def _apply_negation(
+    units: list[_Unit], tokens_by_i: dict[int, _Token], lookup: DictionaryLookup
+) -> list[_Unit]:
     result = list(units)
     neg_token_ids = [u.token.i for u in result if u.token is not None and u.token.dep == "neg"]
 
@@ -131,7 +139,9 @@ def _apply_negation(units: list[_Unit], tokens_by_i: dict[int, _Token]) -> list[
     return result
 
 
-def _apply_adjective_postposition(units: list[_Unit], tokens_by_i: dict[int, _Token]) -> list[_Unit]:
+def _apply_adjective_postposition(
+    units: list[_Unit], tokens_by_i: dict[int, _Token], lookup: DictionaryLookup
+) -> list[_Unit]:
     result = list(units)
     candidates = [
         u.token
@@ -166,7 +176,44 @@ def _apply_adjective_postposition(units: list[_Unit], tokens_by_i: dict[int, _To
     return result
 
 
-_TRANSFER_RULES = (_apply_negation, _apply_adjective_postposition)
+def _apply_morphological_agreement(
+    units: list[_Unit], tokens_by_i: dict[int, _Token], lookup: DictionaryLookup
+) -> list[_Unit]:
+    for unit in units:
+        if unit.token is None:
+            continue
+        tok = unit.token
+
+        if tok.dep == "amod":
+            head = tokens_by_i.get(tok.head_i)
+            if head is None:
+                continue
+            adj_base = _lookup_translation(lookup, tok.lemma, tok.pos)
+            head_translation = _lookup_translation(lookup, head.lemma, head.pos)
+            if adj_base is None or head_translation is None:
+                continue
+            gender = fr_morphology.guess_gender(head_translation)
+            number = head.morph.get("Number") or tok.morph.get("Number")
+            unit.forced_translation = fr_morphology.agree_adjective(adj_base, gender, number)
+
+        elif tok.pos == "VERB":
+            verb_base = _lookup_translation(lookup, tok.lemma, tok.pos)
+            if verb_base is None:
+                continue
+            person = tok.morph.get("Person")
+            number = tok.morph.get("Number")
+            unit.forced_translation = fr_morphology.conjugate_verb(verb_base, person, number)
+
+        elif tok.pos in {"NOUN", "PROPN"} and tok.morph.get("Number") == "Plur":
+            noun_base = _lookup_translation(lookup, tok.lemma, tok.pos)
+            if noun_base is None:
+                continue
+            unit.forced_translation = fr_morphology.pluralize_noun(noun_base)
+
+    return units
+
+
+_TRANSFER_RULES = (_apply_negation, _apply_adjective_postposition, _apply_morphological_agreement)
 
 _TOKEN_OR_SPACE = re.compile(r"\S+|\s+")
 
@@ -198,6 +245,12 @@ def _diff_against_direct(direct_text: str, transfer_text: str) -> list[DiffSegme
 _Rendered = tuple[str, int, bool, bool]
 
 
+def _case_source(tok: _Token) -> str:
+    if tok.is_sent_start and not (tok.text.isupper() and len(tok.text) > 1):
+        return tok.text.lower()
+    return tok.text
+
+
 def _render_units(units: list[_Unit], lookup: DictionaryLookup) -> list[_Rendered]:
     rendered: list[_Rendered] = []
     prev_token_i: int | None = None
@@ -213,8 +266,9 @@ def _render_units(units: list[_Unit], lookup: DictionaryLookup) -> list[_Rendere
             no_space_before = no_space_before or tok.text in _ALWAYS_NO_SPACE_BEFORE
             rendered.append((tok.text, tok.sent_id, True, no_space_before))
         else:
-            translation = _lookup_translation(lookup, tok.lemma, tok.pos)
-            surface = _match_case(tok.text, translation) if translation else tok.text
+            translation = unit.forced_translation or _lookup_translation(lookup, tok.lemma, tok.pos)
+            case_source = _case_source(tok)
+            surface = _match_case(case_source, translation) if translation else case_source
             rendered.append((surface, tok.sent_id, False, no_space_before))
         prev_token_i = tok.i
     return rendered
@@ -286,7 +340,7 @@ def transfer_translate(text: str, lookup: DictionaryLookup) -> TranslationResult
 
     units = [_Unit(token=tok) for tok in tokens]
     for rule in _TRANSFER_RULES:
-        units = rule(units, tokens_by_i)
+        units = rule(units, tokens_by_i, lookup)
 
     rendered = _render_units(units, lookup)
     rendered = _apply_contractions(rendered)

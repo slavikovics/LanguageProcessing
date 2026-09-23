@@ -1,5 +1,6 @@
 from . import (
     alphabetic,
+    fr_morphology,
     frequent_words,
     metrics,
     similarity,
@@ -19,5 +20,6 @@ __all__ = [
     "alphabetic",
     "translation",
     "transfer_translation",
+    "fr_morphology",
     "syntax_parsing",
 ]

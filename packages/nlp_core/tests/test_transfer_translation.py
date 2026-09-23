@@ -44,19 +44,19 @@ def test_adjective_moves_after_noun():
 
 def test_prenominal_adjective_exception_keeps_order():
     result = transfer_translation.transfer_translate("A good idea.", _LOOKUP)
-    assert "bon idée" in result.translated_text
-    assert "idée bon" not in result.translated_text
+    assert "bonne idée" in result.translated_text.lower()
+    assert "idée bonne" not in result.translated_text.lower()
 
 
 def test_negation_produces_ne_pas_and_drops_do_support():
     result = transfer_translation.transfer_translate("The patient does not show symptoms.", _LOOKUP)
-    assert "ne montrer pas" in result.translated_text.lower()
+    assert "ne montre pas" in result.translated_text.lower()
     assert "does" not in result.translated_text.lower()
 
 
 def test_negation_elides_ne_before_vowel():
     result = transfer_translation.transfer_translate("The trial does not improve.", _LOOKUP)
-    assert "n'améliorer" in result.translated_text.lower()
+    assert "n'améliore pas" in result.translated_text.lower()
 
 
 def test_preposition_contracts_with_article():
@@ -100,3 +100,30 @@ def test_quotes_bind_to_their_words_not_the_gap():
     result = transfer_translation.transfer_translate('The patient said "good".', _LOOKUP)
     assert ' "' in result.translated_text  # space before the opening quote (normal word gap)
     assert '" ' not in result.translated_text  # but nothing pries the quotes apart from their word
+
+
+def test_adjective_agrees_with_feminine_noun():
+    result = transfer_translation.transfer_translate("A good idea.", _LOOKUP)
+    assert "bonne idée" in result.translated_text.lower()
+    assert "bon idée" not in result.translated_text.lower()
+
+
+def test_adjective_and_noun_agree_with_plural():
+    lookup = {
+        **_LOOKUP,
+        translation.dictionary_key("big", "ADJ"): "grand",
+        translation.dictionary_key("dog", "NOUN"): "chien",
+    }
+    result = transfer_translation.transfer_translate("The big dogs.", lookup)
+    assert "grands chiens" in result.translated_text.lower()
+
+
+def test_verb_agrees_with_person_and_number():
+    result = transfer_translation.transfer_translate("The patient shows symptoms.", _LOOKUP)
+    assert "montre " in result.translated_text.lower()
+    assert "montrer" not in result.translated_text.lower()
+
+
+def test_agreement_is_noop_when_word_has_no_translation():
+    result = transfer_translation.transfer_translate("The big dogs.", _LOOKUP)
+    assert "dog" in result.translated_text.lower()
